@@ -1,0 +1,111 @@
+*&---------------------------------------------------------------------*
+*& Report  ZMBL_TEST07
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  zmbl_test07.
+
+
+TABLES:
+  seoclasstx,
+  wdy_wb_geninfo,
+  trdir.
+
+CONSTANTS : c_perfix(10) TYPE c  VALUE '/1BCWDY/B_' .
+DATA:
+
+  lv_sstring TYPE text255,
+  lv_appl    TYPE taplt-appl.
+
+"id of webdynpro component
+SELECTION-SCREEN  BEGIN OF BLOCK: a04 WITH FRAME TITLE a04.
+SELECT-OPTIONS scomp FOR wdy_wb_geninfo-component_name.
+SELECTION-SCREEN: END OF BLOCK a04.
+
+SELECTION-SCREEN  BEGIN OF BLOCK: a05 WITH FRAME TITLE a05.
+"id of text to be found
+SELECT-OPTIONS    sstring     FOR lv_sstring NO INTERVALS MODIF ID dsp.
+
+*****************Below field will not be displayed
+SELECTION-SCREEN: END OF BLOCK a05,
+                  BEGIN OF BLOCK a10 WITH FRAME TITLE a10.
+**id of generated program for each webdynpro object( views,comp controller..)
+
+SELECT-OPTIONS:   repname  FOR trdir-name MEMORY ID rs_scan_repid NO-DISPLAY.
+
+SELECTION-SCREEN: END OF BLOCK a10.
+**id of dev class related to wd
+SELECT-OPTIONS:   p_class  FOR seoclasstx-clsname NO-DISPLAY.
+
+
+DATA lt_wdy_wb_geninfo TYPE TABLE OF wdy_wb_geninfo.
+DATA ls_wdy_wb_geninfo TYPE wdy_wb_geninfo.
+DATA ls_repname LIKE LINE OF repname .
+DATA ls_class LIKE LINE OF p_class .
+
+DATA lt_comp TYPE TABLE OF wdy_component .
+DATA ls_comp TYPE  wdy_component .
+
+
+***get program name linked to wd components
+SELECT * FROM wdy_wb_geninfo
+  INTO TABLE lt_wdy_wb_geninfo
+  WHERE component_name IN  scomp.
+
+IF sy-subrc NE 0 .
+  WRITE 'no object found'.
+  RETURN .
+
+ENDIF .
+
+ls_repname-sign = 'I'.
+ls_repname-option = 'EQ'.
+
+LOOP AT lt_wdy_wb_geninfo INTO  ls_wdy_wb_geninfo.
+  CONCATENATE c_perfix ls_wdy_wb_geninfo-guid INTO ls_repname-low.
+
+  APPEND ls_repname TO repname.
+  CLEAR ls_repname-low.
+ENDLOOP .
+
+
+*get assistance class
+SELECT * FROM wdy_component
+  INTO TABLE lt_comp
+  WHERE component_name IN scomp .
+
+ls_class-sign = 'I' .
+ls_class-option = 'EQ' .
+
+LOOP AT lt_comp INTO ls_comp WHERE assistance_class IS NOT INITIAL  .
+
+  ls_class-low = ls_comp-assistance_class .
+
+  APPEND ls_class TO p_class.
+ENDLOOP .
+
+**submit standard SAP scan report
+SUBMIT rs_abap_source_scan
+*        WITH appl ...
+*        with cnam ...
+*        with comment ...
+*        with devclass ...
+*        with dynnr ...
+*        with funcgrp ...
+*        with inclu ...
+*        with modiass ...
+*        with plusminu ...
+        WITH p_class IN p_class
+*        with p_regex ...
+*        with p_vers ...
+*        with rb_all ...
+*        with rb_code ...
+*        with rb_dyn ...
+        WITH repname IN repname
+        WITH sstring IN sstring
+*        with subc ...
+*        with unam ...
+AND RETURN.
