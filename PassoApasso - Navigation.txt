@@ -1,0 +1,64 @@
+1º) Criar Outboundplug no view Source
+2º) Criar outboundplug no window source
+3º) Criar inboundplug no window target
+4º) Se for componentes diferentes, deve ser criado o Component Usage e o Component INterface e depois criar o NAVIGATION LINK.
+5º) No evento da linha clicável, chamar o outboundplug, exemplo:
+
+  cl_thtmlb_util=>get_event_info(
+    EXPORTING
+      iv_event  = htmlb_event_ex
+    IMPORTING
+      ev_index  = DATA(lv_index) ).
+
+  DATA(lr_entity) = me->typed_context->result->get_bo_by_index(
+                      iv_index        =  lv_index
+                      iv_change_focus = abap_false ).
+
+  CHECK lr_entity IS BOUND.
+
+  DATA(lr_col) = NEW cl_crm_bol_bo_col( ).
+
+  lr_col->if_bol_bo_col~add(
+    EXPORTING
+      iv_entity    = lr_entity  ).
+
+  op_nav_to_change_case(
+      iv_data_collection = lr_col
+  ).
+
+
+6º) No outbound plug da VIEW, gerar código abaixo para chamar outbound plug da window:
+
+  DATA(lr_window) = me->view_manager->get_window_controller( ).
+  lr_window->call_outbound_plug(
+    EXPORTING
+      iv_outbound_plug   = 'NAV_TO_CHANGE_CASE' " OutboundPlug of the WINDOW
+      iv_data_collection = IV_DATA_COLLECTION ).
+
+
+7º) Adicionar OUTBOUND Plug na WINDOW no Runtimerepository, assim como Inboud Plug na outra WINDOW.
+
+8º) no ComponentInterface criar InterfaceView com os plugs.
+
+9º) Criar Component Usage e adicioná-lo na Window Source.
+
+10º) Criar navigation LINK de WINDOW Source para Component usage destino.
+
+11º) No OutboundPlug da Window Source, adicionar a navegação:
+
+  DATA(lr_window) = me->view_manager->get_window_controller( ).
+
+  lr_window->navigate(
+    EXPORTING
+      source_rep_view = rep_view
+      outbound_plug   = 'FROM_ACC_TO_CC' "NavigationalLink FROM_ACC_TO_CC
+      data_collection = IV_DATA_COLLECTION ).
+
+
+
+
+
+Direkte Navigation von Window ZTR_CH_CASE_WIZ/PartnerResult zu Window ZTR_CH_CASE_WIZ/ChangeCaseWindow ist nicht zulässig
+
+
+TO_ZTR_CHAN_CA_H_SRC_RESULT_FROM_SEARCH
