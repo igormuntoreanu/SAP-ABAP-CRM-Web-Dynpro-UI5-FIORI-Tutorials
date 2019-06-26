@@ -1,0 +1,22 @@
+Step by step for CRM Component Usage to exchange data between two different components.
+
+Scenario: Component A will send data to Component B. PS: Read with attention and do not overpass the steps.
+
+1º) Create Model Node at the Component Controller of the Component B.
+2º) Create an empty Window and View with the same Model Node of the 1º step the do the binding.
+3º) At the Runtime Repository Editor, link the View inside the Window of the Component B and create a Component Interface, 
+Interface View and at the Interface Controller, create the context.
+4º) Create the Configuration of the Component B.
+5º) At the Runtime Repository of the Componente A, create the Component Usage.
+6º) At the Runtime Repository, in the View Set of the Component A, add the View of the Component Usage from the 5º step.
+7º) At the Component Controller of the Component A, at the IMPL class, redefine the method WD_USAGE_INITIALIZE and insert
+the following code:
+
+    CASE iv_usage->usage_name.
+
+      WHEN 'ZCUTR_SRN'. "<- Here use the Usage Name that YOU have defined
+        CALL METHOD iv_usage->bind_context_node
+          EXPORTING
+            iv_controller_type  = cl_bsp_wd_controller=>co_type_component
+            iv_target_node_name = 'PARTNER'   "Target Model NODE
+            iv_node_2_bind      = 'PARTNER'.  "Actual Model NODE
