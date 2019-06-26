@@ -1,8 +1,8 @@
-1º) Criar Outboundplug no view Source
-2º) Criar outboundplug no window source
-3º) Criar inboundplug no window target
-4º) Se for componentes diferentes, deve ser criado o Component Usage e o Component INterface e depois criar o NAVIGATION LINK.
-5º) No evento da linha clicável, chamar o outboundplug, exemplo:
+1º) Create Outbound plug at the View Source
+2º) Create Outbound plug at the Window Source
+3º) Create Inbound plug  at the Window Target
+4º) If the components are different, you must create the Component Usage and the Component Interface and then create the NAVIGATION LINK.
+5º) At the event of the clickable model/value attribute, call the Outboundplug, example:
 
   cl_thtmlb_util=>get_event_info(
     EXPORTING
@@ -27,7 +27,7 @@
   ).
 
 
-6º) No outbound plug da VIEW, gerar código abaixo para chamar outbound plug da window:
+6º) At the View Outbound plug, add the code below and call the Window Outbound plug:
 
   DATA(lr_window) = me->view_manager->get_window_controller( ).
   lr_window->call_outbound_plug(
@@ -36,15 +36,15 @@
       iv_data_collection = IV_DATA_COLLECTION ).
 
 
-7º) Adicionar OUTBOUND Plug na WINDOW no Runtimerepository, assim como Inboud Plug na outra WINDOW.
+7º) Add the Outbound Plug at the Window in the Runtime Repository, as well as the Inbound Plug in the other Window.
 
-8º) no ComponentInterface criar InterfaceView com os plugs.
+8º) At the Component Interface create the InterfaceView with the Plugs.
 
-9º) Criar Component Usage e adicioná-lo na Window Source.
+9º) Create a Component Usage and add it to the Window Source in the Runtime Repository.
 
-10º) Criar navigation LINK de WINDOW Source para Component usage destino.
+10º) Create a Navigation Link from the Window Source to the destination Component Usage.
 
-11º) No OutboundPlug da Window Source, adicionar a navegação:
+11º) At the Outbound Plug from the Window Source, add the navigation code:
 
   DATA(lr_window) = me->view_manager->get_window_controller( ).
 
@@ -53,12 +53,3 @@
       source_rep_view = rep_view
       outbound_plug   = 'FROM_ACC_TO_CC' "NavigationalLink FROM_ACC_TO_CC
       data_collection = IV_DATA_COLLECTION ).
-
-
-
-
-
-Direkte Navigation von Window ZTR_CH_CASE_WIZ/PartnerResult zu Window ZTR_CH_CASE_WIZ/ChangeCaseWindow ist nicht zulässig
-
-
-TO_ZTR_CHAN_CA_H_SRC_RESULT_FROM_SEARCH

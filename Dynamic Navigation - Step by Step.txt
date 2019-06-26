@@ -1,0 +1,41 @@
+1º) Define the clickable model/value node at the GET_P method, give also an event to it.
+2º) At the event, code:
+
+  cl_thtmlb_util=>get_event_info(
+    EXPORTING
+      iv_event  = htmlb_event_ex
+    IMPORTING
+      ev_index  = DATA(lv_index) ).
+
+  DATA(lr_entity) = me->typed_context->result->get_bo_by_index(
+                      iv_index        =  lv_index
+                      iv_change_focus = abap_false ).
+
+  DATA(lr_nav) = cl_crm_ui_descriptor_obj_srv=>create_ui_object_based( iv_ui_object_type   = 'ZTR_CH_CASE_WIZ' "Here change to your Component
+                                                                       iv_ui_object_action = 'B' ).
+
+  DATA(lr_col) = NEW cl_crm_bol_bo_col( ).
+
+  lr_col->if_bol_bo_col~insert(
+    EXPORTING
+      iv_bo        = lr_nav
+      iv_index     = 1 ).
+
+  lr_col->if_bol_bo_col~insert(
+    EXPORTING
+      iv_bo        = lr_entity
+      iv_index     = 2 ).
+
+  DATA(lr_navigation) = cl_crm_ui_navigation_service=>get_instance( ).
+
+  IF lr_navigation->is_dynamic_nav_supported( lr_nav ) = abap_true.
+    lr_navigation->navigate_dynamically( lr_col ).
+  ENDIF.
+
+
+
+3º) At Transaction CRMS_UI_TLINK, take the necessary Target ID.
+
+4º) At Transaction CRMC_UI_NBLINKS, define the Generic Outbound Plug Mappings with the Target ID.
+
+Done!

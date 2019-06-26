@@ -1,0 +1,37 @@
+Define at the IMPL class: GT_BUTTON TYPE CRMT_THTMLB_BUTTON_T.
+
+1º) Insert a similar code at the HTM page and remove the original or do adaptations:
+
+<%@page language="abap" %>
+<%@extension name="htmlb" prefix="htmlb" %>
+<%@extension name="xhtmlb" prefix="xhtmlb" %>
+<%@extension name="crm_bsp_ic" prefix="crmic" %>
+<%@extension name="bsp" prefix="bsp" %>
+<%@extension name="thtmlb" prefix="thtmlb" %>
+<%@extension name="chtmlb" prefix="chtmlb" %>
+<%
+  DATA: LV_XML TYPE STRING.
+  lv_xml    = controller->CONFIGURATION_DESCR->GET_CONFIG_DATA( ).
+%>
+<thtmlb:areaFrameSetter toolbarButtons  = "<%= controller->gt_button %>"
+                        maxButtonNumber = "1"
+                        displayMode     = "<%= controller->view_group_context->is_view_in_display_mode( controller ) %>" />
+
+<chtmlb:overviewTableConfig id    = "Table"
+                            xml   = "<%= lv_xml %>"
+                            table = "//BTQRSRVREQ/Table"
+                            width = "100%" />
+
+
+
+2º) Redefine the DO_PREPARE_OUTPUT at the IMPL Class of the View
+
+    IF gt_button IS INITIAL.
+*   here the name of the button and the event is determine
+      ls_button-type     = cl_thtmlb_util=>gc_icon_new.
+      ls_button-text     = cl_wd_utilities=>get_otr_text_by_alias( 'CRM_UIU_BP/BP_NEW' ). "#EC NOTEXT
+      ls_button-on_click = 'new'.
+      ls_button-enabled  = abap_true.
+      APPEND ls_button TO gt_button.
+      CLEAR ls_button.
+    ENDIF.
