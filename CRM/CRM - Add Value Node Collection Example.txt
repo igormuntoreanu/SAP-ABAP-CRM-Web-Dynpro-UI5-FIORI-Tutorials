@@ -1,0 +1,18 @@
+  DATA(lr_notes) = me->typed_context->notes->collection_wrapper->get_current( ).
+  IF lr_notes IS NOT BOUND.
+
+    DATA(lr_col)  = NEW cl_crm_bol_bo_col( ).
+
+    CREATE DATA lv_data TYPE ty_notiz.
+
+    DATA(lr_line) = NEW cl_bsp_wd_value_node( iv_data_ref = lv_data ).
+    lr_line->set_property_as_string(
+      EXPORTING
+        iv_attr_name           = 'ZZNOTIZ'
+        iv_value               = lv_zznotiz ).
+
+    lr_col->if_bol_bo_col~add(
+      EXPORTING
+        iv_entity    = lr_line ).
+
+    me->typed_context->notes->collection_wrapper->add_collection( iv_collection = lr_col ).

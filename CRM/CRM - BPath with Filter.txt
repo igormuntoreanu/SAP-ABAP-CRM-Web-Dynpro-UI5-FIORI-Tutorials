@@ -1,0 +1,15 @@
+1º) Example of a normal BPATH:
+
+'./ZAET_CA_TO_TAB0000D6/ZAET_CA_TO_TAB0000IX/*$'
+
+
+2º) Concatenation with string, value and "AND" operator.
+
+'./ZAET_CA_TO_TAB0000D6/ZAET_CA_TO_TAB0000IX[(@ZZSTATUS="'
+              zcl_param_util=>gc_sn_srv_stat_process
+              '")'
+              '&(@ZZPROD_ID<>"")]/*$'
+
+3º) Bpath with OR operator
+
+'./ZAET_CA_TO_TAB0000D6/ZAET_CA_TO_TAB0000IX[(@ZZSTATUS="E0001")|(@ZZPROD_ID<>"")]/*$'
