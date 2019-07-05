@@ -1,0 +1,46 @@
+REPORT zifm_excel_bdc.
+
+TYPES: BEGIN OF ty_excel,
+          cliente TYPE kna1-kunnr,
+          nome    TYPE kna1-name1,
+          sobre   TYPE kna1-name2,
+          pais    TYPE kna1-land1,
+          spras   TYPE kna1-spras,
+       END OF ty_excel.
+
+PARAMETERS: p_file TYPE ibipparms-path.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+
+  CALL FUNCTION 'F4_FILENAME'
+    IMPORTING
+      file_name = p_file.
+
+START-OF-SELECTION.
+
+  PERFORM p_carrega_excel.
+
+*&---------------------------------------------------------------------*
+*&      Form  P_CARREGA_EXCEL
+*&---------------------------------------------------------------------*
+FORM p_carrega_excel.
+
+  DATA: lt_data TYPE truxs_t_text_data,
+        lt_ex TYPE TABLE OF ty_excel.
+
+  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+    EXPORTING
+*     I_FIELD_SEPERATOR    =
+*     I_LINE_HEADER        =
+      i_tab_raw_data       = lt_data
+      i_filename           = p_file
+    TABLES
+      i_tab_converted_data = lt_ex
+    EXCEPTIONS
+      conversion_failed    = 1
+      OTHERS               = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+ENDFORM.                    " P_CARREGA_EXCEL

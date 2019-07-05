@@ -1,0 +1,59 @@
+REPORT zifm_xd01_bdc.
+
+DATA: gt_bdc TYPE TABLE OF bdcdata,
+      gs_bdc TYPE bdcdata.
+
+PARAMETERS: p_acc   TYPE rf02d-ktokd,
+            p_name1 TYPE kna1-name1,
+            p_name2 TYPE kna1-name2,
+            p_land  TYPE kna1-land1,
+            p_spras TYPE kna1-spras.
+
+START-OF-SELECTION.
+  PERFORM p_monta_batch_input.
+*&---------------------------------------------------------------------*
+*&      Form  P_MONTA_BATCH_INPUT
+*&---------------------------------------------------------------------*
+FORM p_monta_batch_input .
+
+  PERFORM p_monta_tela   USING 'SAPMF02D'    '0100'.
+  PERFORM p_monta_campos USING 'BDC_OKCODE'  '/00'.
+  PERFORM p_monta_campos USING 'RF02D-KTOKD' p_acc.
+
+  PERFORM p_monta_tela   USING 'SAPMF02D'    '0110'.
+  PERFORM p_monta_campos USING 'BDC_OKCODE'  '=UPDA'.
+  PERFORM p_monta_campos USING 'KNA1-NAME1'  p_name1.
+  PERFORM p_monta_campos USING 'KNA1-NAME2'  p_name2.
+  PERFORM p_monta_campos USING 'KNA1-LAND1'  p_land.
+  PERFORM p_monta_campos USING 'KNA1-SPRAS'  p_spras.
+
+  CALL TRANSACTION 'XD01' USING gt_bdc.
+
+ENDFORM.                    " P_MONTA_BATCH_INPUT
+*&---------------------------------------------------------------------*
+*&      Form  P_MONTA_TELA
+*&---------------------------------------------------------------------*
+FORM p_monta_tela  USING p_programa
+                         p_tela.
+
+  gs_bdc-program  = p_programa.
+  gs_bdc-dynpro   = p_tela.
+  gs_bdc-dynbegin = 'X'.
+
+  APPEND gs_bdc TO gt_bdc.
+  CLEAR gs_bdc.
+
+ENDFORM.                    " P_MONTA_TELA
+*&---------------------------------------------------------------------*
+*&      Form  P_MONTA_CAMPOS
+*&---------------------------------------------------------------------*
+FORM p_monta_campos  USING p_campo
+                           p_valor.
+
+  gs_bdc-fnam = p_campo.
+  gs_bdc-fval = p_valor.
+
+  APPEND gs_bdc TO gt_bdc.
+  CLEAR gs_bdc.
+
+ENDFORM.                    " P_MONTA_CAMPOS
