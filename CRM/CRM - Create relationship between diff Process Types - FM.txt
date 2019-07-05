@@ -1,0 +1,44 @@
+<<<<<<< HEAD
+  DATA: ls_taska TYPE borident,
+        ls_taskb TYPE borident.
+*
+*  DATA(lv_guid_a) = iv_entity_a->get_property_as_string( iv_attr_name = 'CRM_GUID' ).
+*  DATA(lv_guid_b) = iv_entity_b->get_property_as_string( iv_attr_name = 'CRM_GUID' ).
+
+  ls_taska-objkey = IV_GUID_A.
+  ls_taska-objtype = iv_objtype_a.
+
+  ls_taskb-objkey = IV_GUID_B.
+  ls_taskb-objtype = iv_objtype_b.
+
+  CALL FUNCTION 'BINARY_RELATION_CREATE'
+    EXPORTING
+      obj_rolea      = ls_taska
+      obj_roleb      = ls_taskb
+      relationtype   = 'VONA'
+    EXCEPTIONS
+      no_model       = 1
+      internal_error = 2
+=======
+  DATA: ls_taska TYPE borident,
+        ls_taskb TYPE borident.
+*
+*  DATA(lv_guid_a) = iv_entity_a->get_property_as_string( iv_attr_name = 'CRM_GUID' ).
+*  DATA(lv_guid_b) = iv_entity_b->get_property_as_string( iv_attr_name = 'CRM_GUID' ).
+
+  ls_taska-objkey = IV_GUID_A.
+  ls_taska-objtype = iv_objtype_a.
+
+  ls_taskb-objkey = IV_GUID_B.
+  ls_taskb-objtype = iv_objtype_b.
+
+  CALL FUNCTION 'BINARY_RELATION_CREATE'
+    EXPORTING
+      obj_rolea      = ls_taska
+      obj_roleb      = ls_taskb
+      relationtype   = 'VONA'
+    EXCEPTIONS
+      no_model       = 1
+      internal_error = 2
+>>>>>>> 1032aea461865c9eafa4e7c581acad230f06fe01
+      unknown        = 3.
