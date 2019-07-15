@@ -1,0 +1,203 @@
+1º) Action BADI EXEC_METHODCALL_PPF need to be implemented.
+2º) Necessary to create a SMARTFORMS.
+
+METHOD if_ex_exec_methodcall_ppf~execute.
+
+  DATA: lv_function_name        TYPE rs38l_fnam,
+        lr_object               TYPE REF TO cl_doc_crm_order,
+        ls_output               TYPE ssfcompop,
+        ls_control_parameters   TYPE ssfctrlop,
+        lt_return               TYPE TABLE OF bapiret2,
+        lt_guids                TYPE TABLE OF bapibus20001_guid_dis,
+        ls_guid                 TYPE bapibus20001_guid_dis,
+        lt_header               TYPE TABLE OF bapibus2000110_header_dis,
+*        lt_text                 TYPE TABLE OF bapibus20001_text_dis,
+        ls_bo                   TYPE sibflporb,
+        ls_pro                  TYPE LINE OF sdokproptys,
+        lt_pro                  TYPE sdokproptys,
+        lt_content_bin          TYPE sdokcntbins,
+        ls_fileinfo             TYPE sdokfilaci,
+        lt_fileinfo             TYPE TABLE OF sdokfilaci,
+        lv_size                 TYPE i,
+        lv_pdf                  TYPE xstring,
+        ls_document_output_info TYPE ssfcrespd,
+        ls_job_output_info      TYPE ssfcrescl,
+        ls_text                 TYPE crmst_textid_btil,
+        lt_text                 TYPE TABLE OF crmst_textid_btil,
+        ls_job_output_options   TYPE ssfcresop.
+
+  DATA: lr_doc  TYPE REF TO cl_doc_crm_order_h.
+
+  TRY.
+      lr_doc ?= io_appl_object.
+    CATCH cx_root.
+      RETURN.
+  ENDTRY.
+
+  TRY.
+      DATA(lr_order_h) = ca_doc_crm_order_h=>agent->get_persistent( i_crm_obj_guid = lr_doc->get_crm_obj_guid( ) ).
+    CATCH cx_os_object_not_found.
+  ENDTRY.
+
+  CHECK lr_order_h IS BOUND.
+
+  TRY.
+      lr_object  ?= lr_order_h.
+    CATCH cx_root.
+  ENDTRY.
+
+
+  CHECK lr_object IS BOUND.
+
+  DATA(lv_obj_guid) = lr_object->get_crm_obj_guid( ).
+  DATA(lv_obj_kind) = lr_object->get_crm_obj_kind( ).
+  ls_guid-guid = lv_obj_guid.
+  APPEND ls_guid TO lt_guids. CLEAR ls_guid.
+
+  DATA(lr_core) = cl_crm_bol_core=>get_instance( ).
+  TRY.
+      lr_core->load_component_set( iv_component_set_name = 'BT' ).
+      DATA(lr_query) = cl_crm_bol_dquery_service=>get_instance( iv_query_name = 'BTQSrvReq' ).
+      CHECK lr_query IS BOUND.
+
+      lr_query->add_selection_param( EXPORTING iv_attr_name = 'GUID'
+                                               iv_sign      = 'I'
+                                               iv_option    = 'EQ'
+                                               iv_low       = CONV #( lv_obj_guid ) ).
+
+      DATA(lr_result) = lr_query->get_query_result( ).
+
+    CATCH cx_crm_genil_general_error cx_root.
+      RETURN.
+  ENDTRY.
+
+  CHECK lr_result IS BOUND.
+
+  DATA(lr_serv_inc) = lr_result->get_first( ).
+  TRY.
+      DATA(lr_texts) = lr_serv_inc->get_related_entities_by_bpath( './BTADVSSrvReQ/BTOrderHeader/BTHeaderTextIdSet/BTTextIdHAll[(@TDID="Z068")|(@TDID="Z069")]/*$' ).
+    CATCH cx_root.
+  ENDTRY.
+  CHECK lr_texts IS BOUND.
+
+  DATA(lr_texts_curr) = lr_texts->get_first( ).
+  WHILE lr_texts_curr IS BOUND.
+    lr_texts_curr->get_properties( IMPORTING es_attributes = ls_text ).
+    INSERT ls_text INTO TABLE lt_text.
+    CLEAR ls_text.
+    lr_texts_curr = lr_texts->get_next( ).
+  ENDWHILE.
+
+  SORT lt_text BY tdfdate tdftime.
+
+  CALL FUNCTION 'BAPI_ACTIVITYCRM_GETDETAILMULT'
+    TABLES
+      guid   = lt_guids
+      header = lt_header
+      return = lt_return.
+
+  READ TABLE lt_header  INTO DATA(ls_header) INDEX 1.
+  CHECK sy-subrc = 0.
+
+  IF ls_header-process_type = zcl_param_util=>gv_proc_type_srvanforderung.
+    DELETE lt_text WHERE tdid <> 'Z069'. "Par Kommunikation
+  ELSEIF ls_header-process_type = zcl_param_util=>gv_proc_type_incident.
+    DELETE lt_text WHERE tdid <> 'Z068'. "Par Kommunikation
+  ENDIF.
+
+  CHECK lines( lt_text ) > 0.
+
+  ls_control_parameters-no_dialog    = abap_true.
+  ls_control_parameters-getotf       = abap_true.
+  ls_control_parameters-langu        = sy-langu.
+  ls_output-tddest                   = 'LOCL'.
+  ls_output-tdnoprev                 = abap_true.
+
+  CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+    EXPORTING
+      formname           = 'Z_PARTNERKOMMUNIKATION'
+    IMPORTING
+      fm_name            = lv_function_name
+    EXCEPTIONS
+      no_form            = 1
+      no_function_module = 2
+      OTHERS             = 3.
+
+  CHECK sy-subrc = 0.
+
+  CALL FUNCTION lv_function_name
+    EXPORTING
+      control_parameters   = ls_control_parameters
+      user_settings        = space
+      output_options       = ls_output
+      is_header            = ls_header
+      it_texts             = lt_text
+    IMPORTING
+      document_output_info = ls_document_output_info
+      job_output_info      = ls_job_output_info
+      job_output_options   = ls_job_output_options
+    EXCEPTIONS
+      formatting_error     = 1
+      internal_error       = 2
+      send_error           = 3
+      user_canceled        = 4.
+
+  CHECK sy-subrc = 0.
+
+* Generate OTF data
+  CALL METHOD cl_grm_gag_documents=>generate_otf_data
+    EXPORTING
+      lt_output_info = ls_job_output_info-otfdata[]
+    IMPORTING
+      it_ev_size     = lv_size
+      ev_pdf         = lv_pdf.
+
+* Set file info and file content
+  ls_fileinfo-file_size  = lv_size.
+  ls_fileinfo-binary_flg = abap_true.
+  ls_fileinfo-first_line = 1.
+
+  GET TIME.
+  CONCATENATE sy-datum '_'
+              sy-uzeit '_'
+              'Partnerkommunikation.pdf'
+         INTO ls_fileinfo-file_name.
+
+  ls_fileinfo-mimetype   = 'application/pdf'.
+
+  ls_pro-name  = 'KW_RELATIVE_URL'.
+  ls_pro-value = ls_fileinfo-file_name.
+  APPEND ls_pro TO lt_pro. CLEAR ls_pro.
+
+  ls_pro-name  = 'LANGUAGE'.
+  ls_pro-value = sy-langu.
+  APPEND ls_pro TO lt_pro. CLEAR ls_pro.
+
+  APPEND ls_fileinfo TO lt_fileinfo. CLEAR ls_fileinfo.
+
+* Convert binary data
+  CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+    EXPORTING
+      buffer     = lv_pdf
+    TABLES
+      binary_tab = lt_content_bin.
+
+  ls_bo-instid = lr_doc->get_crm_obj_guid( ).
+  ls_bo-typeid = ls_header-object_type.
+  ls_bo-catid  = 'BO'.
+* Create attachment
+  cl_crm_documents=>create_with_table(
+    EXPORTING
+      business_object     = ls_bo
+      properties          = lt_pro
+      file_access_info    = lt_fileinfo
+      file_content_binary = lt_content_bin
+      raw_mode            = abap_true
+    IMPORTING
+      loio                = DATA(loio)
+      phio                = DATA(phio)
+      error               = DATA(error) ).
+
+  rp_status = 1.
+
+ENDMETHOD.
