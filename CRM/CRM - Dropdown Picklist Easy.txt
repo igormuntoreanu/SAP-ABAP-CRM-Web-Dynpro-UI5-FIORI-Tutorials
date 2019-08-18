@@ -1,0 +1,54 @@
+1) In the GET_P:
+
+  CASE iv_property.
+    WHEN if_bsp_wd_model_setter_getter=>fp_fieldtype.
+      rv_value = cl_bsp_dlc_view_descriptor=>field_type_picklist.
+
+    "WHEN IF_BSP_WD_MODEL_SETTER_GETTER=>...
+      "...
+  ENDCASE.
+
+
+2) In the GET_V:
+
+  DATA: lr_ddlb TYPE REF TO cl_crm_uiu_ddlb.
+
+  DATA(lt_selection_table) = zcl_class0000se_impl=>get_partner_fct( ).
+
+  lr_ddlb = NEW #( 'T' ).
+
+  lr_ddlb->set_selection_table( lt_selection_table ).
+
+  rv_valuehelp_descriptor = lr_ddlb.
+
+
+_______________________________________________
+
+Code of zcl_class0000se_impl=>get_partner_fct( ).
+
+
+    DATA: ls_ddlb          TYPE bsp_wd_dropdown_line,
+          lt_partner       TYPE TABLE OF crmc_partner_pdp,
+          ls_partner       TYPE crmc_partner_pdp,
+          lt_partner_descr TYPE TABLE OF crmc_partner_ft,
+          ls_partner_descr TYPE crmc_partner_ft.
+
+    CONSTANTS: lc_partner_scheme TYPE comt_partner_determ_proc VALUE 'ZCH_CASE'.
+
+    SELECT * FROM crmc_partner_pdp INTO TABLE lt_partner
+      WHERE determ_proc = lc_partner_scheme.
+
+    SELECT * FROM crmc_partner_ft INTO TABLE lt_partner_descr FOR ALL ENTRIES IN lt_partner
+      WHERE partner_fct = lt_partner-partner_fct
+      AND spras = sy-langu.
+
+    REFRESH rt_ddlb.
+    APPEND INITIAL LINE TO rt_ddlb.
+
+    LOOP AT lt_partner_descr INTO ls_partner_descr.
+
+      ls_ddlb-key   = ls_partner_descr-partner_fct.
+      ls_ddlb-value = ls_partner_descr-description.
+      INSERT ls_ddlb INTO TABLE rt_ddlb.
+
+    ENDLOOP.
