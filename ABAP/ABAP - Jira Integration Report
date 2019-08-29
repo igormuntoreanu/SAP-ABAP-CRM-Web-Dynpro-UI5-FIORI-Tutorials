@@ -1,0 +1,425 @@
+1) Download the certificates from the Jira website and upload them at STRUST Transaction at the "SSL client SSL Client (Standar".
+2) Create the connection at SM59 under the folder "HTTP Connections to External Server". Test the connection before proceding.
+
+3) Use the program below as an example:
+
+*&---------------------------------------------------------------------*
+*& Report ZJIRA_INTEGRATION
+*&---------------------------------------------------------------------*
+REPORT zjira_integration.
+
+TYPES: BEGIN OF ty_value_pair,
+         name  TYPE ddobjname,
+         value TYPE string,
+       END OF ty_value_pair.
+
+DATA: gv_id   TYPE c LENGTH 13,
+      gv_xml  TYPE string,
+      gt_attr TYPE TABLE OF ty_value_pair,
+      gv_numb TYPE c LENGTH 13.
+
+*PARAMETERS: p_id TYPE c LENGTH 4.
+
+START-OF-SELECTION.
+
+  DO 55 TIMES.
+    ADD 1 TO gv_numb.
+    CONDENSE gv_numb.
+    PERFORM adjust_id.
+    PERFORM connect_to_jira.
+    PERFORM parse_jira_xml.
+    PERFORM write_report.
+  ENDDO.
+
+*&---------------------------------------------------------------------*
+*& Form ADJUST_ID
+*&---------------------------------------------------------------------*
+FORM adjust_id .
+  gv_id = 'DEVOPSAP-' && gv_numb.
+  CONDENSE gv_id.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CONNECT_TO_JIRA
+*&---------------------------------------------------------------------*
+FORM connect_to_jira.
+
+  DATA: lv_password TYPE string,
+        lv_user     TYPE string,
+        lv_url      TYPE string.
+
+  lv_user     = 'imuntore'.
+  lv_password = 'SDasdaNDASJndxXC'.
+  " JIRA standard URL
+  lv_url = 'https://jira.devops.telekom.de/login.jsp?permissionViolation=true&os_destination='.
+
+  "https://jira.devops.telekom.de/si/jira.issueviews:issue-xml/DEVOPSAP-50/DEVOPSAP-50.xml
+  "DEVOPSAP-50
+  CONCATENATE lv_url
+              '%2Fsi%2Fjira.issueviews%3Aissue-xml%2F'
+              gv_id
+              '%2F'
+              gv_id
+              '.xml'
+          INTO lv_url.
+
+  CONDENSE lv_url NO-GAPS.
+
+  " Add user and pw to url
+  CONCATENATE lv_url '&os_username=' lv_user '&os_password=' lv_password INTO lv_url.
+
+  " Create HTTPS client by RFC destination
+  cl_http_client=>create_by_destination(
+    EXPORTING
+      destination              = 'JIRA'
+    IMPORTING
+      client                   = DATA(lr_http_client)
+    EXCEPTIONS
+      argument_not_found       = 1
+      destination_not_found    = 2
+      destination_no_authority = 3
+      plugin_not_active        = 4
+      internal_error           = 5
+      OTHERS                   = 6 ).
+  IF sy-subrc <> 0.
+    CONCATENATE 'User Story' gv_id 'does not exists' INTO DATA(lv_msg) SEPARATED BY space.
+*    MESSAGE lv_msg TYPE 'I'.
+  ENDIF.
+
+  "Set request and header fields
+  cl_http_utility=>set_request_uri( request = lr_http_client->request
+                                    uri     = lv_url ).
+
+  lr_http_client->request->set_header_field( name  = '~request_method'
+                                             value = 'GET' ).
+
+  lr_http_client->request->set_header_field( name  = '~request_protocol'
+                                             value = 'HTTPS/1.0' ).
+
+  " Send
+  CALL METHOD lr_http_client->send
+    EXCEPTIONS
+      http_communication_failure = 1
+      http_invalid_state         = 2
+      http_processing_failed     = 3
+      http_invalid_timeout       = 4
+      OTHERS                     = 5.
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+  " Receive
+  CALL METHOD lr_http_client->receive
+    EXCEPTIONS
+      http_communication_failure = 1
+      http_invalid_state         = 2
+      http_processing_failed     = 3
+      OTHERS                     = 4.
+
+  " Extract data for later use
+  IF sy-subrc = 0.
+
+    " XML for create new task
+    gv_xml  = lr_http_client->response->get_cdata( ).
+    " xstring for attachments
+    DATA(lv_data)  = lr_http_client->response->get_data( ).
+    " content type for attachments
+    DATA(lv_content_type) = lr_http_client->response->get_content_type( ).
+    SPLIT lv_content_type AT ';' INTO lv_content_type DATA(lv_tmp).
+
+  ENDIF.
+
+  lr_http_client->close( ).
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form PARSE_JIRA_XML
+*&---------------------------------------------------------------------*
+FORM parse_jira_xml .
+
+  TYPES: BEGIN OF error,
+           column_name TYPE string,
+           line        TYPE i,
+           reason      TYPE string,
+         END OF error.
+
+  DATA : lr_xml                TYPE REF TO if_ixml,
+         lr_xml_document       TYPE REF TO if_ixml_document,
+         lr_xml_stream_factory TYPE REF TO if_ixml_stream_factory,
+         lr_xml_istream        TYPE REF TO if_ixml_istream,
+         lr_xml_parser         TYPE REF TO if_ixml_parser,
+         lr_xml_parse_error    TYPE REF TO if_ixml_parse_error,
+         lr_xml_node           TYPE REF TO if_ixml_node,
+         node                  TYPE REF TO if_ixml_node,
+         sub_node              TYPE REF TO if_ixml_node,
+         lt_xml_error          TYPE TABLE OF error,
+         lv_error_count        TYPE i,
+         lv_index              TYPE i,
+         lr_xml_node_list      TYPE REF TO if_ixml_node_list,
+         lr_xml_node_iterator  TYPE REF TO if_ixml_node_iterator,
+         lr_xml_node1          TYPE REF TO if_ixml_node,
+         lr_xml_node_list1     TYPE REF TO if_ixml_node_list,
+         lr_xml_node_iterator1 TYPE REF TO if_ixml_node_iterator,
+         lr_xml_node2          TYPE REF TO if_ixml_node,
+         lr_xml_node_list2     TYPE REF TO if_ixml_node_list,
+         lr_xml_node_iterator2 TYPE REF TO if_ixml_node_iterator,
+         lr_xml_node3          TYPE REF TO if_ixml_node,
+         lr_xml_node_list3     TYPE REF TO if_ixml_node_list,
+         lr_xml_node_iterator3 TYPE REF TO if_ixml_node_iterator,
+         lv_type               TYPE i,
+         lv_name               TYPE string,
+         lv_xml                TYPE string,
+         lv_value              TYPE string,
+         lv_url                TYPE string,
+         lv_text               TYPE string,
+         lv_sub_note_value     TYPE string,
+         ls_task_attr          TYPE ty_value_pair.
+
+  DATA: lv_comment  TYPE string,
+        lv_comments TYPE string.
+
+  " Create the Main Factory
+  lr_xml = cl_ixml=>create( ).
+
+  " Create the Initial Document
+  lr_xml_document = lr_xml->create_document( ).
+
+  " Create a Stream Factory
+  lr_xml_stream_factory = lr_xml->create_stream_factory( ).
+
+  " Create an Input Stream
+  lr_xml_istream       = lr_xml_stream_factory->create_istream_string( string = gv_xml ).
+
+  " Create a Parser
+  lr_xml_parser = lr_xml->create_parser(
+      document       = lr_xml_document
+      istream        = lr_xml_istream
+      stream_factory = lr_xml_stream_factory ).
+
+  " Check errors in parsing
+  IF lr_xml_parser->parse( ) <> 0.
+    IF lr_xml_parser->num_errors( ) <> 0.
+      lv_error_count = lr_xml_parser->num_errors( ).
+      lv_index = 0.
+      WHILE lv_index < lv_error_count.
+        lr_xml_parse_error = lr_xml_parser->get_error( index = lv_index ).
+        APPEND INITIAL LINE TO lt_xml_error ASSIGNING FIELD-SYMBOL(<fs_xml_error>).
+        <fs_xml_error>-column_name = lr_xml_parse_error->get_column( ).
+        <fs_xml_error>-line = lr_xml_parse_error->get_line( ).
+        <fs_xml_error>-reason = lr_xml_parse_error->get_reason( ).
+        lv_index = lv_index + 1.
+      ENDWHILE.
+    ENDIF.
+  ENDIF.
+
+  " Close the Input Stream after Parsing
+  lr_xml_istream->close( ).
+
+  " Do not read data if there is a parsing error
+  READ TABLE lt_xml_error INDEX 1 INTO DATA(ls_xml_error).
+
+  IF sy-subrc = 0.
+
+    FIND FIRST OCCURRENCE OF '<title>' IN gv_xml RESULTS DATA(ls_result1).
+
+    IF sy-subrc = 0.
+
+      FIND FIRST OCCURRENCE OF '</title>' IN gv_xml RESULTS DATA(ls_result2).
+
+      IF sy-subrc = 0.
+
+        DATA(lv_start) = ls_result1-offset + 7.
+        DATA(lv_end) = ls_result2-offset.
+        DATA(lv_length) = lv_end - lv_start.
+
+        lv_text = gv_xml+lv_start(lv_length).
+
+      ENDIF.
+    ENDIF.
+
+    IF lv_text = ''.
+      lv_text = ls_xml_error-reason.
+    ENDIF.
+
+*    MESSAGE 'Parsing Error...aborting' TYPE 'I'.
+    RETURN.
+
+  ENDIF.
+
+  " Nevigate to the 'channel' node of xml
+  lr_xml_node = lr_xml_document->find_from_name( name = 'channel' ).
+
+  CHECK lr_xml_node IS NOT INITIAL.
+
+  " In order to process childs of channel node we need to create iterator using its childerns
+  lr_xml_node_list = lr_xml_node->get_children( ).
+  lr_xml_node_iterator = lr_xml_node_list->create_iterator( ).
+
+  " Loop on node
+  WHILE lr_xml_node IS NOT INITIAL.
+    lv_name = lr_xml_node->get_name( ).
+
+    IF lr_xml_node->get_name( ) = 'item'.
+      lr_xml_node1 = lr_xml_node->get_first_child( ).
+      lr_xml_node_list1 = lr_xml_node->get_children( ).
+      lr_xml_node_iterator1 = lr_xml_node_list1->create_iterator( ).
+
+      WHILE lr_xml_node1 IS NOT INITIAL.
+        lv_name = lr_xml_node1->get_name( ).
+
+        IF lr_xml_node1->get_name( ) = 'summary'.
+          ls_task_attr-name = 'DESCRIPTION'.
+          ls_task_attr-value = lr_xml_node1->get_value( ).
+          APPEND ls_task_attr TO gt_attr.
+        ENDIF.
+
+        IF lr_xml_node1->get_name( ) = 'key'.
+          ls_task_attr-name = 'EXT-ID'.
+          ls_task_attr-value = lr_xml_node1->get_value( ).
+          APPEND ls_task_attr TO gt_attr.
+        ENDIF.
+
+        IF lr_xml_node1->get_name( ) = 'type'.
+          ls_task_attr-name = 'TASK-TYPE'.
+          ls_task_attr-value = lr_xml_node1->get_value( ).
+          APPEND ls_task_attr TO gt_attr.
+        ENDIF.
+
+        IF lr_xml_node1->get_name( ) = 'description'.
+          ls_task_attr-name = 'US-TEXT'.
+          ls_task_attr-value = lr_xml_node1->get_value( ).
+          APPEND ls_task_attr TO gt_attr.
+        ENDIF.
+
+        IF lr_xml_node1->get_name( ) = 'reporter'.
+          ls_task_attr-name = 'ASP'.
+          ls_task_attr-value = lr_xml_node1->get_value( ).
+          APPEND ls_task_attr TO gt_attr.
+        ENDIF.
+
+        IF lr_xml_node1->get_name( ) = 'comments'.
+          node = lr_xml_node1->get_first_child( ).
+          WHILE node IS NOT INITIAL.
+
+            lv_comment = node->get_value( ).
+            IF lv_comments IS INITIAL.
+              lv_comments = lv_comment.
+            ELSE.
+              CONCATENATE lv_comments lv_comment INTO lv_comments SEPARATED BY '<br>'.
+            ENDIF.
+            CLEAR lv_comment.
+
+            node = node->get_next( ).
+          ENDWHILE.
+
+          ls_task_attr-name = 'US-COMMENTS'.
+          ls_task_attr-value = lv_comments.
+          APPEND ls_task_attr TO gt_attr.
+
+        ENDIF.
+
+        " Get the next field under item
+        lr_xml_node1 = lr_xml_node_iterator1->get_next( ).
+      ENDWHILE.
+    ENDIF.
+
+    " Set the node to next node
+    lr_xml_node = lr_xml_node_iterator->get_next( ).
+
+  ENDWHILE.
+
+  " Nevigate to the 'customfields' node of xml
+  lr_xml_node = lr_xml_document->find_from_name( name = 'customfields' ).
+
+  CHECK lr_xml_node IS NOT INITIAL.
+
+  " In order to process childs of customfields node we need to create iterator using its childerns
+  lr_xml_node1 = lr_xml_node->get_first_child( ).
+  lr_xml_node_list = lr_xml_node->get_children( ).
+  lr_xml_node_iterator = lr_xml_node_list->create_iterator( ).
+
+  WHILE lr_xml_node1 IS BOUND.
+
+
+    lr_xml_node2 = lr_xml_node1->get_first_child( ).
+    lv_value = lr_xml_node2->get_value( ).
+
+    IF lv_value = 'Story Points' OR
+       lv_value = 'Sprint' OR
+       lv_value = 'Acceptance Criteria'.
+
+      lr_xml_node2 = lr_xml_node1->get_last_child( ).
+      lr_xml_node3 = lr_xml_node2->get_first_child( ).
+
+      DATA(lv_value_detail) = lr_xml_node3->get_value( ).
+
+      TRANSLATE lv_value TO UPPER CASE.
+      ls_task_attr-name = lv_value.
+      ls_task_attr-value = lv_value_detail.
+      APPEND ls_task_attr TO gt_attr.
+
+    ENDIF.
+
+    lr_xml_node1 = lr_xml_node_iterator->get_next( ).
+
+  ENDWHILE.
+
+  " Nevigate to the attachments node of xml
+  lr_xml_node = lr_xml_document->find_from_name( name = 'attachments' ).
+
+  CHECK lr_xml_node IS NOT INITIAL.
+
+  " In order to process childs of customfields node we need to create iterator using its childerns
+  lr_xml_node1 = lr_xml_node->get_first_child( ).
+  lr_xml_node_list = lr_xml_node->get_children( ).
+  lr_xml_node_iterator = lr_xml_node_list->create_iterator( ).
+
+  lr_xml_node1 = lr_xml_node_iterator->get_next( ).
+
+  WHILE lr_xml_node1 IS BOUND.
+
+    lv_value = lr_xml_node1->get_value( ).
+    DATA(lr_attr) = lr_xml_node1->get_attributes( ).
+
+    IF lr_attr IS BOUND.
+      DATA(lr_id) = lr_attr->get_named_item_ns( EXPORTING name = 'id' uri  = '' ).
+      DATA(lr_name) = lr_attr->get_named_item_ns( EXPORTING name = 'name' uri  = '' ).
+
+      DATA(lv_id)   = lr_id->get_value( ).
+      DATA(lv_attachment_name) = lr_name->get_value( ).
+
+      " later split at | for URL and Name of the document
+      CONCATENATE '%2Fsecure%2Fattachment%2F' lv_id '%2F' lv_attachment_name '|' lv_attachment_name INTO lv_url.
+      ls_task_attr-name = 'ATTACHMENTS'.
+      ls_task_attr-value = lv_url.
+      APPEND ls_task_attr TO gt_attr.
+      CLEAR lv_url.
+      CLEAR lv_id.
+      CLEAR lv_attachment_name.
+      CLEAR ls_task_attr.
+    ENDIF.
+
+    lr_xml_node1 = lr_xml_node_iterator->get_next( ).
+
+  ENDWHILE.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form WRITE_REPORT
+*&---------------------------------------------------------------------*
+FORM write_report.
+  LOOP AT gt_attr ASSIGNING FIELD-SYMBOL(<fs_attr>).
+
+    CALL FUNCTION 'SOTR_TAGS_REMOVE_FROM_STRING'
+      CHANGING
+        text = <fs_attr>-value.
+
+    WRITE: / <fs_attr>-name, <fs_attr>-value.
+  ENDLOOP.
+
+  WRITE: /.
+
+  REFRESH gt_attr[].
+
+ENDFORM.
