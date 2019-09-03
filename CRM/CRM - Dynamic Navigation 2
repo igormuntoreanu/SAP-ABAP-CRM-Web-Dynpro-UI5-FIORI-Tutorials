@@ -1,0 +1,38 @@
+@78\QImporting@	value( IR_ENTITY )	TYPE REF TO CL_CRM_BOL_ENTITY	Entität
+
+
+  METHOD navigate_dynamically.
+
+    DATA: lr_ui_obj_map  TYPE REF TO cl_crm_uiu_bt_obj_mapper,
+          lr_col         TYPE REF TO if_bol_bo_col,
+          lv_object_type TYPE bsp_dlc_object_type.
+
+    " Start navigation
+    CREATE OBJECT lr_ui_obj_map.
+
+    lr_ui_obj_map->determine_ui_object_of_entity( EXPORTING iv_entity         = ir_entity
+                                                  CHANGING  cv_ui_object_type = lv_object_type ).
+
+    DATA(lr_nav_descr) = cl_crm_ui_descriptor_obj_srv=>create_ui_object_based( iv_ui_object_type   = lv_object_type
+                                                                               iv_ui_object_action = 'C' ).
+
+    CREATE OBJECT lr_col TYPE cl_crm_bol_bo_col.
+
+    lr_col->insert( iv_bo    = lr_nav_descr
+                    iv_index = 1 ).
+
+    lr_col->insert( iv_bo    = ir_entity
+                    iv_index = 2 ).
+
+
+    DATA(lr_navigation) = cl_crm_ui_navigation_service=>get_instance( ).
+
+    IF lr_navigation->is_dynamic_nav_supported( lr_nav_descr ) = abap_true.
+
+      lr_navigation->navigate_dynamically( lr_col ).
+
+    ENDIF.
+
+  ENDMETHOD.
+
+
