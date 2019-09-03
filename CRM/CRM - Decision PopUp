@@ -1,0 +1,65 @@
+METHOD eh_onfup.
+
+  DATA: ls_followup TYPE zsn_s_followup.
+
+  DATA: lv_window  TYPE string,
+        lv_title   TYPE string,
+        lt_col_def TYPE tableviewcontroltab,
+        ls_col_def TYPE tableviewcontrol.
+
+  REFRESH lt_col_def.
+  ls_col_def-columnname = 'PROC_TYPE_DESCR_40'.
+  ls_col_def-title = 'Vorgangsart'.
+  APPEND ls_col_def TO lt_col_def.
+  CLEAR ls_col_def.
+
+  REFRESH gt_followup.
+
+  IF has_permission( iv_proc_type = zcl_param_util=>gv_proc_type_incident ).
+
+    ls_followup-process_type        = zcl_param_util=>gv_proc_type_incident.
+    ls_followup-proc_type_descr_40  = 'Incident'.
+    ls_followup-partner_main        = '00000001'.
+    ls_followup-partner_asp         = '00000151'.
+    APPEND ls_followup TO gt_followup.
+
+  ENDIF.
+
+  IF has_permission( iv_proc_type = zcl_param_util=>gv_proc_type_complaint ).
+
+    ls_followup-process_type        = zcl_param_util=>gv_proc_type_complaint.
+    ls_followup-proc_type_descr_40  = 'Beschwerde'.
+    ls_followup-partner_main        = '00000001'.
+    ls_followup-partner_asp         = '00000151'.
+    APPEND ls_followup TO gt_followup.
+
+  ENDIF.
+
+  IF has_permission( iv_proc_type = zcl_param_util=>gv_proc_type_srvanforderung ).
+
+    ls_followup-process_type        = zcl_param_util=>gv_proc_type_srvanforderung.
+    ls_followup-proc_type_descr_40  = 'Serviceanforderung'.
+    ls_followup-partner_main        = '00000001'.
+    ls_followup-partner_asp         = '00000151'.
+    APPEND ls_followup TO gt_followup.
+  ENDIF.
+
+  ls_followup-process_type        = zcl_param_util=>gv_proc_type_email_out.
+  ls_followup-proc_type_descr_40  = 'E-Mail'.
+  ls_followup-partner_main        = '00000009'.
+  ls_followup-partner_asp         = '00000015'.
+  APPEND ls_followup TO gt_followup.
+
+  gr_new_popup = comp_controller->window_manager->create_decision_popup(
+
+    iv_title = lv_title
+    iv_description = lv_window
+    iv_visible_row_count = 4
+    iv_display_table = gt_followup
+    iv_visible_columns = lt_col_def ).
+
+  gr_new_popup->set_on_close_event( iv_event_name = 'FUP_CLOSE' iv_view = me ).
+
+  gr_new_popup->open( ).
+
+ENDMETHOD.
