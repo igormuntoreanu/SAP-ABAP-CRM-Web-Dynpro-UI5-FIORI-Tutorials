@@ -1,0 +1,145 @@
+
+@78\QImporting@	IR_ENTITY	TYPE REF TO CL_CRM_BOL_ENTITY
+@78\QImporting@	IV_EXT_OBJ_NAME	TYPE CRMT_EXT_OBJ_NAME
+@78\QImporting@	IV_PROCESS_TYPE	TYPE CRMT_PROCESS_TYPE
+
+
+  METHOD create_follow_up_object.
+
+    DATA: lt_params          TYPE crmt_name_value_pair_tab,
+          ls_params          TYPE crmt_name_value_pair,
+          lr_col             TYPE REF TO if_bol_bo_col,
+
+          lv_object_guid     TYPE crmt_genil_object_guid,
+
+          lr_factory         TYPE REF TO cl_crm_bol_entity_factory,
+          lr_bol_core        TYPE REF TO cl_crm_bol_core,
+
+          lr_order           TYPE REF TO cl_crm_bol_entity,
+          lr_order_header    TYPE REF TO cl_crm_bol_entity,
+          lr_partner_set     TYPE REF TO cl_crm_bol_entity,
+          lr_partner_all     TYPE REF TO cl_crm_bol_entity,
+          lr_btrefobject_all TYPE REF TO cl_crm_bol_entity,
+          lr_btrefobjset_a   TYPE REF TO cl_crm_bol_entity,
+          lr_srn_item        TYPE REF TO cl_crm_bol_entity,
+          lr_order_item_all  TYPE REF TO cl_crm_bol_entity.
+
+
+    get_srn_data( ir_entity = ir_entity ).
+
+    lr_bol_core = cl_crm_bol_core=>get_instance( ).
+    lr_bol_core->start_up('BT' ).
+
+    ls_params-name = 'PROCESS_TYPE'.
+    ls_params-value = iv_process_type.
+    APPEND ls_params TO lt_params.
+
+    lv_object_guid = gs_sn_information-zzobject_id.
+
+    lr_order = lr_bol_core->get_root_entity( iv_object_name = 'BTOrder'
+                                             iv_object_guid = lv_object_guid ).
+
+    IF lr_order IS BOUND.
+
+      lr_order_header = lr_order->get_related_entity( 'BTOrderHeader' ).
+
+      APPEND ls_params TO lt_params.
+      ls_params-name  = 'VONA_KIND'.
+      ls_params-value = 'A'.
+      APPEND ls_params TO lt_params.
+      ls_params-name  = 'RELTYPE'.
+      ls_params-value = 'VONA'.
+      APPEND ls_params TO lt_params.
+
+      TRY.
+          lr_col = lr_order_header->execute( iv_method_name = 'createFollowUp'
+                                             it_param       = lt_params ).
+
+        CATCH: cx_crm_genil_model_error cx_crm_bol_meth_exec_failed.
+          RETURN.
+      ENDTRY.
+
+      IF lr_col IS BOUND.
+        lr_order ?= lr_col->get_first( ).
+        lr_order_header ?= lr_order->get_related_entity( iv_relation_name = 'BTOrderHeader' ).
+      ENDIF.
+
+    ELSE.
+      lr_factory = lr_bol_core->get_entity_factory( iv_ext_obj_name ).
+      lr_order = lr_factory->create( lt_params ).
+      lr_order_header ?= lr_order->get_related_entity( iv_relation_name = 'BTOrderHeader' ).
+    ENDIF.
+
+    lr_order_header->set_property_as_string( iv_attr_name = 'DESCRIPTION'
+                                             iv_value     = gs_sn_information-description ).
+
+
+    lr_partner_set ?= lr_order_header->get_related_entity( iv_relation_name = 'BTHeaderPartnerSet' ).
+
+    IF gs_sn_information-partner_id_ag IS NOT INITIAL.
+      lr_partner_all ?= lr_partner_set->create_related_entity( iv_relation_name = 'BTPartnerAll' ).
+
+      lr_partner_all->set_property_as_string( iv_attr_name = 'PARTNER_FCT'
+                                              iv_value     = gs_sn_information-partner_fct_ag ).
+      lr_partner_all->set_property_as_string( iv_attr_name = 'PARTNER_NO'
+                                              iv_value     = gs_sn_information-partner_id_ag ).
+    ENDIF.
+
+    IF gs_sn_information-partner_id_asp IS NOT INITIAL.
+
+      lr_partner_all ?= lr_partner_set->create_related_entity( iv_relation_name = 'BTPartnerAll' ).
+
+      lr_partner_all->set_property_as_string( iv_attr_name = 'PARTNER_FCT'
+                                              iv_value     = gs_sn_information-partner_fct_asp ).
+      lr_partner_all->set_property_as_string( iv_attr_name = 'PARTNER_NO'
+                                              iv_value     = gs_sn_information-partner_id_asp ).
+
+    ENDIF.
+
+    IF gs_sn_information-partner_id_sab IS NOT INITIAL.
+
+      lr_partner_all ?= lr_partner_set->create_related_entity( iv_relation_name = 'BTPartnerAll' ).
+
+      lr_partner_all->set_property_as_string( iv_attr_name = 'PARTNER_FCT'
+                                              iv_value     = gs_sn_information-partner_fct_sab ).
+      lr_partner_all->set_property_as_string( iv_attr_name = 'PARTNER_NO'
+                                              iv_value     = gs_sn_information-partner_id_sab ).
+
+    ENDIF.
+
+    IF gs_sn_information-product_id IS NOT INITIAL.
+
+      lr_btrefobjset_a   ?= lr_order_header->get_related_entity( iv_relation_name = 'BTHeaderBOSSet' ).
+      IF lr_btrefobjset_a IS BOUND.
+        lr_btrefobjset_a   ?= lr_btrefobjset_a->get_related_entity( iv_relation_name = 'BTRefObjSet_A' ).
+      ENDIF.
+      IF lr_btrefobjset_a IS BOUND.
+        lr_btrefobject_all ?= lr_btrefobjset_a->create_related_entity( iv_relation_name = 'BTRefObjectAll' ).
+
+        lr_btrefobject_all->set_property_as_string( iv_attr_name = 'PRODUCT_ID'
+                                                    iv_value     = gs_sn_information-product_id ).
+      ENDIF.
+    ENDIF.
+
+    IF gs_sn_information-zzsrn_item_guid IS NOT INITIAL.
+
+      lr_order_item_all ?= lr_order_header->get_related_entity( iv_relation_name = 'BTHeaderItemsExt' ).
+      IF lr_order_item_all IS BOUND.
+        lr_order_item_all ?= lr_order_item_all->get_related_entity( iv_relation_name = 'BTOrderItemAll' ).
+      ENDIF.
+
+      IF lr_order_item_all IS BOUND.
+        lr_srn_item ?= lr_order_item_all->create_related_entity( iv_relation_name = 'ZEXT_BOL_RELAT00002W' ).
+
+        lr_srn_item->set_property_as_string( iv_attr_name = 'ZZSRN_ITEM_GUID'
+                                             iv_value     = gs_sn_information-zzsrn_item_guid ).
+      ENDIF.
+
+    ENDIF.
+
+    lr_bol_core->modify( ).
+    lr_order->reread( ).
+
+    rr_entity = lr_order.
+
+  ENDMETHOD.
