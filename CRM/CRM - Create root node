@@ -1,0 +1,16 @@
+data:
+        lv_bol_core                TYPE REF TO cl_crm_bol_core,
+        lv_call_list_factory     TYPE REF TO cl_crm_bol_entity_factory,
+        lr_call_list_entity         TYPE REF TO cl_crm_bol_entity,
+        lt_params_tab             type crmt_name_value_pair_tab,
+        ls_params                   type crmt_name_value_pair.
+ 
+        lv_bol_core = cl_crm_bol_core=>get_instance( ).
+        lv_call_list_factory = lv_bol_core->get_entity_factory( 'BTOrder' ). " 
+ 
+  CLEAR: ls_params.
+  ls_params-name = 'NAME'.
+  ls_params-value = 'TEST CALL LIST'.
+  APPEND ls_params TO lt_params_tab.
+ 
+     lr_call_list_entity = lv_call_list_factory->create( lt_params_tab ).
