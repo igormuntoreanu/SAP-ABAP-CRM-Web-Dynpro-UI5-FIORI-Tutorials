@@ -1,0 +1,44 @@
+Steps to follow
+
+The objects in the GDC are defined in the IMG:
+
+Customer Relationship Management –> UI Framework –> Technical Role Definition –> Define Global Data Context Parameters
+
+Here ,you can maintain your custom attribute also.
+
+
+
+Set the data to the GDC attribute(XXXXXXX = GDC Parameter declared in SPRO)
+
+data: lr_gdc type ref to if_crm_ui_data_context,
+
+        lr_entity type ref to CL_CRM_BOL_ENTITY.
+
+lr_gdc ?= cl_crm_ui_data_context_srv=>get_instance( ).
+
+TRY.
+****Get the entity********
+
+*Your logic to get entity
+
+**************************
+
+       lr_entity ?= <entity from the your logic>.
+CATCH CX_SY_MOVE_CAST_ERROR.
+ENDTRY.
+
+
+lr_gdc->set_entity( name = ‘XXXXXXX’ value = lr_entity ).
+
+Get the data to the GDC attribute(XXXXXXX = GDC Parameter declared in SPRO)
+
+data: lr_gdc type ref to if_crm_ui_data_context,
+
+        lr_entity type ref to CL_CRM_BOL_ENTITY.
+
+lr_gdc ?= cl_crm_ui_data_context_srv=>get_instance( ).
+
+
+lr_gdc->get_entity( exporting name = ‘XXXXXXX’
+
+  importing value = lr_entity ).
