@@ -1,0 +1,52 @@
+METHOD eh_ondocflow.
+
+  DATA: lr_ui_obj_map  TYPE REF TO cl_crm_uiu_bt_obj_mapper,
+        lr_col         TYPE REF TO if_bol_bo_col,
+        lr_entity      TYPE REF TO cl_crm_bol_entity,
+        lv_object_type TYPE bsp_dlc_object_type.
+
+  DATA: lr_data_collection   TYPE REF TO if_bol_bo_col.
+
+  cl_thtmlb_util=>get_event_info(
+      EXPORTING
+        iv_event  = htmlb_event_ex
+      IMPORTING
+        ev_index  = DATA(lv_index) ).
+
+  CREATE OBJECT lr_ui_obj_map.
+
+  CREATE OBJECT lr_data_collection TYPE cl_crm_bol_bo_col.
+
+  lr_entity ?= me->typed_context->btorder->get_bo_by_index( iv_index        = lv_index
+                                                            iv_change_focus = abap_true ).
+
+  CHECK lr_entity IS BOUND.
+
+  lr_ui_obj_map->determine_ui_object_of_entity( EXPORTING iv_entity         = lr_entity
+                                                CHANGING  cv_ui_object_type = lv_object_type ).
+
+  CALL METHOD cl_crm_ui_descriptor_obj_srv=>create_entity_based
+    EXPORTING
+      ir_entity           = lr_entity
+      iv_ui_object_type   = lv_object_type
+      iv_ui_object_action = 'B'
+    RECEIVING
+      rr_result           = DATA(lr_nav_descr).
+
+  CREATE OBJECT lr_col TYPE cl_crm_bol_bo_col.
+
+  lr_col->insert( iv_bo    = lr_nav_descr
+                  iv_index = 1 ).
+
+  lr_col->insert( iv_bo    = lr_entity
+                  iv_index = 2 ).
+
+
+  DATA(lr_navigation) = cl_crm_ui_navigation_service=>get_instance( ).
+
+  IF lr_navigation->is_dynamic_nav_supported( lr_nav_descr ) = abap_true.
+    RAISE EVENT history_trigger.
+    lr_navigation->navigate_dynamically( lr_col ).
+  ENDIF.
+
+ENDMETHOD.
