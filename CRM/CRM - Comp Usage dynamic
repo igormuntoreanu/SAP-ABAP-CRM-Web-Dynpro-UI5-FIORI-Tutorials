@@ -1,0 +1,40 @@
+  METHOD eh_ontest.
+
+    DATA: lr_coll     TYPE REF TO if_bol_bo_col,
+          lr_popup    TYPE REF TO if_bsp_wd_popup,
+          lr_rep_view TYPE REF TO cl_bsp_wd_rep_view_ovw,
+          lr_rep      TYPE REF TO cl_bsp_wd_repository,
+          lv_title    TYPE string.
+
+    CREATE OBJECT lr_coll TYPE cl_crm_bol_bo_col.
+
+    lr_coll->add( me->typed_context->ztr_t_map_h->collection_wrapper->get_current( ) ).
+
+* Create Usage Name
+    lr_rep_view ?= me->rep_view.
+    lr_rep = lr_rep_view->get_repository( ).
+
+* Create usage dynamically
+    lr_rep->create_cmp_usage_def( EXPORTING  iv_usage_name            = 'TestPopUp'
+                                             iv_component_name        = 'ZTR_LSMW'
+                                  EXCEPTIONS duplicate_entry          = 1 ).
+
+    TRY.
+        IF lr_popup IS NOT BOUND.
+
+          lv_title = 'Testanwendung'.
+          lr_popup = comp_controller->window_manager->create_popup( iv_interface_view_name = 'ZTR_LSMW/TestApplication'
+                                                                             iv_usage_name = 'TestPopUp'
+                                                                                  iv_title = lv_title ).
+
+        ENDIF.
+
+        lr_popup->set_window_width( 1000 ).
+        lr_popup->set_display_mode( if_bsp_wd_popup=>c_display_mode_surrounded ).
+        lr_popup->open( iv_collection   = lr_coll
+                        iv_inbound_plug = 'DEFAULT' ).
+
+      CATCH cx_bol_exception.
+
+    ENDTRY.
+  ENDMETHOD.
