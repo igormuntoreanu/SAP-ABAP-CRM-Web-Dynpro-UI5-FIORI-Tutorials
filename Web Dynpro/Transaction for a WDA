@@ -1,0 +1,13 @@
+To Create a Transaction code for a Web Dynpro application, use Transaction SE93 (Transaction Maintenance).
+
+1. On the dialog screen, enter the transaction code (up to 20 characters) then click on Create button.
+
+2. A dialog pop up screen appears, enter meaningful description of the transaction in the Short Text field.
+
+3. Choose the option Transaction with parameters (Parameter transaction).
+
+4. Choose Continue. The Create Parameter Transaction screen appears.
+
+5. In the Transaction field, enter WDYID and select the checkbox Skip initial screen. There is no need to make changes in the Classification group box.
+
+6. Add the necessary entries to the Default Values table by using the F4 help. The values are automatically available after you enter WDYID in the Transaction field.
