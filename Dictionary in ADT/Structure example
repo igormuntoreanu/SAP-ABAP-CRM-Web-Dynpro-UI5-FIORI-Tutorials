@@ -1,0 +1,11 @@
+@EndUserText.label : 'Invoice Information'
+@AbapCatalog.enhancementCategory : #NOT_EXTENSIBLE
+define type zinvoice_info {
+  customer_id      : snwd_partner_id;
+  order_id         : snwd_so_id;
+  invoice_date     : timestampl;
+  currency_code    : snwd_curr_code;
+  @Semantics.amount.currencyCode : 'zinvoice_info.currency_code'
+  sum_gross_amount : sepm_oia_total_amount;
+
+}
