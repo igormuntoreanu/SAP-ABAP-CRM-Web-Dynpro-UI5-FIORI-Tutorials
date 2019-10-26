@@ -1,0 +1,41 @@
+@AbapCatalog.sqlViewName: 'ZV_CDS_INVC'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Open Sales Order Invoices'
+define view ZCDSV_OPEN_INVOICE as select from snwd_so_inv_head {
+
+    key snwd_so_inv_head.buyer_guid, 'C' as category
+    
+}
+
+    where snwd_so_inv_head.payment_status <> 'P'
+    group by snwd_so_inv_head.buyer_guid
+    having count( distinct snwd_so_inv_head.node_key ) <= 1
+    
+    union all
+    
+    select from snwd_so_inv_head {
+    
+    key snwd_so_inv_head.buyer_guid, 'D' as category   
+        
+}
+    
+    where snwd_so_inv_head.payment_status <> 'P'
+    group by snwd_so_inv_head.buyer_guid
+    having count( distinct snwd_so_inv_head.node_key ) >  1
+       and count( distinct snwd_so_inv_head.node_key ) <= 3
+       
+    union all     
+    
+    select from snwd_so_inv_head {
+    
+    key snwd_so_inv_head.buyer_guid, 'S' as category   
+        
+}
+    
+    where snwd_so_inv_head.payment_status <> 'P'
+    group by snwd_so_inv_head.buyer_guid
+    having count( distinct snwd_so_inv_head.node_key ) >  3
+        
+ 
