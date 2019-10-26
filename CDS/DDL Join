@@ -1,0 +1,14 @@
+@AbapCatalog.sqlViewName: 'ZV_CDS_CUST'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Customer Classification'
+define view zcdsv_cust_classification
+  as select from snwd_bpa           as bpa
+    join         ZCDSV_OPEN_INVOICE as opn_inv on bpa.node_key = opn_inv.buyer_guid
+{
+  key bpa.bp_id        as customer_id,
+  key bpa.company_name as customer_name,
+      opn_inv.category
+} 
+ 
