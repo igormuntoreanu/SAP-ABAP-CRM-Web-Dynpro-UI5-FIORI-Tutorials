@@ -1,0 +1,20 @@
+DATA lv_discount TYPE p LENGTH 1 DECIMALS 1 VALUE '0.8'.
+
+SELECT ( 1 + 1 ) AS two,
+       ( @lv_discount * gross_amount ) AS red_gross_amount,
+       CAST( gross_amount AS FLTP ) / CAST( 2 AS FLTP ) AS half_gross_amount,
+       ceil( gross_amount )  AS ceiled_gross_amount,
+       floor( gross_amount ) AS floor_gross_amount
+    FROM snwd_so
+    INTO TABLE @DATA(lt_arithmetics).
+    
+    
+---------------------------------------
+    
+Results are like:
+
+ROW TWO RED_GROSS_AMOUNT HALF_GROSS_AMOUNT      CEILED_GROSS_AMOUNT FLOOR_GROSS_AMOUNT
+1	  2	  20693.624	       1.2933514999999999E+04	25868	              25867
+2	  2	  11681.992	       7.3012449999999999E+03	14603	              14602
+3	  2	  4504.864	       2.8155400000000000E+03	5632	              5631
+4	  2	  1363.232	       8.5201999999999998E+02	1705	              1704
