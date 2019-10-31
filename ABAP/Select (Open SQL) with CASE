@@ -12,3 +12,12 @@ FROM snwd_so AS so
 INNER JOIN snwd_bpa AS bp
    ON so~buyer_guid = bp~node_key
 INTO TABLE @DATA(lt_snwd).
+
+
+-------------------------------------------------------
+Results are like:
+
+ROW SO_ID      CURRENCY_CODE GROSS_AMOUNT COMPANY_NAME DELIVERY_STATUS GROUP(C9)
+1   0500000000 EUR           25867.03     diego        D               DELIVERED
+2   0500000001 EUR           14602.49     kitykat      D               DELIVERED
+3   0500000002 EUR           5631.08      TECUM        D               DELIVERED
