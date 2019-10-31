@@ -9,7 +9,7 @@ SELECT company_name AS company,
 Results are like
 
 ROW COMPANY NAME COMPANY_NAME
-6	  TECUM	  AG	 TECUM(AG)
-7	  kitykat	Ltd. kitykat(Ltd.)
-8	  Laurent	S.A. Laurent(S.A.)
-9	  AVANTEL	S.A. AVANTEL(S.A.)
+6   TECUM   AG   TECUM(AG)
+7   kitykat Ltd. kitykat(Ltd.)
+8   Laurent S.A. Laurent(S.A.)
+9   AVANTEL S.A. AVANTEL(S.A.)
