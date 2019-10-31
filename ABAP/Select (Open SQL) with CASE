@@ -1,0 +1,14 @@
+SELECT so~so_id AS so_id,
+       so~currency_code AS currency_code,
+       so~gross_amount AS gross_amount,
+       bp~company_name AS company_name,
+       so~delivery_status AS delivery_status,
+  CASE so~delivery_status
+  WHEN ' ' THEN 'OPEN'
+  WHEN 'D' THEN 'DELIVERED'
+    ELSE so~delivery_status
+  END AS group
+FROM snwd_so AS so
+INNER JOIN snwd_bpa AS bp
+   ON so~buyer_guid = bp~node_key
+INTO TABLE @DATA(lt_snwd).
