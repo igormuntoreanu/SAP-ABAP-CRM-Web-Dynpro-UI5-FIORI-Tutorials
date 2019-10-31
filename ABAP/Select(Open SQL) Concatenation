@@ -1,0 +1,15 @@
+SELECT company_name AS company,
+       legal_form AS name,
+       company_name && '(' && legal_form && ')' AS company_name
+  FROM snwd_bpa
+  INTO TABLE @DATA(lt_info_string).
+
+-------------------
+
+Results are like
+
+ROW COMPANY NAME COMPANY_NAME
+6	  TECUM	  AG	 TECUM(AG)
+7	  kitykat	Ltd. kitykat(Ltd.)
+8	  Laurent	S.A. Laurent(S.A.)
+9	  AVANTEL	S.A. AVANTEL(S.A.)
