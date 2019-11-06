@@ -1,0 +1,78 @@
+*&---------------------------------------------------------------------*
+*& Form get_data_template
+*&---------------------------------------------------------------------*
+FORM get_data_template USING pv_number TYPE i
+                       CHANGING ct_cust_early TYPE ty_t_customers
+                                ct_cust_late TYPE ty_t_ustomers.
+* Declarations
+****************
+* type for result overview
+TYPES: BEGIN OF lty_s_overview,
+          param TYPE string,
+          value TYPE string,
+       END OF lty_s_overview.
+       
+* Data objects for result overview
+DATA: lt_overview TYPE TABLE OF lty_s_overview,
+      ls_overview TYPE lty_s_overview.
+
+* Processing
+********************************
+CLEAR: ct_cust_early, ct_cust_late.
+
+TRY.
+
+* See report HA400_EXPR_ADBC_T2 or HA400_PROCEDURE_S1 for equivalent code that makes
+* little or no use of expressions, i.e. uses classical ABAP code style.
+* Create statement object (primary DB connection)
+
+DATA(lo_sql) = NEW cl_sql_statement( ).
+* Call Procedure with Overview (fill lt_overview)
+
+DATA(lo_result) = lo_sql->execute_query( |CALL _SYS_BIC."ha400.primdb.demo/DP_EARLY_AND_LATE_PAYERS"( |
+                                         && |{ pv_number }, null , null ) WITH OVERVIEW | ).
+                                         
+lo_result->set_param_table( REF #( lt_overview ) ).
+lo_result->next_package( ).
+lo_result->close( ).
+
+* Retrieve first result (Parameter et_early)
+
+lo_result = lo_sql->execute_query(
+|SELECT * FROM { lt_overview[ param = 'ET_EARLY' ]-value } | ).
+lo_result->set_param_table( REF #( ct_cust_early ) ).
+lo_result->next_package( ).
+
+lo_result->close( ).
+* Retrieve second result (Parameter et_late)
+lo_result = lo_sql->execute_query(
+|SELECT * FROM { lt_overview[ param = 'ET_LATE' ]-value } | ).
+
+lo_result->set_param_table( REF #( ct_cust_late ) ).
+lo_result->next_package( ).
+lo_result->close( ).
+
+* Exception handling
+CATCH cx_sql_exception INTO DATA(lx_sql_exc). "Excpt. Class for SQL Error
+MESSAGE lx_sql_exc TYPE 'E'.
+ENDTRY.
+ENDFORM. "
+
+*&---------------------------------------------------------------------*
+*& Form get_data_solution
+*&---------------------------------------------------------------------*
+FORM get_data_solution USING pv_number TYPE i
+CHANGING ct_cust_early TYPE ty_t_customers
+ct_cust_late TYPE ty_t_customers.
+DATA: lt_cust_early TYPE TABLE OF if_ha400_early_and_late=>et_early,
+lt_cust_late TYPE TABLE OF if_ha400_early_and_late=>et_late.
+CALL DATABASE PROCEDURE ha400_early_and_late
+EXPORTING
+iv_number = pv_number
+IMPORTING
+et_early = lt_cust_early
+et_late = lt_cust_late.
+ct_cust_early = lt_cust_early.
+ct_cust_late = lt_cust_late.
+ENDFORM. "
+326
