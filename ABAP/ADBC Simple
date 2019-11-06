@@ -1,0 +1,63 @@
+*&---------------------------------------------------------------------*
+*& Form get_data_template
+*&---------------------------------------------------------------------*
+FORM get_data_template CHANGING ct_customers TYPE ty_t_customers.
+
+* Declarations
+****************
+* ADBC Objects and Variables
+DATA: lo_con TYPE REF TO cl_sql_connection,
+lo_sql TYPE REF TO cl_sql_statement,
+lo_result TYPE REF TO cl_sql_result_set,
+lv_sql TYPE string,
+lr_data TYPE REF TO data.
+* Exception Handling
+DATA: lx_sql_exc TYPE REF TO cx_sql_exception.
+
+* Processing
+****************************
+
+CLEAR ct_customers.
+TRY.
+* 1. Get secondary DB Connection
+
+lo_con = cl_sql_connection=>get_connection( ).
+
+* 2. Create statement object
+
+CREATE OBJECT lo_sql
+EXPORTING
+con_ref = lo_con.
+
+* 3. assemble SQL statement
+
+lv_sql = |SELECT "BP_ID", "COMPANY_NAME", |
+&& | AVG("DAYS_OPEN") AS AVG_DAYS_OPEN |
+&& | FROM "_SYS_BIC"."ha400.secdb.demo/AT_OPEN_INVOICES" |
+&& | GROUP BY "BP_ID", "COMPANY_NAME" |
+&& | ORDER BY "BP_ID" |.
+
+* 4. Execute Query
+
+lo_result = lo_sql->execute_query( lv_sql ).
+
+* 5. Assign target variable
+
+GET REFERENCE OF ct_customers INTO lr_data.
+lo_result->set_param_table( lr_data ).
+
+* 6. Read result into internal Table
+
+lo_result->next_package( ).
+
+* 7. Close connection
+
+lo_result->close( ).
+
+* Exception handling
+CATCH cx_sql_exception INTO lx_sql_exc. "Excpt. Class for SQL Error
+
+MESSAGE lx_sql_exc TYPE 'E'.
+
+ENDTRY.
+ENDFORM.
