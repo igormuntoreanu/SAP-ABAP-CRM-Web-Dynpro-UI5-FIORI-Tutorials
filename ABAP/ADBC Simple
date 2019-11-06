@@ -61,3 +61,14 @@ MESSAGE lx_sql_exc TYPE 'E'.
 
 ENDTRY.
 ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form get_data_solution
+*&---------------------------------------------------------------------*
+FORM get_data_solution CHANGING ct_customers TYPE ty_t_customers.
+  SELECT bp_id company_name AVG( days_open ) AS avg_days_open
+  FROM ha400_opendays
+  INTO TABLE ct_customers
+  GROUP BY bp_id company_name
+  ORDER BY bp_id.
+ENDFORM.
