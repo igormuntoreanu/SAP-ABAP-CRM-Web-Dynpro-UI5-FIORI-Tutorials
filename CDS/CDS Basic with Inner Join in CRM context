@@ -1,0 +1,68 @@
+@AbapCatalog.sqlViewName: 'YCRMBPACTIVITIES'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Get BP Activities'
+define view YCRM_BP_ACTIVITIES
+  as select from crmd_orderadm_h  as _ord_adm
+    inner join   crmd_order_index as _index
+      on(
+        _ord_adm.guid            = _index.header
+        and _ord_adm.object_type = _index.object_type
+      )
+    inner join   crmd_activity_h  as _actv
+      on(
+        _ord_adm.guid = _actv.guid
+      )
+    inner join   crmc_act_cat_t   as _categtext
+      on(
+        _actv.category       = _categtext.category
+        and _categtext.langu = $session.system_language
+      )
+    inner join   crmc_proc_type_t as _type
+      on(
+        _index.process_type_ix = _type.process_type
+        and _type.langu        = $session.system_language
+      )
+    inner join   crmd_link        as _link
+      on(
+        _index.header = _link.guid_hi
+      )
+    inner join   scappt           as _dates
+      on(
+        _link.guid_set = _dates.appl_guid
+      )
+    inner join   scpriot          as _priority
+      on(
+        _actv.priority      = _priority.priority
+        and _priority.langu = $session.system_language
+      )
+    inner join   crmc_subob_cat_t as _botext
+      on(
+        _botext.subobj_category = _ord_adm.object_type
+        and _botext.langu       = $session.system_language
+      )
+{
+  key _ord_adm.guid,
+      _index.vin,
+      _index.campaign_id       as campaign,
+      _index.posting_date_hd,
+      _index.partner_no,
+      _index.stat_open,
+      _ord_adm.object_id,
+      _ord_adm.description,
+      _ord_adm.object_type,
+      _ord_adm.created_by,
+      _botext.s_description_20 as object_type_txt,
+      _actv.priority,
+      _priority.txt_long       as priority_txt,
+      _actv.category,
+      _categtext.description   as category_txt,
+      _type.process_type,
+      _type.p_description_20   as process_type_txt,
+      _dates.appl_guid,
+      _dates.date_from         as valid_from,
+      _dates.date_to           as valid_to,
+      _dates.time_from         as time_from_s,
+      _dates.time_to           as time_to_s
+}
