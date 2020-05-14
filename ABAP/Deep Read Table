@@ -1,0 +1,15 @@
+  TRY.
+      lv_user_level = it_filter_select_options[ property = 'UserLevel' ]-select_options[ option = 'EQ' ]-low .
+      IF lv_user_level = 'PAG'.
+        lv_user_level = 'IMP'.
+      ENDIF.
+    CATCH cx_sy_itab_line_not_found.
+  ENDTRY.
+  
+  Before:
+  
+  
+  READ TABLE it_key_tab ASSIGNING FIELD-SYMBOL(<fs_key_tab>) WITH KEY name = 'PartnerId'.
+  CHECK sy-subrc = 0.
+
+  lv_partner =  |{ <fs_key_tab>-value ALPHA = IN }|.
