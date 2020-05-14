@@ -1,0 +1,44 @@
+@AbapCatalog.sqlViewName: 'YCRMDIMMLCDS'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Mailings for BP'
+define view YCRMD_IM_ML_CDS
+  with parameters
+    p_partnerguid : BU_PARTNER_GUID
+  as select from    crmd_im_ml_item as _item
+    inner join      crmd_im_ml_head as _header
+      on _header.ml_guid_h = _item.ml_guid_h
+    left outer join cgpl_text       as _text
+      on  _text.guid  = _header.project_guid
+      and _text.langu = $session.system_language
+    left outer join cgpl_project    as _project
+      on _project.guid = _header.project_guid
+{
+      //_header
+  key _item.ml_guid_i,
+      _item.objtype,
+      _item.channel,
+      _item.changed_at,
+      _item.order_guid,
+      _item.io_type,
+      _item.mp_guid,
+      _item.io_description,
+      _item.partner_guid,
+      _header.created_at,
+      _header.project_guid,
+      _text.text1,
+      _project.external_id
+}
+where
+  _item.partner_guid = $parameters.p_partnerguid;
+  
+  
+  
+  ____________________________________________________________________
+  Open SQL
+  
+      SELECT FROM ycrmd_im_ml_cds( p_partnerguid = @lv_partner )
+      FIELDS *
+      WHERE channel    NE @iv_channel
+        AND order_guid EQ '00000000000000000000000000000000'
