@@ -1,0 +1,90 @@
+SAP ABAP Predicates Functions
+
+-> Table Functions
+
+" Return the number of lines
+DATA(lines) = lines(itab).
+
+"Returns the number of the row found 
+DATA(idx1) = line_index( itab[ 2 ][ 2 ][ KEY primary_key table_line = 7 ] ).
+
+-> String Functions
+
+DATA: lv_text TYPE string VALUE 'EXceLleNt cHoiCE'
+DATA(upper) = to_upper( lv_text ). "Result: EXCELLENT CHOICE
+DATA(lower) = to_lower( lv_text ). "Result: excellent choice
+DATA(tomix) = to_mixed( val = lv_text case = 'E' ). "Result: Excellent choice
+
+" Results in order: "CD", "CDEFGH", "EFGH", "AB", and "ABCD".
+result = substring( val = 'ABCDEFGH' off = 2 len = 2 ).
+result = substring_from( val = 'ABCDEFGH' sub = 'CD' ).
+result = substring_after( val = 'ABCDEFGH' sub = 'CD' ).
+result = substring_before( val = 'ABCDEFGH' sub = 'CD' ).
+result = substring_to( val = 'ABCDEFGH' sub = 'CD' ).
+
+" Result 1: "AB", Result 2: "BC" ... and so on
+DO.
+  TRY.
+      result = segment( val   = 'AB;CD;EF;GH;IJ;KL;MN'
+                        index = sy-index
+                        sep = ';' ).
+    CATCH cx_sy_strg_par_val.
+      EXIT.
+  ENDTRY.
+ENDDO.
+
+" Result: _microsoft_archive_
+DATA: lv_text TYPE string VALUE '%microsoft%archive%'.
+lv_text = replace( val   = lv_text   sub   = '%'   with  = '_'   occ   =  0 ).
+
+" Result: 123;123;123;123;123;
+DATA: lv_text TYPE string VALUE '123;'.
+DATA(result) = repeat( val = lv_text occ = 5 ).
+
+" Result: ABAP_Objects
+DATA: itab  TYPE TABLE OF string, result TYPE string.
+APPEND 'ABAP'    TO itab.
+APPEND 'Objects' TO itab.
+result = concat_lines_of( table = itab sep = '_' ).
+
+" Result: lv_position1 = 6, lv_position2 = 10, lv_position3 = 4, lv_position4 = 0
+DATA: lv_text     TYPE string VALUE '<html lang="en" dir="ltr"></html>'.
+DATA(lv_position1) = find( val = lv_text sub = 'lang' ).
+DATA(lv_position2) = find_end( val = lv_text sub = 'lang' ).
+DATA(lv_position3) = find_any_of( val = lv_text sub = 'lang' ).
+DATA(lv_position4) = find_any_not_of( val = lv_text sub = 'lang' ).
+
+" Result: I was born in Rio de Janeiro
+DATA(lv_result) = condense( 'I was   born   in Rio de    Janeiro' ).
+
+" Result: Horray!
+DATA(lv_result) = translate( val = '---Hur-rah!---' from = 'uh-' to = 'oy' ).
+
+" Result: 4
+DATA(lv_result) = strlen( 'ABCD' ).
+-> Logical Functions
+
+" Check if line exists, returning true or false
+IF line_exists( it_bookings[ carrid = 'AA' connid = '17' ]).
+ENDIF.
+
+" Predicate Functions comparative table 
+ 
+
+" Result: lv_question = ' '. lv_question2 = 'X'.
+DATA: lv_string1 TYPE string VALUE 'Hello my Friend 007',
+            lv_string2 TYPE string VALUE 'Hello my Friend 008'.
+
+DATA(lv_question) = xsdbool( lv_string1 EQ lv_string2 ).
+DATA(lv_question2) = xsdbool( lv_string1 EQ lv_string1 ).
+
+-> Numeric Functions
+
+" Result: abs = 5.55; sign = -1; ceil = -5; floor = -6; trunc = -5; frac= -0.55
+DATA m TYPE decfloat16 VALUE '-5.55'.
+DATA(abs)   = abs( m ).
+DATA(sign)  = sign( m ).
+DATA(ceil)  = ceil( m ).
+DATA(floor) = floor( m ).
+DATA(trunc) = trunc( m ).
+DATA(frac)  = frac( m ).
