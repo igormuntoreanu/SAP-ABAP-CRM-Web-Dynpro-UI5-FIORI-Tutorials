@@ -1,0 +1,171 @@
+METHOD get_bp_attachments.
+
+  DATA: l_url       TYPE string,
+        lv_info_url TYPE skwf_urlp,
+        lv_account  TYPE string,
+        lv_doc_id   TYPE string,
+        lv_datetime TYPE timestamp.
+
+  SELECT SINGLE partner_guid INTO @DATA(lv_partner_guid) FROM ycrm_but000 WHERE partner = @gv_partner.
+  CHECK sy-subrc = 0.
+
+  SELECT *
+    FROM yswkg_brel
+    INTO TABLE @DATA(lt_skwg_brel)
+    WHERE reltype  = 'WCM_LINK'
+      AND catid_a  = 'BO'
+      AND instid_a = @lv_partner_guid.
+
+  CHECK sy-subrc = 0.
+
+  SORT lt_skwg_brel BY instid_a typeid_a catid_a.
+  DELETE ADJACENT DUPLICATES FROM lt_skwg_brel COMPARING instid_a typeid_a catid_a.
+  SORT lt_skwg_brel BY utctime DESCENDING.
+
+  LOOP AT lt_skwg_brel INTO DATA(ls_skwg_brel).
+
+    cl_crm_documents=>get_info_url(
+      EXPORTING
+        business_object           = VALUE #( instid = ls_skwg_brel-instid_a
+                                             typeid = ls_skwg_brel-typeid_a
+                                             catid  = ls_skwg_brel-catid_a )
+      IMPORTING
+        phioloios                 = DATA(lt_phioloios)
+        ios_properties_result     = DATA(lt_ios_prop_result) ).
+
+    LOOP AT lt_phioloios INTO DATA(ls_phioloios).
+
+      cl_crm_documents=>get_with_table(
+        EXPORTING
+          phio     =     VALUE #( objtype = ls_phioloios-objtypeph
+                                  class   = ls_phioloios-classph
+                                  objid   = ls_phioloios-objidph )
+          loio     =     VALUE #( objtype = ls_phioloios-objtypelo
+                                  class   = ls_phioloios-classlo
+                                  objid   = ls_phioloios-objidlo )
+        IMPORTING
+          file_access_info    = DATA(lt_file_access_info) ).
+*          file_content_binary = DATA(lt_bin_content) ).
+
+      cl_crm_documents=>get_with_url(
+        EXPORTING
+          phio     =     VALUE #( objtype = ls_phioloios-objtypeph
+                                  class   = ls_phioloios-classph
+                                  objid   = ls_phioloios-objidph )
+          loio     =     VALUE #( objtype = ls_phioloios-objtypelo
+                                  class   = ls_phioloios-classlo
+                                  objid   = ls_phioloios-objidlo )
+          url_type = '2'
+        IMPORTING
+          error    =     DATA(lv_error)
+          url      =     DATA(lv_url)
+        EXCEPTIONS
+          no_io    = 1
+          OTHERS   = 2 ).
+
+      IF sy-subrc = 0.
+        l_url = lv_url.
+        l_url = ycl_crma5627_dp_attachments=>exchange_host( EXPORTING i_url  = l_url i_host = i_url ).
+        IF lt_file_access_info IS NOT INITIAL.
+          "X117369 DeHa - we need the newest CF
+          READ TABLE lt_ios_prop_result ASSIGNING FIELD-SYMBOL(<fs_prop>) WITH KEY objtype = ls_phioloios-objtypeph
+                                                                                   class   = ls_phioloios-classph
+                                                                                   objid   = ls_phioloios-objidph.
+          IF sy-subrc = 0.
+            READ TABLE lt_file_access_info ASSIGNING FIELD-SYMBOL(<info>) INDEX 1.
+            IF sy-subrc = 0 AND <info>-file_name CS 'CF_'.
+              READ TABLE <fs_prop>-properties ASSIGNING FIELD-SYMBOL(<fs_properties>) WITH KEY name = 'CREATED_AT'.
+              IF sy-subrc = 0 AND <fs_properties>-value > lv_datetime.
+                lv_datetime = <fs_properties>-value.
+                CLEAR rt_attachments.
+                APPEND VALUE #( objid = ls_phioloios-objidph partner_guid = lv_partner_guid file_name = lt_file_access_info[ 1 ]-file_name relative_url = l_url ) TO rt_attachments.
+              ENDIF.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+  ENDLOOP.
+
+  " Check if URL CF from Adobe Sign attached
+  LOOP AT lt_skwg_brel INTO DATA(ls_skwg_brel_url).
+
+    cl_crm_documents=>get_info_url(
+      EXPORTING
+        business_object           = VALUE #( instid = ls_skwg_brel_url-instid_a
+                                             typeid = ls_skwg_brel_url-typeid_a
+                                             catid  = ls_skwg_brel_url-catid_a )
+        newest_only               = 'X'
+      IMPORTING
+        phioloios_url             = DATA(lt_phioloios_url)
+        ios_properties_result_url = DATA(lt_ios_prop_result_url) ).
+
+    LOOP AT lt_phioloios_url INTO DATA(ls_phioloios_url).
+
+      cl_crm_documents=>get_with_table(
+               EXPORTING
+                 phio     =     VALUE #( objtype = ls_phioloios_url-objtypeph
+                                         class   = ls_phioloios_url-classph
+                                         objid   = ls_phioloios_url-objidph )
+                 loio     =     VALUE #( objtype = ls_phioloios_url-objtypelo
+                                         class   = ls_phioloios_url-classlo
+                                         objid   = ls_phioloios_url-objidlo )
+               IMPORTING
+                 file_access_info    = DATA(lt_file_access_info_url) ).
+*                 file_content_binary = DATA(lt_bin_content_url)
+*                 file_content_ascii  = DATA(lt) ).
+
+      cl_crm_documents=>get_with_url(
+         EXPORTING
+           phio     =     VALUE #( objtype = ls_phioloios_url-objtypeph
+                                   class   = ls_phioloios_url-classph
+                                   objid   = ls_phioloios_url-objidph )
+           loio     =     VALUE #( objtype = ls_phioloios_url-objtypelo
+                                   class   = ls_phioloios_url-classlo
+                                   objid   = ls_phioloios_url-objidlo )
+           url_type = '2'
+         IMPORTING
+           error    =     DATA(lv_error_url)
+           url      =     DATA(lv_url_url)
+         EXCEPTIONS
+           no_io    = 1
+           OTHERS   = 2  ).
+
+      l_url = lv_url_url.
+
+      READ TABLE lt_ios_prop_result_url ASSIGNING <fs_prop> WITH KEY objtype = ls_phioloios_url-objtypeph
+                                                                     class   = ls_phioloios_url-classph
+                                                                     objid   = ls_phioloios_url-objidph.
+      IF sy-subrc = 0.
+        READ TABLE <fs_prop>-properties ASSIGNING <fs_properties> WITH KEY name = 'CREATED_AT'.
+        IF sy-subrc = 0 AND <fs_properties>-value > lv_datetime.
+          lv_datetime = <fs_properties>-value.
+          LOOP AT <fs_prop>-properties ASSIGNING <fs_properties> WHERE name = 'KW_RELATIVE_URL'.
+            IF <fs_properties>-value CS 'CF_'.
+              EXIT.
+            ENDIF.
+          ENDLOOP.
+          IF <fs_properties>-value CS 'CF_'.
+            READ TABLE <fs_prop>-properties ASSIGNING <fs_properties> WITH KEY name = 'BDS_KEYWORD'.
+            IF sy-subrc = 0.
+              CLEAR rt_attachments[].
+              lv_account = <fs_properties>-value.
+
+              READ TABLE lt_file_access_info_url ASSIGNING FIELD-SYMBOL(<fs_info_url>) INDEX 1.
+              IF sy-subrc = 0.
+                lv_info_url = <fs_info_url>-file_name.
+                lv_doc_id   = <fs_info_url>-file_name.
+              ENDIF.
+
+              l_url = ycl_a5627_adobe_sign_receive=>get_doc_url( EXPORTING iv_access_token = ycl_a5627_adobe_sign_receive=>get_access_token(  )
+                                                                           iv_account      = lv_account
+                                                                           iv_doc_id       = lv_doc_id ).
+
+              APPEND VALUE #( objid = ls_phioloios_url-objidph partner_guid = lv_partner_guid file_name = lv_info_url relative_url = l_url ) TO rt_attachments.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+  ENDLOOP.
+ENDMETHOD.
