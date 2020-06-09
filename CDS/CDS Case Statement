@@ -1,0 +1,27 @@
+@AbapCatalog.sqlViewName: 'YCRMA5627VEHDTS'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Vehicle General Dates'
+define view YCRMA5627_VEH_DATES as select from yveh_general as vehic
+left outer join yveh_gen_xt as gener
+    on gener.product_guid = vehic.product_guid
+left outer join yveh_maint_dat as maint
+    on maint.product_guid = vehic.product_guid
+{
+    key vehic.product_guid,
+    key vehic.zz0011 as vin,
+    gener.zz0014 as new_warr_end,
+    gener.zz0016 as p_app_warr_end,
+    gener.zz0037 as road_ass_end,
+    maint.zz0010 as plan_maint,
+    maint.zz0012 as pred_maint,
+    maint.zz0013 as plan_oil, 
+    maint.zz0015 as pred_oil,
+    case when maint.zz0010 < maint.zz0012 then maint.zz0010
+         else maint.zz0012
+    end as earlier_maint,
+    case when maint.zz0013 < maint.zz0015 then maint.zz0013
+         else maint.zz0015
+    end as earlier_oil
+}
