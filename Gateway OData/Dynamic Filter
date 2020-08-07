@@ -1,0 +1,69 @@
+  " $filter
+  me->entityset_filter(
+    EXPORTING
+      it_filter_select_options = it_filter_select_options
+      iv_entity_name           = iv_entity_name
+    CHANGING
+      ct_entityset = et_entityset  ).
+  
+________________________________________________________________________________________________
+  
+IT_FILTER_SELECT_OPTIONS	TYPE /IWBEP/T_MGW_SELECT_OPTION
+IV_ENTITY_NAME	TYPE STRING
+value( CT_ENTITYSET )	TYPE YCL_YCRMA5627_VEH_MPC=>TT_VEHICLEACTIVITIES  
+________________________________________________________________________________________________
+  
+    DATA:
+    lx_root         TYPE REF TO cx_root,
+    lo_dp_facade    TYPE REF TO /iwbep/cl_mgw_dp_facade,
+    lo_model        TYPE REF TO /iwbep/if_mgw_odata_re_model,
+    ls_entity_props TYPE /iwbep/if_mgw_odata_re_prop=>ty_s_mgw_odata_property,
+    lt_entity_props TYPE /iwbep/if_mgw_odata_re_prop=>ty_t_mgw_odata_properties,
+    ls_filter_sel   TYPE /iwbep/s_mgw_select_option,
+    lv_entity_name  TYPE /iwbep/med_external_name,
+    lv_tabix        TYPE i,
+    lv_type         TYPE string.
+
+  FIELD-SYMBOLS:
+    <fs_val>  TYPE data,
+    <fs_data> TYPE data.
+
+* Pre-check.
+  CHECK lines( it_filter_select_options ) > 0.
+
+* 'Type-cast' datatype.
+  lv_entity_name = iv_entity_name.
+
+* Get type of table.
+  TRY.
+*   Get DP facade.
+      lo_dp_facade ?= me->/iwbep/if_mgw_conv_srv_runtime~get_dp_facade( ).
+*   Get Model
+      lo_model = lo_dp_facade->/iwbep/if_mgw_dp_int_facade~get_model( ).
+*   Get Entity Properties.
+      lt_entity_props = lo_model->get_entity_type( lv_entity_name )->get_properties( ).
+
+*   Traverse filters.
+      LOOP AT it_filter_select_options INTO ls_filter_sel.
+*     Map Model Property to ABAP field name.
+        READ TABLE lt_entity_props INTO ls_entity_props
+        WITH KEY name = ls_filter_sel-property.
+        IF sy-subrc = 0.
+*       Evaluate (single) Property filter on EntitySet.
+          LOOP AT ct_entityset ASSIGNING <fs_data>.
+            lv_tabix = sy-tabix.
+*         Get Property value.
+            ASSIGN COMPONENT ls_entity_props-technical_name OF STRUCTURE <fs_data> TO <fs_val>.
+            IF sy-subrc = 0 AND <fs_val> IS ASSIGNED.
+*           Evaluate i'th filter (not adhering to filter => delete).
+              IF <fs_val> NOT IN ls_filter_sel-select_options.
+*             Delete from table, when not adhering to filter.
+                DELETE ct_entityset INDEX lv_tabix.
+              ENDIF.
+            ENDIF.
+            UNASSIGN <fs_val>.
+          ENDLOOP.
+        ENDIF.
+      ENDLOOP.
+    CATCH cx_root INTO lx_root.
+  ENDTRY.
