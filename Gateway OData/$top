@@ -1,0 +1,8 @@
+  " $top
+  IF is_paging-top IS NOT INITIAL.
+    LOOP AT et_entityset ASSIGNING FIELD-SYMBOL(<fs_entity_set>).
+      IF sy-tabix > is_paging-top.
+        DELETE et_entityset INDEX sy-tabix.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
