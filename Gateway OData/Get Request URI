@@ -1,0 +1,19 @@
+METHOD check_old_service.
+
+  rv_old_service = abap_true.
+
+  TRY.
+      DATA(lr_r3espons2) = me->/iwbep/if_mgw_conv_srv_runtime~get_dp_facade( ).
+      DATA(lt_header) = lr_r3espons2->get_request_header( ).
+
+      READ TABLE lt_header INTO DATA(ls_header) WITH KEY name = '~request_uri'.
+      IF sy-subrc = 0.
+        IF ls_header-value CS 'YCRMA5627_BP_CONS_SRV'. "New Service
+          CLEAR rv_old_service.
+        ENDIF.
+      ENDIF.
+
+    CATCH /iwbep/cx_mgw_tech_exception. " Technical Exception
+  ENDTRY.
+
+ENDMETHOD.
