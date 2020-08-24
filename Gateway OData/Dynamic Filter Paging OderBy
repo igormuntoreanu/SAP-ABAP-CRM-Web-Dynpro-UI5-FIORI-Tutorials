@@ -1,0 +1,18 @@
+Class:
+/IWBEP/CL_MGW_DATA_UTIL
+
+Methods:
+PAGING
+FILTERING
+ORDERBY
+
+__________________________
+
+Example
+
+      CALL METHOD /iwbep/cl_mgw_data_util=>paging
+        EXPORTING
+          is_paging = is_paging
+        CHANGING
+          ct_data   = et_entityset.
+
