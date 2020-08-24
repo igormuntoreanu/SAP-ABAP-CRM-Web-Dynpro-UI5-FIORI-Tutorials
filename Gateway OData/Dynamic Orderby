@@ -1,0 +1,60 @@
+      map_and_sort(
+        EXPORTING
+          it_order       = it_order
+          iv_entity_name = iv_entity_name
+        CHANGING
+          ct_table       = et_entityset ).
+          
+   _________________________________________________________
+   
+ METHOD map_and_sort.
+    DATA: lt_order     TYPE /iwbep/t_mgw_sorting_order,
+          lt_order_tmp TYPE /iwbep/t_mgw_sorting_order.
+
+    lt_order = it_order.
+
+    IF lines( lt_order ) EQ 1.
+      TRY.
+          DATA(lv_property) = lt_order[ 1 ]-property.
+        CATCH cx_sy_itab_line_not_found.
+      ENDTRY.
+
+      SELECT SINGLE p~abap_field FROM /iwbep/i_sbo_et AS e
+        LEFT OUTER JOIN /iwbep/i_sbo_pr AS p ON
+        p~parent_uuid = e~node_uuid WHERE
+        p~name = @lv_property  AND e~name = @iv_entity_name INTO @DATA(lv_abap_field).
+
+      lt_order_tmp = VALUE #( ( property = lv_abap_field order = lt_order[ 1 ]-order ) ) .
+
+      "order by
+      CALL METHOD /iwbep/cl_mgw_data_util=>orderby
+        EXPORTING
+          it_order = lt_order_tmp
+        CHANGING
+          ct_data  = ct_table.
+
+    ELSEIF lines( lt_order ) GT 1.
+      LOOP AT lt_order ASSIGNING FIELD-SYMBOL(<fs_order>).
+        CLEAR lv_property.
+        TRY.
+            lv_property = <fs_order>-property.
+          CATCH cx_sy_itab_line_not_found.
+        ENDTRY.
+
+        SELECT SINGLE p~abap_field FROM /iwbep/i_sbo_et AS e
+          LEFT OUTER JOIN /iwbep/i_sbo_pr AS p ON
+          p~parent_uuid = e~node_uuid WHERE
+          p~name = @lv_property  AND e~name = @iv_entity_name INTO @lv_abap_field.
+
+        lt_order_tmp = VALUE #( BASE lt_order_tmp ( property = lv_abap_field order = <fs_order>-order ) ) .
+      ENDLOOP.
+
+      "order by
+      CALL METHOD /iwbep/cl_mgw_data_util=>orderby
+        EXPORTING
+          it_order = lt_order_tmp
+        CHANGING
+          ct_data  = ct_table.
+    ENDIF.
+
+  ENDMETHOD.
