@@ -8,11 +8,34 @@ ORDERBY
 
 __________________________
 
-Example
+Example inside of a Get Entity Set
 
       CALL METHOD /iwbep/cl_mgw_data_util=>paging
         EXPORTING
           is_paging = is_paging
         CHANGING
           ct_data   = et_entityset.
+          
+          
+      DATA(lt_order) = CORRESPONDING #( io_tech_request_context->get_orderby( ) ).
+      "order by
+      CALL METHOD /iwbep/cl_mgw_data_util=>orderby
+        EXPORTING
+          it_order = lt_order
+        CHANGING
+          ct_data  = et_entityset.          
 
+DATA: lt_filter_tmp TYPE /iwbep/t_mgw_select_option.
+
+lt_filter = it_filter. "TYPE /IWBEP/T_MGW_SELECT_OPTION
+
+      TRY.
+          lt_filter_tmp = VALUE #( ( property = lv_abap_field select_options = lt_filter[ 1 ]-select_options ) ) .
+        CATCH cx_sy_itab_line_not_found.
+      ENDTRY.
+      "filter by
+      CALL METHOD /iwbep/cl_mgw_data_util=>filtering
+        EXPORTING
+          it_select_options = lt_filter_tmp
+        CHANGING
+          ct_data           = ct_table.
