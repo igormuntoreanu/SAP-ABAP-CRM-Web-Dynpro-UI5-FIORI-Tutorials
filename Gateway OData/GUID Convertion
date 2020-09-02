@@ -1,0 +1,52 @@
+Avoid the automatically GUID convertion by the Standard Metadata Internal Type
+At the MPC_EXT Class, redefine the "DEFINE" method:
+
+METHOD define.
+
+  TRY.
+      super->define( ).
+    CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
+  ENDTRY.
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleDetails'
+                                        iv_property      = 'ProductGuid' ).
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleActivities'
+                                        iv_property      = 'OrderGuid' ).
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleComplaints'
+                                        iv_property      = 'OrderGuid' ).
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleConnect'
+                                        iv_property      = 'ProductGuid' ).
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleCustomers'
+                                        iv_property      = 'ProductGuid' ).
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleLeasing'
+                                        iv_property      = 'ProductGuid' ).
+
+  me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleGuid'
+                                        iv_property      = 'YcustomerGuid' ).
+
+ENDMETHOD.
+
+________________________________________________________
+@78\QImporting@	IV_ENTITY_NAME	TYPE /IWBEP/IF_MGW_MED_ODATA_TYPES=>TY_E_MED_ENTITY_NAME
+@78\QImporting@	IV_PROPERTY	    TYPE /IWBEP/IF_MGW_MED_ODATA_TYPES=>TY_E_MED_ENTITY_NAME
+________________________________________________________
+METHOD transform_guid_to_char.
+
+  TRY.
+      DATA(lo_entity) = me->model->get_entity_type( iv_entity_name = IV_ENTITY_NAME ).
+
+      DATA(lo_guid) = lo_entity->get_property( iv_property_name = IV_PROPERTY ).
+      lo_guid->disable_conversion( ).
+
+      lo_guid->set_internal_type( iv_type = 'C' ).
+      lo_guid->set_internal_length( iv_internal_length = 32 ).
+
+    CATCH: /iwbep/cx_mgw_med_exception, cx_root. " Meta data exception
+  ENDTRY.
+
+ENDMETHOD.
