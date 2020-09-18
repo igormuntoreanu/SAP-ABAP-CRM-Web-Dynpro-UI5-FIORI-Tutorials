@@ -12,8 +12,11 @@ IT_FILTER_SELECT_OPTIONS	TYPE /IWBEP/T_MGW_SELECT_OPTION
 IV_ENTITY_NAME	TYPE STRING
 value( CT_ENTITYSET )	TYPE YCL_YCRMA5627_VEH_MPC=>TT_VEHICLEACTIVITIES  
 ________________________________________________________________________________________________
-  
-    DATA:
+ 
+ 
+METHOD entityset_filter_details.
+
+  DATA:
     lx_root         TYPE REF TO cx_root,
     lo_dp_facade    TYPE REF TO /iwbep/cl_mgw_dp_facade,
     lo_model        TYPE REF TO /iwbep/if_mgw_odata_re_model,
@@ -63,7 +66,29 @@ ________________________________________________________________________________
             ENDIF.
             UNASSIGN <fs_val>.
           ENDLOOP.
+        ELSE.
+*     Map Model Property to ABAP field name.
+          READ TABLE lt_entity_props INTO ls_entity_props
+          WITH KEY technical_name = ls_filter_sel-property.
+          IF sy-subrc = 0.
+*       Evaluate (single) Property filter on EntitySet.
+            LOOP AT ct_entityset ASSIGNING <fs_data>.
+              lv_tabix = sy-tabix.
+*         Get Property value.
+              ASSIGN COMPONENT ls_entity_props-technical_name OF STRUCTURE <fs_data> TO <fs_val>.
+              IF sy-subrc = 0 AND <fs_val> IS ASSIGNED.
+*           Evaluate i'th filter (not adhering to filter => delete).
+                IF <fs_val> NOT IN ls_filter_sel-select_options.
+*             Delete from table, when not adhering to filter.
+                  DELETE ct_entityset INDEX lv_tabix.
+                ENDIF.
+              ENDIF.
+              UNASSIGN <fs_val>.
+            ENDLOOP.
+          ENDIF.
         ENDIF.
       ENDLOOP.
     CATCH cx_root INTO lx_root.
   ENDTRY.
+
+ENDMETHOD.
