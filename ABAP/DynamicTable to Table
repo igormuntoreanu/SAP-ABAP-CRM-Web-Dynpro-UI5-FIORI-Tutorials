@@ -1,0 +1,14 @@
+
+  DATA: lt_bp_relation TYPE ycl_ycrma5627_veh_mpc=>tt_vehiclebprelations,
+        lt_veh_details TYPE ycl_ycrma5627_veh_mpc=>tt_vehicledetails,
+        lo_table       TYPE REF TO cl_abap_tabledescr.
+        
+  lo_table ?= cl_abap_structdescr=>describe_by_data( ct_entityset ).
+        
+  IF lo_table->applies_to_data( p_data = lt_veh_details ).
+  lt_veh_details = ct_entityset.
+  "Do something
+  ELSEIF lo_table->applies_to_data( p_data = lt_bp_relation ).
+  "Do other things
+  lt_bp_relations = ct_entityset.
+  ENDIF.
