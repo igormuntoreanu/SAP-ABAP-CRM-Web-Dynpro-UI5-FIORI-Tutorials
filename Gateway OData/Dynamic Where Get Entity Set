@@ -1,0 +1,4 @@
+Get entity set with dynamic Where
+
+DATA(lv_where)  = io_tech_request_context->get_osql_where_clause_convert( ).
+SELECT DISTINCT * FROM ycrma5627_veh_bprel INTO CORRESPONDING FIELDS OF TABLE @rv_entity_set WHERE (lv_where).
