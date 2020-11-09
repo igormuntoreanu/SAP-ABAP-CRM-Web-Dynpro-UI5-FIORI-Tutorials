@@ -1,0 +1,233 @@
+METHOD feedbackset_create_entity.
+
+  DATA: ls_fb    TYPE ycl_ycrma5627_feedback_mpc=>ts_feedback,
+        ls_fb_db TYPE ycrma5627_fb.
+
+  io_data_provider->read_entry_data(
+    IMPORTING
+      es_data = ls_fb ).
+
+  TRY.
+      ls_fb-transactionid = COND #( WHEN ls_fb-transactionid IS INITIAL THEN cl_system_uuid=>if_system_uuid_static~create_uuid_c32( ) ).
+      ls_fb-companyid     = COND #( WHEN ls_fb-companyid IS INITIAL THEN cl_system_uuid=>if_system_uuid_static~create_uuid_c32( ) ).
+    CATCH cx_uuid_error.
+  ENDTRY.
+
+  IF ls_fb-timeiso IS INITIAL.
+    GET TIME STAMP FIELD ls_fb-timeiso.
+  ENDIF.
+
+  ls_fb_db  = CORRESPONDING #( ls_fb ).
+  er_entity = CORRESPONDING #( ls_fb ).
+
+  DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+
+  INSERT ycrma5627_fb FROM ls_fb_db.
+  IF sy-subrc = 0.
+    COMMIT WORK AND WAIT.
+    "Inserted
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'S'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  002  ).
+
+  ELSE.
+    "Error during insert
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  005  ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        message_container = lo_message_container.
+  ENDIF.
+
+ENDMETHOD.
+
+
+
+
+METHOD feedbackset_delete_entity.
+
+  DATA: ls_fb    TYPE ycl_ycrma5627_feedback_mpc=>ts_feedback,
+        ls_fb_db TYPE ycrma5627_fb.
+
+  io_tech_request_context->get_converted_keys(
+      IMPORTING
+        es_key_values = ls_fb ).
+
+  ls_fb_db  = CORRESPONDING #( ls_fb ).
+
+  DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+
+  DELETE ycrma5627_fb FROM ls_fb_db.
+  IF sy-subrc = 0.
+    COMMIT WORK AND WAIT.
+    "Deleted
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'S'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  003  ).
+
+  ELSE.
+    "Feedback Rating not found in the DB.
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  001  ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        message_container = lo_message_container.
+  ENDIF.
+
+ENDMETHOD.
+
+
+
+
+METHOD feedbackset_get_entity.
+
+  DATA: ls_fb    TYPE ycl_ycrma5627_feedback_mpc=>ts_feedback,
+        ls_fb_db TYPE ycrma5627_fb.
+
+  io_tech_request_context->get_converted_keys(
+    IMPORTING
+      es_key_values = ls_fb ).
+
+  DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+
+  SELECT SINGLE *
+         FROM ycrma5627_fb
+         INTO CORRESPONDING FIELDS OF er_entity
+         WHERE companyid      = ls_fb-companyid
+           AND transactionid  = ls_fb-transactionid
+           AND timeiso        = ls_fb-timeiso
+           AND appid          = ls_fb-appid.
+  IF sy-subrc <> 0.
+    "Feedback not found in the DB
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  001  ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        message_container = lo_message_container.
+  ENDIF.
+
+ENDMETHOD.
+
+
+
+
+METHOD feedbackset_get_entityset.
+
+  DATA: ls_fb    TYPE ycl_ycrma5627_feedback_mpc=>ts_feedback,
+        ls_fb_db TYPE ycrma5627_fb.
+
+  DATA: lt_order TYPE /iwbep/t_mgw_sorting_order.
+
+  DATA(lv_where)  = io_tech_request_context->get_osql_where_clause_convert( ).
+
+  DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+
+  SELECT *
+         FROM ycrma5627_fb
+         INTO CORRESPONDING FIELDS OF TABLE et_entityset
+         WHERE (lv_where).
+  IF sy-subrc = 0.
+    "paging
+    CALL METHOD /iwbep/cl_mgw_data_util=>paging
+      EXPORTING
+        is_paging = is_paging
+      CHANGING
+        ct_data   = et_entityset.
+
+    "filter by
+    CALL METHOD /iwbep/cl_mgw_data_util=>filtering
+      EXPORTING
+        it_select_options = it_filter_select_options
+      CHANGING
+        ct_data           = et_entityset.
+
+    lt_order = CORRESPONDING #( io_tech_request_context->get_orderby( ) ).
+    "order by
+    CALL METHOD /iwbep/cl_mgw_data_util=>orderby
+      EXPORTING
+        it_order = lt_order
+      CHANGING
+        ct_data  = et_entityset.
+
+    " $top
+    IF is_paging-top IS NOT INITIAL.
+      LOOP AT et_entityset ASSIGNING FIELD-SYMBOL(<fs_entity_set>).
+        IF sy-tabix > is_paging-top.
+          DELETE et_entityset INDEX sy-tabix.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+  ELSE.
+    "Feedback not found in the DB
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  001  ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        message_container = lo_message_container.
+  ENDIF.
+
+ENDMETHOD.
+
+
+
+
+METHOD feedbackset_update_entity.
+
+  DATA: ls_fb    TYPE ycl_ycrma5627_feedback_mpc=>ts_feedback,
+        ls_fb_db TYPE ycrma5627_fb.
+
+  io_data_provider->read_entry_data(
+    IMPORTING
+      es_data = ls_fb ).
+
+  ls_fb_db  = CORRESPONDING #( ls_fb ).
+  er_entity = CORRESPONDING #( ls_fb ).
+
+  DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+
+  UPDATE ycrma5627_fb FROM ls_fb_db.
+  IF sy-subrc = 0.
+    COMMIT WORK AND WAIT.
+    "Updated
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'S'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  003  ).
+
+  ELSE.
+    "Error during update
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'YCRMA5627_FEEDBACK'
+        iv_msg_number             =  001  ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        message_container = lo_message_container.
+  ENDIF.
+
+ENDMETHOD.
+
