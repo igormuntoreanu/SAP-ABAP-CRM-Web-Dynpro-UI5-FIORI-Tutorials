@@ -1,0 +1,27 @@
+*    is this user is relevant for ACE ?
+  TRY.
+      CALL METHOD cl_crm_ace_authorization_mode=>get_authorization_mode
+        EXPORTING
+          im_object_type        = 'BUS1006'
+          im_is_bor_otype       = abap_true
+        IMPORTING
+          ex_authorization_mode = DATA(lv_authorization_mode).
+    CATCH cx_crm_ace_unsupported_action .
+  ENDTRY.
+  
+  
+  
+      IF lv_check_ace IS NOT INITIAL. " Based on SEARCH_BY_COMPLEX_ATTR (CL_BUPA_IL_SEARCH_SERVICE) line 343
+        SELECT but000~partner, but000~partner_guid, but000~mc_name1, but000~mc_name2, but000~type, but000~augrp
+          FROM but000
+            INNER JOIN but100 ON but100~partner = but000~partner
+            INNER JOIN crm_ace2_bp_acl  ON crm_ace2_bp_acl~object_guid = but000~partner_guid
+            INNER JOIN  crm_ace2_bp_uct ON crm_ace2_bp_uct~acegroup_id = crm_ace2_bp_acl~acegroup_id
+          INTO TABLE @DATA(lt_ace)
+          FOR ALL ENTRIES IN @lt_veh_details
+          WHERE but000~partner = @lt_veh_details-curr_partner "Ownership
+            AND crm_ace2_bp_uct~usr_name = @sy-uname.
+        IF sy-subrc = 0.
+          SORT lt_ace BY partner.
+        ENDIF. 
+      ENDIF.
