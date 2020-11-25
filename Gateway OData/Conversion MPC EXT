@@ -8,6 +8,53 @@ METHOD define.
     CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
   ENDTRY.
 
+
+  TRY.
+      DATA(lo_entity) = me->model->get_entity_type( iv_entity_name = 'VehicleDetails' ).
+
+      DATA(lo_guid) = lo_entity->get_property( iv_property_name = 'Vin' ).
+      TRY.
+          lo_guid->enable_conversion( ).
+          lo_guid->set_conversion_exit(
+            EXPORTING
+              iv_conv_exit  = 'VBCUP' ).
+          lo_guid->set_is_uppercase( iv_is_uppercase = abap_true ).
+        CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
+      ENDTRY.
+
+      lo_guid = lo_entity->get_property( iv_property_name = 'LicensePlate' ).
+      TRY.
+          lo_guid->enable_conversion( ).
+          lo_guid->set_conversion_exit(
+            EXPORTING
+              iv_conv_exit  = 'VBCUP' ).
+          lo_guid->set_is_uppercase( iv_is_uppercase = abap_true ).
+        CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
+      ENDTRY.
+
+      lo_guid = lo_entity->get_property( iv_property_name = 'ModelType' ).
+      TRY.
+          lo_guid->enable_conversion( ).
+          lo_guid->set_conversion_exit(
+            EXPORTING
+              iv_conv_exit  = 'VBCUP' ).
+          lo_guid->set_is_uppercase( iv_is_uppercase = abap_true ).
+        CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
+      ENDTRY.
+
+      lo_guid = lo_entity->get_property( iv_property_name = 'Model' ).
+      TRY.
+          lo_guid->enable_conversion( ).
+          lo_guid->set_conversion_exit(
+            EXPORTING
+              iv_conv_exit  = 'VBCUP' ).
+          lo_guid->set_is_uppercase( iv_is_uppercase = abap_true ).
+        CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
+      ENDTRY.
+    CATCH: /iwbep/cx_mgw_med_exception, cx_root. " Meta data exception
+  ENDTRY.
+
+
   me->transform_guid_to_char( EXPORTING iv_entity_name   = 'VehicleDetails'
                                         iv_property      = 'ProductGuid' ).
 
