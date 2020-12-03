@@ -1,0 +1,119 @@
+Call a Service Entity Set from another Service:
+
+  METHOD get_rec_obj_veh.
+    CHECK iv_profile IS NOT INITIAL.
+    DATA: lt_act_guids  TYPE crmd_object_guid_tab,
+          it_filter     TYPE /iwbep/t_mgw_select_option,
+          lt_activities TYPE ycl_ycrma5627_act_api_mpc=>tt_activity,
+          lv_importer   TYPE ycrma3000_importer.
+    DATA: it_filter_select_options TYPE /iwbep/t_mgw_select_option,
+          is_paging	               TYPE /iwbep/s_mgw_paging,
+          it_key_tab               TYPE /iwbep/t_mgw_name_value_pair,
+          it_navigation_path       TYPE /iwbep/t_mgw_navigation_path,
+          it_order                 TYPE /iwbep/t_mgw_sorting_order,
+          iv_filter_string         TYPE string,
+          iv_search_string         TYPE string,
+          io_tech_request_context	 TYPE REF TO /iwbep/if_mgw_req_entityset,
+          lt_entityset_bprel       TYPE ycl_ycrma5627_veh_mpc=>tt_vehicledetails,
+          es_response_context	     TYPE /iwbep/if_mgw_appl_srv_runtime=>ty_s_mgw_response_context,
+          lr_entityset_bp_rel      TYPE REF TO data.
+
+
+    lv_importer = get_user_importer(  ).
+
+    "through error if importer is missing
+    IF lv_importer IS INITIAL.
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_tech_exception
+        EXPORTING
+          http_status_code = 500
+          textid           = VALUE #(
+                     msgid = yif_crma5627_api~gc_msg_class_recent_items
+                     msgno = 015 "Importer couldn't be determined for user &1 !
+                     attr1 = sy-uname
+                     ).
+
+    ENDIF.
+
+    GET TIME STAMP FIELD DATA(lv_timestamp).
+
+
+    TRY.
+
+        SELECT * FROM ycrma5627_cds_c_recentobj_veh( p_importer = @lv_importer , p_timestamp = @lv_timestamp , p_profile = @iv_profile )
+        INTO TABLE @DATA(lt_recent_items).
+
+      CATCH cx_sy_dynamic_osql_semantics INTO DATA(lx_sql).
+
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_tech_exception
+          EXPORTING
+            http_status_code = 500
+            textid           = VALUE #(
+                       msgid = yif_crma5627_api~gc_msg_class_recent_items
+                       msgno = 014 "SQL Error! Contact Developer with call URL.!
+                       ).
+
+    ENDTRY.
+
+    CHECK lt_recent_items IS NOT INITIAL.
+    SORT lt_recent_items BY seq_no.
+    "to get BP relation from one place
+    DATA(lo_bp_rel) = NEW ycl_ycrma5627_veh_dpc_ext( ).
+
+    DELETE ADJACENT DUPLICATES FROM lt_recent_items COMPARING vin.
+    LOOP AT lt_recent_items REFERENCE INTO DATA(lr_recent_items).
+      APPEND INITIAL LINE TO et_entityset REFERENCE INTO DATA(lr_entity_set).
+      lr_entity_set->veh_description = lr_recent_items->veh_description.
+      lr_entity_set->model_year = lr_recent_items->model_year.
+      lr_entity_set->vin = lr_recent_items->vin.
+      lr_entity_set->veh_guid = lr_recent_items->veh_guid.
+      lr_entity_set->profile = iv_profile.
+      lr_entity_set->usern_name  = sy-uname.
+
+      it_key_tab = VALUE #( ( name = 'Vin' value = lr_recent_items->vin  ) ).
+      IF it_key_tab IS NOT INITIAL.
+        TRY.
+            lo_bp_rel->/iwbep/if_mgw_appl_srv_runtime~get_entityset(
+
+              EXPORTING
+                iv_entity_name           = 'VehicleDetails'
+                iv_entity_set_name       = 'VehicleDetailsSet'
+                iv_source_name           = 'VehicleDetails'
+                it_filter_select_options = it_filter_select_options
+                it_order                 = it_order
+                is_paging                = is_paging
+                it_navigation_path       = it_navigation_path
+                it_key_tab               = it_key_tab
+                iv_filter_string         = iv_filter_string
+                iv_search_string         = iv_search_string
+                io_tech_request_context  = go_if_mgw_req_entityset
+              IMPORTING
+                er_entityset             = lr_entityset_bp_rel
+                es_response_context      = es_response_context
+            ).
+          CATCH /iwbep/cx_mgw_busi_exception.
+          CATCH /iwbep/cx_mgw_tech_exception.
+        ENDTRY.
+        FIELD-SYMBOLS: <ls_data> TYPE any.
+
+        IF lr_entityset_bp_rel IS NOT INITIAL.
+          ASSIGN lr_entityset_bp_rel->* TO <ls_data>.
+          lt_entityset_bprel = <ls_data>.
+          READ TABLE lt_entityset_bprel ASSIGNING FIELD-SYMBOL(<fs_bprel>) INDEX 1.
+
+          lr_entity_set->owner = <fs_bprel>-curr_partner.
+          lr_entity_set->owner_fullname = |{ <fs_bprel>-bp_name_first } { <fs_bprel>-bp_name_last  }|.
+*          FIND REGEX '(?=.*At)(?=.*Dealer)' IN  lr_entity_set->owner_fullname.
+          IF  <fs_bprel>-per_navig_owner = abap_true.
+            lr_entity_set->owner_clickable = abap_true.
+          ENDIF.
+          lr_entity_set->service_customer = <fs_bprel>-service_customer.
+          lr_entity_set->service_cus_fullname = |{ <fs_bprel>-service_customer_fn } { <fs_bprel>-service_customer_ln  }|.
+*          FIND REGEX '(?=.*At)(?=.*Dealer)' IN  lr_entity_set->service_cus_fullname.
+          IF  <fs_bprel>-per_navig_serv = abap_true.
+            lr_entity_set->sercust_clickable = abap_true.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
