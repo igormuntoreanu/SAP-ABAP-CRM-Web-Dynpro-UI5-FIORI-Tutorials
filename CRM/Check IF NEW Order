@@ -1,0 +1,7 @@
+* Check whether it is a new ticket. Skip Mashup SAVE Action in AB Customer Consent for New tickets - E30EEBZ 03.12.2020
+  lr_newentity ?= me->ztyped_context->builheader->collection_wrapper->get_current( ).
+  IF lr_newentity IS BOUND.
+    IF lr_newentity->IS_PERSISTENT( ) eq abap_true.
+      lv_new = abap_true.
+    ENDIF.
+  ENDIF.
