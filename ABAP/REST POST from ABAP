@@ -1,0 +1,159 @@
+    CONSTANTS: lc_pccm_destination_ev1(15) TYPE c VALUE 'MYPO_CIAM_E'.
+    CONSTANTS: lc_pccm_destination_kvx_k(15) TYPE c VALUE 'MYPO_CIAM_K'.
+    CONSTANTS: lc_pccm_destination_kvx_pp(15) TYPE c VALUE 'MYPO_CIAM_PP'.
+    CONSTANTS: lc_pccm_destination_pvx(15) TYPE c VALUE 'MYPO_CIAM_P'.
+    CONSTANTS: lc_updated(3) TYPE c VALUE 200.
+    CONSTANTS: lc_created(3) TYPE c VALUE 201.
+
+    DATA:
+      l_country_str      TYPE ycrma5143_lang,
+      ls_language        TYPE ycrma5143_langu,
+      lv_destination(15) TYPE c,
+      lo_http_client     TYPE REF TO if_http_client,
+      lo_rest_client     TYPE REF TO cl_rest_http_client,
+      lv_url             TYPE string VALUE '/<country>/<langu>/accounts',
+      http_status        TYPE string,
+      http_status_c(3)   TYPE c VALUE 201,
+      lv_body            TYPE string,
+      lo_json            TYPE REF TO cl_clb_parse_json,
+      lo_response        TYPE REF TO if_rest_entity,
+      lo_request         TYPE REF TO if_rest_entity,
+      lo_sql             TYPE REF TO cx_sy_open_sql_db,
+      status             TYPE string,
+      reason             TYPE string,
+      response           TYPE string,
+      content_length     TYPE string,
+      location           TYPE string,
+      content_type       TYPE string,
+      lv_status          TYPE i,
+      lv_ciam_id         TYPE string,
+      lv_profile_id      TYPE string,
+      l_langu            TYPE laiso,
+      lv_xtrace_id       TYPE string,
+      ex_ref             TYPE REF TO cx_root,
+      lv_msg_text        TYPE string.
+
+    FIELD-SYMBOLS: <fs_comp> TYPE STANDARD TABLE,
+                   <fs_item> TYPE msg. "msg WITH NON-UNIQUE DEFAULT KEY,.
+    DATA: lv_lines      TYPE i,
+          lv_comp_count TYPE i.
+    DATA: dref TYPE REF TO data.
+
+    DATA lr_json_deserializer TYPE REF TO cl_trex_json_deserializer.
+    DATA: lr_parser TYPE REF TO cl_clb_parse_json.
+    DATA: ls_response_msg TYPE ycrma5143_inv_response."response_msg.
+
+    "0. Select right destination
+    CASE sy-sysid(2).
+      WHEN 'EV'.
+        lv_destination = lc_pccm_destination_ev1.
+      WHEN 'KV'.
+        lv_destination = lc_pccm_destination_kvx_pp.
+        IF strlen( gs_request-lastname ) >= 2 .      "BPs with lastname startng with K- are sent to CIAM K
+          IF gs_request-lastname(2) = 'K-' OR gs_request-lastname(2) = 'k-'.
+            lv_destination = lc_pccm_destination_kvx_k.
+          ENDIF.
+        ELSEIF  strlen( gs_request-localizedlastname ) >= 2.   "can happen after importer based attribut mapping
+          IF gs_request-localizedlastname(2) = 'K-' OR gs_request-localizedlastname(2) = 'k-'.    "
+            lv_destination = lc_pccm_destination_kvx_k.
+          ENDIF.
+        ENDIF.
+      WHEN 'PV'.
+        lv_destination = lc_pccm_destination_pvx.
+    ENDCASE.
+
+    REPLACE ALL OCCURRENCES OF '<country>' IN lv_url WITH gv_country.
+
+    SELECT SINGLE laiso FROM t002 INTO gs_request-preferredlanguage WHERE spras = gs_request-preferredlanguage. "get correct language key
+
+    REPLACE ALL OCCURRENCES OF '<langu>' IN lv_url WITH gs_request-preferredlanguage.
+   "get language_country combination -> not necessary anymore. 2digit key must be send
+
+    "1.===Create Client & Set Request URL
+    cl_http_client=>create_by_destination(
+     EXPORTING
+       destination              = lv_destination    " Logical destination (specified in function call)
+     IMPORTING
+       client                   = lo_http_client    " HTTP Client Abstraction
+     EXCEPTIONS
+       argument_not_found       = 1
+       destination_not_found    = 2
+       destination_no_authority = 3
+       plugin_not_active        = 4
+       internal_error           = 5
+       OTHERS                   = 6
+   ).
+
+
+    CREATE OBJECT lo_rest_client
+      EXPORTING
+        io_http_client = lo_http_client.
+
+    lo_http_client->request->set_version( if_http_request=>co_protocol_version_1_0 ).
+
+    cl_http_utility=>set_request_uri(
+      EXPORTING
+        request = lo_http_client->request    " HTTP Framework (iHTTP) HTTP Request
+        uri     = lv_url                     " URI String (in the Form of /path?query-string)
+    ).
+
+*    "2.===Convert Data to JSON + formatting
+    lv_body = /ui2/cl_json=>serialize( data = gs_request compress = abap_true ).
+    ycl_crma5143_ciam_out=>correct_case_sensitives(
+      CHANGING
+        cv_string = lv_body
+    ).
+
+    "3.===Set body
+    lo_request = lo_rest_client->if_rest_client~create_request_entity( ).
+    lo_request->set_content_type( iv_media_type = if_rest_media_type=>gc_appl_json ).
+    lo_request->set_string_data( lv_body ).
+    lo_request->set_header_field(
+      EXPORTING
+        iv_name  = 'accept'
+        iv_value = 'application/json'
+    ).
+
+    "4.===Post
+    TRY.
+        lo_rest_client->if_rest_resource~post( lo_request ).
+      CATCH cx_root INTO ex_ref.
+        lv_msg_text = ex_ref->get_text( ).
+
+        ycl_crma5143_utils=>add_message_bapi(
+      EXPORTING
+        iv_type        = 'E'
+        iv_id          = 'YCRMA5143'
+        iv_number      = '078'
+        iv_message_v1  = lv_msg_text
+      CHANGING
+        et_bapiret     = et_return ).
+    ENDTRY.
+
+    CHECK ycl_crma5280_log=>is_error_occured( et_return ) = abap_false.
+
+    "5.===Collect response
+    lo_response = lo_rest_client->if_rest_client~get_response_entity( ).
+    http_status = lv_status = lo_response->get_header_field( '~status_code' ).
+    reason = lo_response->get_header_field( '~status_reason' ).
+    lv_ciam_id = lo_response->get_header_field( 'ciamid' ).
+    lv_profile_id = lo_response->get_header_field( 'profileid' ).
+    lv_xtrace_id = lo_response->get_header_field( 'x-trace-id' ).
+    ev_xtrace_id = lv_xtrace_id.
+    response = lo_response->get_string_data( ).
+
+
+    "6.===Output
+    http_status_c = http_status.
+    ev_ciam_id = lv_ciam_id.
+    ev_profile_id = lv_profile_id.
+
+    "7.===create response message
+    create_response_messages(
+      EXPORTING
+        iv_http_status = http_status_c
+        iv_response = response
+        iv_reason = reason
+      CHANGING
+        ct_return = et_return
+).
