@@ -1,0 +1,68 @@
+1- Install extensions in the Visua Studio Code:
+
+SAP Fiori tools – Application Modeler
+SAP Fiori tools – Guided Development
+SAP Fiori tools – Service Modeler
+SAP Fiori tools – XML Annotation Language Server
+
+2- Create a folder, open application folder in Visual Studio Code and open Terminal.
+
+3- npm install -g yo @sapui5/generator-sapui5-templates
+
+4- yo @sapui5/sapui5-templates
+
+5- Fill like example:
+
+module name: DemoSAPUI5
+namespace: com.demosapui5
+template: SAP Fiori Master-Detail Application
+title: Products
+Description: Sample UI5 Tooling App
+Choose Fiori or Standalone: SAP Fiori Launchpad Component
+Service Base URI: https://services.odata.org/V2/Northwind/Northwind.svc/
+Data source URL: /srv/
+Object Collection: Products
+Object Collection ID: ProductID
+Object Title: ProductName
+Object Numeric Attribute: UnitPrice
+Object Unit of Measure:
+Line Item Collection:
+Line Item Collection ID:
+Line Item Title:
+Line Item Numeric Attribute:
+Line Item Unit of Measure:
+
+6- npm install
+
+7- npx ui5 serve -o test.html
+
+8- npm install --global @ui5/cli
+
+9- ui5 build
+
+10- npm install nwabap-ui5uploader -–save-dev
+
+11- Create .nwabaprc in the root folder with the below properties
+
+{
+    "base": "./dist",
+    "conn_usestrictssl" : false,
+    "conn_server": "http://<hostname>:<port>/",
+    "conn_client" : "client",
+    "conn_user": “UserName”,
+    "conn_password": “Password”,
+    "abap_package": "$TMP",
+    "abap_bsp": "ZVSCODE_APP",
+    "abap_bsp_text": "UI5 upload through VSCode App"
+}
+
+12- Add “deploy”: “npx nwabap upload” in the package.json. 
+
+  "scripts": {
+    "build": "ui5 build",
+    "start": "ui5 serve -o index.html",
+    "deploy": "npx nwabap upload"
+  },
+
+13- npm run upload   
+    npm run deploy
