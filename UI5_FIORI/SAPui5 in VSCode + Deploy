@@ -53,7 +53,8 @@ Line Item Unit of Measure:
     "conn_password": “Password”,
     "abap_package": "$TMP",
     "abap_bsp": "ZVSCODE_APP",
-    "abap_bsp_text": "UI5 upload through VSCode App"
+    "abap_bsp_text": "UI5 upload through VSCode App",
+    "abap_transport": "DS4K900171"
 }
 
 12- Add “deploy”: “npx nwabap upload” in the package.json. 
