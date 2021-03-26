@@ -9,7 +9,7 @@ SAP Fiori tools – XML Annotation Language Server
 
 3- npm install -g yo @sapui5/generator-sapui5-templates
 
-4- yo @sapui5/sapui5-templates
+4- yo @sapui5/sapui5-templates            - or - yo @sapui5
 
 5- Fill like example:
 
