@@ -1,0 +1,460 @@
+Mounting the NODES, LINES AND GROUPS of the Network Graph of SAP UI5:
+
+METHOD create_node.
+
+  DATA: ls_node      TYPE LINE OF /pbk/t_psm_get_graph_nodes,
+        ls_groups    TYPE LINE OF /pbk/t_psm_get_graph_groups,
+        ls_lines     TYPE LINE OF /pbk/t_psm_get_graph_lines,
+        ls_attribute TYPE /pbk/s_psm_get_graph_nodes_att.
+
+  ls_node-key         = is_comp-component.
+  ls_node-title       = is_comp-component_descr.
+  ls_node-status_comp = is_comp-status.
+
+  ls_groups-key   = is_comp-component.
+  ls_groups-title = is_comp-component_descr.
+
+  ls_node-icon        = 'sap-icon://BusinessSuiteInAppSymbols/icon-input'.
+  ls_node-shape       = co_shape_ui_circle. "Box or Circle
+  ls_node-group       = is_comp-component. "space.
+
+  DATA(lt_produced_objects) = it_produced_all[].
+  DELETE lt_produced_objects WHERE component NE is_comp-component.
+
+  READ TABLE lt_produced_objects INTO DATA(ls_produced_objects) INDEX 1.
+  IF sy-subrc = 0.
+    DELETE lt_produced_objects INDEX 1. "First entry is not relevant, just the status
+  ENDIF.
+
+  CASE ls_produced_objects-status. "Possibilities: INITIAL, WAITING, RUNNING, ERROR, SHUTDOWN, TERMINATED, CANCELLED
+    WHEN co_status_initial.
+      " white
+    WHEN co_status_running OR co_status_waiting.
+      ls_node-status = co_status_ui_i. "Informati = blue
+      ls_groups-status = co_status_ui_i.
+    WHEN co_status_error.
+      ls_node-status = co_status_ui_e. "Error = red
+      ls_groups-status = co_status_ui_e.
+    WHEN co_status_cancelled OR co_status_shutdown.
+      ls_node-status = co_status_ui_w. "Warning = yellow
+      ls_groups-status = co_status_ui_w.
+    WHEN co_status_terminated.
+      ls_node-status = co_status_ui_s. "Success = green
+      ls_groups-status = co_status_ui_s.
+    WHEN OTHERS.
+  ENDCASE.
+
+  "Create Produced Node Attributes
+  IF lines( lt_produced_objects ) > 0.
+    ls_attribute-node_key = ls_node-key.
+    ls_attribute-label = TEXT-001. "Produced Objects
+    APPEND ls_attribute TO ls_node-attributes.
+    CLEAR ls_attribute.
+    LOOP AT lt_produced_objects ASSIGNING FIELD-SYMBOL(<fs_produced>).
+      ls_attribute-node_key = ls_node-key.
+      ls_attribute-label = <fs_produced>-id && '-' && <fs_produced>-data_object.
+      ls_attribute-value = <fs_produced>-status.
+      APPEND ls_attribute TO ls_node-attributes.
+      CLEAR ls_attribute.
+    ENDLOOP.
+  ENDIF.
+
+  "Create Groups
+  READ TABLE ct_groups WITH KEY key = ls_groups-key TRANSPORTING NO FIELDS.
+  IF sy-subrc <> 0.
+    APPEND ls_groups TO ct_groups.
+  ENDIF.
+
+  APPEND ls_node TO ct_node.
+
+  IF iv_from IS NOT INITIAL AND iv_to IS NOT INITIAL.
+    ls_lines-from = iv_from.
+    ls_lines-to   = iv_to.
+    APPEND ls_lines TO ct_lines.
+  ENDIF.
+
+ENDMETHOD.
+
+METHOD create_node_boxes.
+
+  DATA: lv_cont      TYPE i,
+        ls_node      TYPE /pbk/s_psm_get_graph_nodes,
+        ls_lines     TYPE /pbk/s_psm_get_graph_lines,
+        ls_attribute TYPE /pbk/s_psm_get_graph_nodes_att.
+
+  LOOP AT ct_node ASSIGNING FIELD-SYMBOL(<fs_node>).
+    DATA(lv_tabix) = sy-tabix.
+    LOOP AT it_consumed ASSIGNING FIELD-SYMBOL(<fs_consumed>) WHERE consumer = <fs_node>-key.
+      lv_cont = lv_cont + 1.
+      IF lv_cont EQ 1.
+        ls_attribute-node_key = <fs_node>-key.
+        ls_attribute-label = TEXT-002. "Consumed Objects
+        APPEND ls_attribute TO <fs_node>-attributes.
+        CLEAR ls_attribute.
+      ENDIF.
+      ls_attribute-node_key = <fs_node>-key.
+      ls_attribute-label = <fs_consumed>-dataobjectkey.
+      ls_attribute-value = <fs_consumed>-producer.
+      APPEND ls_attribute TO <fs_node>-attributes.
+      CLEAR ls_attribute.
+    ENDLOOP.
+    CLEAR lv_cont.
+
+    DATA(lt_produced_objects) = it_produced_all[].
+    DELETE lt_produced_objects WHERE component NE <fs_node>-key.
+
+    DELETE lt_produced_objects INDEX 1. "First entry is not relevant
+
+    "Create Produced Nodes with link to the Component
+    LOOP AT lt_produced_objects ASSIGNING FIELD-SYMBOL(<fs_produced>).
+      ls_node-key    = <fs_produced>-component && '_' && <fs_produced>-id && '_' && <fs_produced>-job_type && '_' && <fs_produced>-job && '_' && <fs_produced>-data_object.
+      ls_node-title  = <fs_produced>-data_object.
+      CASE <fs_produced>-status. "Possibilities: INITIAL, WAITING, RUNNING, ERROR, SHUTDOWN, TERMINATED, CANCELLED
+        WHEN co_status_initial.
+          " white
+        WHEN co_status_running OR co_status_waiting.
+          ls_node-status = co_status_ui_i. "Informati = blue
+        WHEN co_status_error.
+          ls_node-status = co_status_ui_e. "Error = red
+        WHEN co_status_cancelled OR co_status_shutdown.
+          ls_node-status = co_status_ui_w. "Warning = yellow
+        WHEN co_status_terminated.
+          ls_node-status = co_status_ui_s. "Success = green
+        WHEN OTHERS.
+      ENDCASE.
+      ls_node-group  = <fs_node>-key.
+      ls_node-shape  = co_shape_ui_box.
+      ls_node-icon   = 'sap-icon://BusinessSuiteInAppSymbols/icon-input'.
+
+      "Attributes
+      ls_attribute-node_key = ls_node-key.
+      ls_attribute-label    = TEXT-003. "Job Number
+      ls_attribute-value    = <fs_produced>-id.
+      APPEND ls_attribute TO ls_node-attributes.
+      CLEAR ls_attribute.
+
+      ls_attribute-node_key = ls_node-key.
+      ls_attribute-label    = TEXT-004. "Job Type
+      ls_attribute-value    = <fs_produced>-job_type.
+      APPEND ls_attribute TO ls_node-attributes.
+      CLEAR ls_attribute.
+
+      ls_attribute-node_key = ls_node-key.
+      ls_attribute-label    = TEXT-005. "Job Description
+      ls_attribute-value    = <fs_produced>-job.
+      APPEND ls_attribute TO ls_node-attributes.
+      CLEAR ls_attribute.
+
+      ls_attribute-node_key = ls_node-key.
+      ls_attribute-label    = TEXT-006. "Status
+      ls_attribute-value    = <fs_produced>-status.
+      ls_attribute-status   = ls_node-status.
+      APPEND ls_attribute TO ls_node-attributes.
+      CLEAR ls_attribute.
+
+      APPEND ls_node TO ct_node.
+
+      ls_lines-from = <fs_node>-key.
+      ls_lines-to   = ls_node-key.
+      APPEND ls_lines TO ct_lines.
+
+*      IF lines( ct_node ) >= lv_tabix + 1.
+*        " Get the next and bind with Produced Object
+*        READ TABLE ct_node INTO DATA(ls_node_next) INDEX lv_tabix + 1.
+*        IF sy-subrc = 0.
+*          ls_lines-from = ls_node-key.
+*          ls_lines-to   = ls_node_next-key.
+*          APPEND ls_lines TO ct_lines.
+*        ENDIF.
+*      ENDIF.
+
+      CLEAR: ls_lines, ls_node.
+
+    ENDLOOP.
+
+    REFRESH lt_produced_objects.
+
+  ENDLOOP.
+
+ENDMETHOD.
+
+
+METHOD /bobf/if_frw_action~execute.
+
+  DATA: lt_root               TYPE /pbk/t_psm_scnr,
+        lt_key                TYPE /bobf/t_frw_key,
+        lt_node               TYPE /pbk/t_psm_get_graph_nodes,
+        lt_lines              TYPE TABLE OF /pbk/s_psm_get_graph_lines,
+        lt_groups             TYPE TABLE OF /pbk/s_psm_get_graph_groups,
+        ls_graph              TYPE /pbk/s_psm_get_network_graph,
+        lt_graph              TYPE TABLE OF /pbk/s_psm_get_network_graph,
+        lt_comps_final        TYPE /pbk/t_psm_get_components,
+        lt_comps_final_sorted TYPE /pbk/t_psm_get_components,
+        lt_comps_n_producers  TYPE /pbk/t_psm_get_components,
+        ls_comps              TYPE LINE OF /pbk/t_psm_get_components,
+        ls_comps_final_sorted TYPE LINE OF /pbk/t_psm_get_components,
+        ls_comps_n_producers  TYPE LINE OF /pbk/t_psm_get_components,
+        lt_produced_all       TYPE /pbk/t_psm_comp_detail.
+
+  FIELD-SYMBOLS: <ls_parameters> TYPE /pbk/s_psm_a_scenario_id.
+
+  ASSIGN is_parameters->* TO <ls_parameters>.
+
+  CLEAR: eo_message, et_failed_key, et_data.
+
+  "Get Scenario Key
+  /bobf/cl_tra_serv_mgr_factory=>get_service_manager(
+       /pbk/if_psm_scenario_c=>sc_bo_key )->convert_altern_key(
+    EXPORTING
+      iv_node_key          = /pbk/if_psm_scenario_c=>sc_node-root
+      iv_altkey_key        = /pbk/if_psm_scenario_c=>sc_alternative_key-root-scenario_id
+      it_key               = VALUE /pbk/t_psm_k_scenario_id( ( <ls_parameters>-scenario_id ) )
+   IMPORTING
+      et_key               = lt_key ).
+
+  "Get Scenario Details
+  IF io_read IS BOUND.
+    io_read->retrieve(
+        EXPORTING
+          iv_node            = /pbk/if_psm_scenario_c=>sc_node-root
+          it_key             = lt_key
+        IMPORTING
+          et_data            = lt_root ).
+  ELSE.
+    SELECT *
+      FROM /pbk/d_psm_scnr
+      INTO CORRESPONDING FIELDS OF TABLE lt_root
+      WHERE scenario_id = <ls_parameters>-scenario_id.
+  ENDIF.
+
+  DATA(lr_components) = NEW /pbk/cl_psm_a_get_components( ).
+
+  "Build Table of Components
+  LOOP AT lt_root ASSIGNING FIELD-SYMBOL(<ls_root>).
+
+    lr_components->find_wf_component_status( EXPORTING is_scenario_header = <ls_root>
+                                             IMPORTING et_data = DATA(lt_components) ).
+
+    IF lt_components IS INITIAL. "Scenario is initial state, didn't start
+
+      "Get components of WF
+      /pbk/cl_psm_configuration=>get_component_in_admcw( EXPORTING iv_workflow  = <ls_root>-jobtype_id
+                                                         IMPORTING et_component = DATA(lt_admin_workflows) ).
+
+      LOOP AT lt_admin_workflows ASSIGNING FIELD-SYMBOL(<ls_admin_workflows>).
+        ls_comps-component = <ls_admin_workflows>-component.
+        ls_comps-component_descr = /pbk/cl_psm_configuration=>get_component_description( iv_component = <ls_admin_workflows>-component ).
+        ls_comps-status = /pbk/if_psm_szm_tec_constants=>gc_component_status-initial.
+
+        APPEND ls_comps TO lt_components.
+        CLEAR ls_comps.
+      ENDLOOP.
+
+    ENDIF.
+
+    lt_components = lr_components->sort_components( lt_components ).
+    APPEND LINES OF lt_components TO lt_comps_final.
+    REFRESH lt_components[].
+
+  ENDLOOP.
+
+  "Consumed Objects
+  IF lt_comps_final IS NOT INITIAL.
+    SELECT *
+      FROM /pbk/v_psm_condo
+      INTO TABLE @DATA(lt_consumed)
+      FOR ALL ENTRIES IN @lt_comps_final
+      WHERE scenarioid = @<ls_parameters>-scenario_id
+        AND consumer   = @lt_comps_final-component.
+  ENDIF.
+
+  "Build Network Graph Nodes
+  LOOP AT lt_comps_final ASSIGNING FIELD-SYMBOL(<fs_comps_final>).
+    DATA(lr_produced_objects) = NEW /pbk/cl_psm_a_get_comp_deta( ).
+
+    CALL FUNCTION 'BAL_GLB_MEMORY_REFRESH' " Avoid 03 exception already loaded from Function "BAL_DB_LOAD
+      EXCEPTIONS
+        not_authorized = 1
+        OTHERS         = 2.
+
+    " Get Produced data objects
+    lr_produced_objects->get_component_timings(
+      EXPORTING
+        iv_scenario_id      = <ls_parameters>-scenario_id
+        iv_component        = <fs_comps_final>-component
+      IMPORTING
+        et_component_detail = DATA(lt_produced_objects) ).
+
+    APPEND LINES OF lt_produced_objects TO lt_produced_all.
+    REFRESH lt_produced_objects.
+  ENDLOOP.
+
+  " Sorting Logic and generation of Circle Nodes (Complex Logic)
+  " Here we get the first Node and start to getting the next Nodes based on their Producers.
+  DO lines( lt_comps_final ) TIMES.
+    DATA(lv_index) = sy-index.
+    "Find the first Node
+    IF lv_index = 1.
+      LOOP AT lt_produced_all ASSIGNING FIELD-SYMBOL(<fs_produced_all>).
+        READ TABLE lt_consumed INTO DATA(ls_consumed) WITH KEY consumer = <fs_produced_all>-component.
+        IF sy-subrc <> 0. "It was the first produced
+          DATA(ls_consumed_aux) = ls_consumed.
+          CLEAR ls_consumed_aux.
+          ls_consumed_aux-consumer = <fs_produced_all>-component. "From the second and further we need first to do this
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+      IF ls_consumed_aux IS INITIAL.
+        "Get then the Component without producer
+        DATA(lt_produced_all_aux) = lt_produced_all[].
+        SORT lt_produced_all_aux BY component.
+        DELETE ADJACENT DUPLICATES FROM lt_produced_all_aux COMPARING component.
+        LOOP AT lt_produced_all_aux ASSIGNING <fs_produced_all>.
+          DATA(lt_consumed_aux) = lt_consumed[].
+          DELETE lt_consumed_aux WHERE consumer NE <fs_produced_all>-component.
+          IF sy-subrc = 0.
+            DELETE lt_consumed_aux WHERE producer IS INITIAL.
+            IF sy-subrc = 0 AND lines( lt_consumed_aux ) = 0. "Means that this component does not have the producer and will be taken as the first one.
+              ls_consumed_aux-consumer = <fs_produced_all>-component.
+              READ TABLE lt_comps_final INTO ls_comps_final_sorted WITH KEY component = <fs_produced_all>-component.
+              IF sy-subrc = 0.
+
+                "Build Network Graph Node (Circle Nodes)
+                create_node( EXPORTING  it_produced_all = lt_produced_all
+                                        is_comp         = ls_comps_final_sorted
+                             CHANGING   ct_node         = lt_node
+                                        ct_lines        = lt_lines
+                                        ct_groups       = lt_groups ).
+
+                APPEND ls_comps_final_sorted TO lt_comps_final_sorted.
+                CLEAR ls_comps_final_sorted.
+              ENDIF.
+              CONTINUE.
+            ENDIF.
+          ENDIF.
+        ENDLOOP.
+      ELSE.
+        READ TABLE lt_comps_final INTO ls_comps_final_sorted WITH KEY component = <fs_produced_all>-component.
+        IF sy-subrc = 0.
+
+          "Build Network Graph Node (Circle Nodes)
+          create_node( EXPORTING  it_produced_all = lt_produced_all
+                                  is_comp         = ls_comps_final_sorted
+                       CHANGING   ct_node         = lt_node
+                                  ct_lines        = lt_lines
+                                  ct_groups       = lt_groups ).
+
+          APPEND ls_comps_final_sorted TO lt_comps_final_sorted.
+          CLEAR ls_comps_final_sorted.
+        ENDIF.
+        CONTINUE.
+      ENDIF.
+    ENDIF.
+
+    "Logic below is for the second line and so on - Find the Producer
+    READ TABLE lt_consumed INTO ls_consumed WITH KEY producer = ls_consumed_aux-consumer.
+    IF sy-subrc = 0.
+      DATA(lv_consumer) = ls_consumed_aux-consumer.
+      LOOP AT lt_consumed INTO ls_consumed WHERE producer = lv_consumer.
+        CLEAR ls_consumed_aux.
+        ls_consumed_aux = ls_consumed.
+        READ TABLE lt_comps_final INTO ls_comps_final_sorted WITH KEY component = ls_consumed-consumer.
+        IF sy-subrc = 0.
+          READ TABLE lt_comps_final_sorted WITH KEY component = ls_comps_final_sorted-component TRANSPORTING NO FIELDS.
+          IF sy-subrc <> 0.
+
+            "Build Network Graph Node (Circle Nodes)
+            create_node( EXPORTING  it_produced_all = lt_produced_all
+                                    is_comp         = ls_comps_final_sorted
+                                    iv_from         = CONV #( lv_consumer )
+                                    iv_to           = CONV #( ls_consumed_aux-consumer )
+                         CHANGING   ct_node         = lt_node
+                                    ct_lines        = lt_lines
+                                    ct_groups       = lt_groups ).
+
+            APPEND ls_comps_final_sorted TO lt_comps_final_sorted.
+            CLEAR ls_comps_final_sorted.
+          ENDIF.
+        ENDIF.
+        LOOP AT lt_consumed INTO ls_consumed WHERE producer = ls_consumed_aux-consumer.
+          READ TABLE lt_comps_final INTO ls_comps_final_sorted WITH KEY component = ls_consumed-consumer.
+          IF sy-subrc = 0.
+            READ TABLE lt_comps_final_sorted WITH KEY component = ls_comps_final_sorted-component TRANSPORTING NO FIELDS.
+            IF sy-subrc <> 0.
+
+              "Build Network Graph Node (Circle Nodes)
+              create_node( EXPORTING  it_produced_all = lt_produced_all
+                                      is_comp         = ls_comps_final_sorted
+                                      iv_from         = CONV #( ls_consumed_aux-consumer )
+                                      iv_to           = CONV #( ls_comps_final_sorted-component )
+                           CHANGING   ct_node         = lt_node
+                                      ct_lines        = lt_lines
+                                      ct_groups       = lt_groups ).
+
+              APPEND ls_comps_final_sorted TO lt_comps_final_sorted.
+              CLEAR ls_comps_final_sorted.
+            ENDIF.
+          ENDIF.
+        ENDLOOP.
+      ENDLOOP.
+    ELSE.
+      "Does not have a producer: Should be displayed alone in the Network Graph
+      READ TABLE lt_comps_final INTO ls_comps_n_producers WITH KEY component = ls_consumed_aux-consumer.
+      IF sy-subrc = 0.
+        READ TABLE lt_comps_final_sorted WITH KEY component = ls_consumed_aux-consumer TRANSPORTING NO FIELDS.
+        IF sy-subrc <> 0.
+
+          "Build Network Graph Node (Circle Nodes)
+          create_node( EXPORTING  it_produced_all = lt_produced_all
+                                  is_comp         = ls_comps_n_producers
+                       CHANGING   ct_node         = lt_node
+                                  ct_lines        = lt_lines
+                                  ct_groups       = lt_groups ).
+
+          APPEND ls_comps_n_producers TO lt_comps_n_producers.
+          CLEAR ls_comps_n_producers.
+        ENDIF.
+      ENDIF.
+      "Find next
+      LOOP AT lt_produced_all ASSIGNING <fs_produced_all>.
+        READ TABLE lt_comps_final_sorted WITH KEY component = <fs_produced_all>-component TRANSPORTING NO FIELDS.
+        IF sy-subrc <> 0.
+          READ TABLE lt_comps_n_producers WITH KEY component = <fs_produced_all>-component TRANSPORTING NO FIELDS.
+          IF sy-subrc <> 0.
+            CLEAR ls_consumed_aux.
+            ls_consumed_aux-consumer = <fs_produced_all>-component.
+            EXIT.
+          ENDIF.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    IF lines( lt_comps_n_producers ) + lines( lt_comps_final_sorted ) = lines( lt_comps_final ).
+      EXIT.
+    ENDIF.
+  ENDDO.
+
+  APPEND LINES OF lt_comps_n_producers TO lt_comps_final_sorted.
+
+  "Create Boxes Attributes and link them
+  create_node_boxes(  EXPORTING it_produced_all = lt_produced_all
+                                it_consumed = lt_consumed
+                      CHANGING ct_node  = lt_node
+                               ct_lines = lt_lines ).
+
+  ls_graph-scenario_id = <ls_parameters>-scenario_id.
+
+  DATA(lv_nodes) = /ui2/cl_json=>serialize( data = lt_node pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+  CONCATENATE '{ "nodes": ' lv_nodes ',' INTO ls_graph-content.
+
+  DATA(lv_lines) = /ui2/cl_json=>serialize( data = lt_lines compress = abap_true pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+  CONCATENATE ls_graph-content '"lines": ' lv_lines ',' INTO ls_graph-content.
+
+  DATA(lv_groups) = /ui2/cl_json=>serialize( data = lt_groups compress = abap_true pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+  CONCATENATE ls_graph-content '"groups": ' lv_groups ' }' INTO ls_graph-content.
+
+  APPEND ls_graph TO lt_graph.
+
+  et_data = lt_graph[].
+
+ENDMETHOD.
