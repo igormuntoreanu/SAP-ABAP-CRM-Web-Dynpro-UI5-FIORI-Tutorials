@@ -1,0 +1,105 @@
+@78\QImporting@	IV_OBJECT	TYPE BALOBJ_D
+@78\QImporting@	IV_SUBOBJECT	TYPE BALSUBOBJ
+@78\QImporting@	IV_EXT_IDENTIF	TYPE BALNREXT
+@79\QExporting@	ET_APP_LOG_EXP	TYPE /PBK/T_PSM_APP_LOG
+
+METHOD get_log_messages.
+*----------------------------------------------------------------------*
+* - 2017/01/20 <LAUTOTH> - Get list of log messages and return
+* - 2017/05/09 SBALINO - read event from log context
+* - 2017/10/27 SBALINO - round down timestamps, because
+*    a timestamp automatic rounded up to 60 is not a valid one
+*----------------------------------------------------------------------*
+
+    DATA: lt_log_header  TYPE balhdr_t,
+          lt_msg_handle  TYPE bal_t_msgh,
+          ls_msg         TYPE bal_s_msg,
+          lt_app_log_exp TYPE /pbk/t_psm_app_log.
+    DATA ls_log_context TYPE /pbk/s_tru_app_log_context.
+
+*--------------------------------------------------------------------*
+    " Create log filter
+*--------------------------------------------------------------------*
+    DATA(lt_bal_sel_extn) = VALUE bal_r_extn( ( sign = 'I' option = 'EQ' low = iv_ext_identif ) ).
+    DATA(lt_bal_sel_obj)  = VALUE bal_r_obj(  ( sign = 'I' option = 'EQ' low = iv_object ) ).
+    DATA(lt_bal_sel_sobj) = VALUE bal_r_sub(  ( sign = 'I' option = 'EQ' low = iv_subobject ) ).
+
+    DATA(ls_log_filter) = VALUE bal_s_lfil( extnumber = lt_bal_sel_extn
+                                            object    = lt_bal_sel_obj
+                                            subobject = lt_bal_sel_sobj ).
+*--------------------------------------------------------------------*
+    " Pass the header data and get log header data to find log handle
+*--------------------------------------------------------------------*
+    CALL FUNCTION 'BAL_DB_SEARCH'
+      EXPORTING
+        i_client           = sy-mandt
+        i_s_log_filter     = ls_log_filter
+      IMPORTING
+        e_t_log_header     = lt_log_header
+      EXCEPTIONS
+        log_not_found      = 1
+        no_filter_criteria = 2
+        OTHERS             = 3. "#EC CI_SUBRC
+
+    IF sy-subrc = 0.
+
+*--------------------------------------------------------------------*
+      "Get message handler to find actual message
+*--------------------------------------------------------------------*
+      CALL FUNCTION 'BAL_DB_LOAD'
+        EXPORTING
+          i_t_log_header     = lt_log_header
+          i_client           = sy-mandt
+        IMPORTING
+          e_t_msg_handle     = lt_msg_handle
+        EXCEPTIONS
+          no_logs_specified  = 1
+          log_not_found      = 2
+          log_already_loaded = 3
+          OTHERS             = 4. "#EC CI_SUBRC
+
+      IF sy-subrc = 0.
+
+*--------------------------------------------------------------------*
+        "Get log message and export
+*--------------------------------------------------------------------*
+        LOOP AT lt_msg_handle ASSIGNING FIELD-SYMBOL(<ls_msg_handler>).
+          CLEAR ls_msg.
+
+          CALL FUNCTION 'BAL_LOG_MSG_READ'
+            EXPORTING
+              i_s_msg_handle = <ls_msg_handler>
+              i_langu        = sy-langu
+            IMPORTING
+              e_s_msg        = ls_msg
+            EXCEPTIONS
+              log_not_found  = 1
+              msg_not_found  = 2
+              OTHERS         = 3. "#EC CI_SUBRC
+          IF sy-subrc = 0.
+
+            "export message
+            APPEND INITIAL LINE TO lt_app_log_exp ASSIGNING FIELD-SYMBOL(<ls_app_log_exp>).
+            MESSAGE ID ls_msg-msgid TYPE ls_msg-msgty  NUMBER ls_msg-msgno
+            WITH ls_msg-msgv1 ls_msg-msgv2 ls_msg-msgv3 ls_msg-msgv4 INTO <ls_app_log_exp>-message.
+            <ls_app_log_exp>-timestamp  = round( val = ls_msg-time_stmp dec = 0 mode = cl_abap_math=>round_down ).
+            <ls_app_log_exp>-long_timestamp = ls_msg-time_stmp.
+
+            <ls_app_log_exp>-applogid   = sy-tabix.
+            <ls_app_log_exp>-consumerid = iv_ext_identif.
+            ls_log_context-event = ls_msg-context-value.
+            <ls_app_log_exp>-event      = ls_log_context-event.
+
+            <ls_app_log_exp>-msg_key = ls_msg-msgno.
+            <ls_app_log_exp>-v1 = ls_msg-msgv1.
+            <ls_app_log_exp>-v2 = ls_msg-msgv2.
+            <ls_app_log_exp>-v3 = ls_msg-msgv3.
+            <ls_app_log_exp>-v4 = ls_msg-msgv4.
+
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+    ENDIF.
+
+    et_app_log_exp = lt_app_log_exp.
+  ENDMETHOD.
