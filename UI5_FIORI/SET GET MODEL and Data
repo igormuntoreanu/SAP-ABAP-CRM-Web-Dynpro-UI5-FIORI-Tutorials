@@ -1,0 +1,14 @@
+  sap.ui.define([
+	"de/hrk/hochweit/components/Benutzerverwaltung/controller/BaseController",
+	"sap/ui/model/json/JSONModel",
+],
+	// eslint-disable-next-line no-unused-vars
+	function (Controller, JSONModel) {	
+            
+            
+            this.loginModel = new JSONModel(login.data);
+            //Set Model
+            this.getView().setModel(this.loginModel, "Login");
+            
+            //Get Model Data
+            const sLogin = this.getModel("Login").getData();
