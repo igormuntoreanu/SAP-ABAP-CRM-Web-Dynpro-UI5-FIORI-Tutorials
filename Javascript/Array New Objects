@@ -1,0 +1,29 @@
+var oDiscs = [];
+
+function Disc(artist, genre, disc, copiesSold, pricePerDisc, musics){
+  
+  var oDiscs = {};
+  oDiscs.artist = artist;
+  oDiscs.genre = genre;
+  oDiscs.disc = disc;
+  oDiscs.copiesSold = copiesSold;
+  oDiscs.pricePerDisc = pricePerDisc;
+  oDiscs.totalProfit = copiesSold *  pricePerDisc;
+  oDiscs.musics = musics;
+  
+  return oDiscs;
+}
+
+   var oDisc = new Disc("Black Sabbath", "Heavy Metal", "Paranoid", 1600000, 8, [
+  "War Pigs", "Paranoid", "Planet Caravan"
+])
+   
+   oDiscs.push(oDisc);
+
+   oDisc = new Disc("Dire Straits", "Rock", "Brother in Arms", 3000000, 9, [
+  "So Far Away", "Money For Nothing", "Walk of Life"
+]);
+
+  oDiscs.push(oDisc);
+
+console.log(oDiscs);
