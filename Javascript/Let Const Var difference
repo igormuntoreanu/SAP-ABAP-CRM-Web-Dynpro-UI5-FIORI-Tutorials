@@ -1,3 +1,6 @@
+// Hoisting: Javascript Standards moves the declarations to the top(only for vars)
+// Standard variable definition is accessible in different contexts
+var allowToDrive;
 
 function checkAdult() {
   const age = Math.floor(Math.random() * 71);
@@ -13,8 +16,8 @@ function checkAdult() {
   // Variable Message is out of context because it was defined with "let"
   // console.log( message + age); 
 }
-// Standard variable definition is accessible in different contexts
-var allowToDrive = this.checkAdult();
+
+allowToDrive = this.checkAdult();
 if (allowToDrive) {
   console.log("Allowed to Drive " + allowToDrive);
 } else {
