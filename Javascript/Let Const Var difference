@@ -1,0 +1,22 @@
+
+function checkAdult() {
+  const age = Math.floor(Math.random() * 71);
+  // This type of variable will not change because it is a constant
+  // age = age + 1;
+  if (age > 18) {
+    let message = "Adult, age = ";
+    console.log( message + age);
+    return true;
+  } else {
+    return false;
+  }
+  // Variable Message is out of context because it was defined with "let"
+  // console.log( message + age); 
+}
+// Standard variable definition is accessible in different contexts
+var allowToDrive = this.checkAdult();
+if (allowToDrive) {
+  console.log("Allowed to Drive " + allowToDrive);
+} else {
+  console.log("Not Allowed to Drive " + allowToDrive);
+}
