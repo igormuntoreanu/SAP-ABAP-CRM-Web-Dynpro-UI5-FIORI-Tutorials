@@ -1,0 +1,2 @@
+				index = oRollen.rolle.findIndex(line => line.key === "admin");
+				(index != -1) ? oRollen.rolle.splice(index, 1) : oRollen;
