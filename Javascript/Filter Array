@@ -1,0 +1,1 @@
+oRollen = oRollen.filter(line => (line.key === "power_user" || line.key === "hsb");
