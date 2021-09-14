@@ -1,0 +1,47 @@
+onLiveChange:
+
+formatDecimal: function (oEvent) {
+			//Only allow Numbers and with 2 Decimal digits
+			var regex = /^[1-9]\d{0,8}(,\d{0,2})?$/;
+			var isValid = false;
+			var parameters = oEvent.getParameters();
+
+			isValid = regex.test(parameters.newValue);
+			if (isValid === false) {
+				//Only allows digits and comma
+				var input = parameters.newValue.replace(/[^\d,]/g, "");
+				//Remove after 3 digits after comma and keep until second digit
+				input = input.replace(/^(\d+,?\d{0,2})\d*$/, "$1");
+				//Remove duplicated commas
+				input = input.replace(/(,[^,]*),/g, "$1");
+				//Remove comma if first position of the string
+				input = input.replace(/^,/g, "");
+				//Remove 0 if first position of the string
+				input = input.replace(/^[0]/g, "");
+				// input = input.replace(/^,|,$/g, "");
+				oEvent.getSource().setValue(input);
+			}
+		},
+
+onChange:
+
+onWpvChange: function (oEvent) {
+			this.oParentController.oModel.setProperty("/wpvHasChanged", true);
+			var parameters = oEvent.getParameters();
+			//Do not allow last position with comma
+			var input = parameters.newValue.replace(/,$/g, "");
+
+			var res = input.split(",");
+			// If there is no decimal point or only one decimal place found.
+			if (res.length === 1 || res[1].length < 3) {
+				// Replace comma with point to do the conversion
+				input = input.replace(/,/g, ".");
+				// Set the number to two decimal places
+				var value = Number(input);
+				value = value.toFixed(2);
+				// Replace point with comma
+				value = value.replace(/\./g, ",");
+			}
+
+			oEvent.getSource().setValue(value);
+		}
