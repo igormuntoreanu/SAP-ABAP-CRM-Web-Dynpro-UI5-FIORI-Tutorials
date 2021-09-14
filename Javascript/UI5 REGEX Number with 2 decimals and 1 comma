@@ -2,12 +2,11 @@ onLiveChange:
 
 formatDecimal: function (oEvent) {
 			//Only allow Numbers and with 2 Decimal digits
-			var regex = /^[1-9]\d{0,8}(,\d{0,2})?$/;
+			var regex = /^[0-9]\d{0,8}(,\d{0,2})?$/;
 			var isValid = false;
 			var parameters = oEvent.getParameters();
-
 			isValid = regex.test(parameters.newValue);
-			if (isValid === false) {
+			if (isValid === false && parameters.newValue !== "" && parameters.newValue !== "0,") {
 				//Only allows digits and comma
 				var input = parameters.newValue.replace(/[^\d,]/g, "");
 				//Remove after 3 digits after comma and keep until second digit
@@ -17,9 +16,15 @@ formatDecimal: function (oEvent) {
 				//Remove comma if first position of the string
 				input = input.replace(/^,/g, "");
 				//Remove 0 if first position of the string
-				input = input.replace(/^[0]/g, "");
+				if (!input === "0,00"){
+					input = input.replace(/^[0]/g, "");	
+				}
 				// input = input.replace(/^,|,$/g, "");
 				oEvent.getSource().setValue(input);
+			}
+			
+			if (parameters.newValue === "" || parameters.newValue === "0,") {
+				oEvent.getSource().setValue("0,00");
 			}
 		},
 
