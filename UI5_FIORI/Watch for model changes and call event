@@ -1,0 +1,15 @@
+Na View onInit:
+this.vertragModel = this.getOwnerComponent().getModel("vertrag");
+this.getView().attachModelContextChange( this._modelCallBack.bind(this) );
+
+-----
+
+_modelCallBack: function(){
+			this.getView().detachModelContextChange(this._modelCallBack);
+			this.vertragModel.attachPropertyChange(this._updateZeilenContext.bind(this, this._vertragPath));
+		},
+    
+-----
+_updateZeilenContext: function(sPath){
+			debugger; // Toda vez que for alterado algo na tela cairá aqui.
+		},
