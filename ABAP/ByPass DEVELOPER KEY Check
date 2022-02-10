@@ -1,0 +1,6 @@
+Add any entry with 20 characters at DEVACCESS table.
+At Include LSKEYF00, form CHECK_KEY. Set a Break-point 
+Jump the CALL Function.
+Create an Enhancement there to make your life easier. 
+
+Must have debugging authorization to change variables
