@@ -1,0 +1,309 @@
+// https://sapintegrationhub.com/basis/archivelink/store-files-sap-archivelink/
+
+*&---------------------------------------------------------------------*
+*& Report ZARCHIVE_FILE
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ZARCHIVE_FILE.
+
+
+DATA: gt_file_table TYPE filetable,   "Uploaded file information
+      gt_content    TYPE soli_tab,    "Uploaded files content
+      gv_len        TYPE i.           "File length
+
+DATA: gv_ext   TYPE sood1-file_ext,   "File extension
+      gv_fname TYPE sood1-objdes.     "File name
+
+data: gv_archiv_id       TYPE saearchivi, "Archive connection ID
+      gv_xstring TYPE xstring,            "File in Xstring
+      gv_out TYPE i,
+      gv_arc_doc_id      TYPE saeardoid.  "Archive document ID
+
+ DATA gt_content1024        TYPE TABLE OF tbl1024.  "RAW 1024 format
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+PARAMETERS: p_path  TYPE string OBLIGATORY.                                 "File path
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-002.
+
+PARAMETERS: p_obj    TYPE toav0-sap_object OBLIGATORY DEFAULT 'EQUI',    "Business object type
+            p_obj_ty TYPE toaom-ar_object OBLIGATORY DEFAULT 'ZMDZ010',  "Archive document type
+            p_doc_no TYPE equnr OBLIGATORY.                              "Business document number
+
+SELECTION-SCREEN END OF BLOCK b2.
+
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_path.
+
+  PERFORM open_file_dialog USING p_path.                    "Open file upload dialog box
+
+
+START-OF-SELECTION.
+
+  PERFORM upload_file USING p_path.                         "Upload file
+
+  PERFORM split_file_path USING p_path.                     "Find file extension and file name
+
+  PERFORM get_archive_connection USING p_obj p_obj_ty.      "Get carchive connection of SAP object and archive document type
+
+  PERFORM convert_binary_to_xstring.                        "Convert binary to Xstring
+
+  PERFORM convert_xstring_to_1024.                          "Convert Xstring to raw 1024
+
+  PERFORM archive_obj_create_table.                         "Create archive table link and create archive document ID
+
+  PERFORM archive_obj_insert USING p_obj p_obj_ty p_doc_no. "Save archive document
+
+
+*&amp;---------------------------------------------------------------------*
+*&amp; Include          ZATTACH_FILE_FORMS
+*&amp;---------------------------------------------------------------------*
+*&amp;---------------------------------------------------------------------*
+*&amp; Form OPEN_FILE_DIALOG
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM open_file_dialog USING p_path.
+
+  DATA: ls_file_table LIKE LINE OF gt_file_table,
+        lv_rc         TYPE i.
+
+  CLEAR p_path.
+  REFRESH: gt_file_table.
+  CALL METHOD cl_gui_frontend_services=>file_open_dialog
+    EXPORTING
+      window_title     = 'Select File'
+      default_filename = '*.jpeg'
+      multiselection   = 'X'
+    CHANGING
+      file_table       = gt_file_table
+      rc               = lv_rc.
+
+  READ TABLE gt_file_table INDEX 1 INTO ls_file_table.
+  p_path = ls_file_table-filename.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form UPLOAD_FILE
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM upload_file USING p_path.
+
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename   = p_path
+      filetype   = 'BIN'
+    IMPORTING
+      filelength = gv_len
+    TABLES
+      data_tab   = gt_content.
+
+  PERFORM exception.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form SPLIT_FILE_PATH
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp;      --&gt; P_PATH
+*&amp;      --&gt; P_EXT
+*&amp;      --&gt; P_FNAME
+*&amp;---------------------------------------------------------------------*
+FORM split_file_path  USING    p_path.
+
+  DATA: lv_filename TYPE pcfile-path.
+
+  CHECK p_path IS NOT INITIAL.
+
+  lv_filename = p_path.
+
+  CALL FUNCTION 'PC_SPLIT_COMPLETE_FILENAME'
+    EXPORTING
+      complete_filename = lv_filename
+*     CHECK_DOS_FORMAT  =
+    IMPORTING
+*     DRIVE             =
+      extension         = gv_ext
+*     NAME              =
+      name_with_ext     = gv_fname
+*     PATH              =
+    EXCEPTIONS
+      invalid_drive     = 1
+      invalid_extension = 2
+      invalid_name      = 3
+      invalid_path      = 4
+      OTHERS            = 5.
+
+  PERFORM exception.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form EXCEPTION
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM exception .
+  IF sy-subrc ne 0.
+    MESSAGE ID     sy-msgid
+          TYPE   sy-msgty
+          NUMBER sy-msgno
+          WITH   sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form GET_ARCHIVE_CONNECTION
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp;      --&gt; P_OBJ
+*&amp;      --&gt; P_OBJ_TY
+*&amp;---------------------------------------------------------------------*
+FORM get_archive_connection  USING    p_obj
+                                      p_obj_ty.
+
+  CALL FUNCTION 'ARCHIV_CONNECTDEFINITION_GET'
+    EXPORTING
+      objecttype    = p_obj
+      documenttype  = p_obj_ty
+      client        = sy-mandt
+    IMPORTING
+      archivid      = gv_archiv_id
+    EXCEPTIONS
+      nothing_found = 1
+      OTHERS        = 2.
+
+  PERFORM exception.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form CONVERT_BINARY_TO_XSTRING
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM convert_binary_to_xstring .
+
+  CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+    EXPORTING
+      input_length = gv_len
+*     FIRST_LINE   = 0
+*     LAST_LINE    = 0
+    IMPORTING
+      buffer       = gv_xstring
+    TABLES
+      binary_tab   = gt_content.
+
+  PERFORM exception.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form CONVERT_XSTRING_TO_1024
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM convert_xstring_to_1024 .
+
+  CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+    EXPORTING
+      buffer        = gv_xstring
+    IMPORTING
+      output_length = gv_out
+    TABLES
+      binary_tab    = gt_content1024.
+
+  PERFORM exception.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form ARCHIVE_OBJ_CREATE_TABLE
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM archive_obj_create_table .
+
+  DATA: lv_doc_typ    TYPE toadv-doc_type,
+        lv_arc_length TYPE sapb-length.
+
+  lv_doc_typ = gv_ext.      "File extension
+  lv_arc_length = gv_len.   "File length
+
+  CALL FUNCTION 'ARCHIVOBJECT_CREATE_TABLE'
+    EXPORTING
+      archiv_id                = gv_archiv_id
+      document_type            = lv_doc_typ
+      length                   = lv_arc_length
+*     vscan_profile            = lv_vscan_profile
+***      compid                   = 'data'
+    IMPORTING
+      archiv_doc_id            = gv_arc_doc_id
+    TABLES
+      binarchivobject          = gt_content1024
+*     archivobject             = lt_content2
+    EXCEPTIONS
+      error_archiv             = 1
+      error_communicationtable = 2
+      error_kernel             = 3
+      OTHERS                   = 4.
+
+  PERFORM exception.
+
+ENDFORM.
+*&amp;---------------------------------------------------------------------*
+*&amp; Form ARCHIVE_OBJ_INSERT
+*&amp;---------------------------------------------------------------------*
+*&amp; text
+*&amp;---------------------------------------------------------------------*
+*&amp; --&gt;  p1        text
+*&amp; &lt;--  p2        text
+*&amp;---------------------------------------------------------------------*
+FORM archive_obj_insert USING p_obj p_obj_ty p_doc_no.
+
+  DATA: lv_doc_type  TYPE toadv-doc_type,
+        lv_file_name TYPE toaat-filename,
+        lv_object_no TYPE sapb-sapobjid.
+
+  lv_doc_type = gv_ext.       "File type PDF
+  lv_file_name = gv_fname.    "File Name
+  lv_object_no = p_doc_no.    "Invoice number
+
+  CALL FUNCTION 'ARCHIV_CONNECTION_INSERT'
+    EXPORTING
+      archiv_id             = gv_archiv_id
+      arc_doc_id            = gv_arc_doc_id
+      ar_object             = p_obj_ty
+      object_id             = lv_object_no
+      sap_object            = p_obj
+      doc_type              = lv_doc_type
+      filename              = lv_file_name
+      descr                 = 'SAP Integration Hub'
+      creator               = sy-uname
+    EXCEPTIONS
+      error_connectiontable = 1
+      OTHERS                = 2.
+
+  PERFORM exception.
+
+ENDFORM.
