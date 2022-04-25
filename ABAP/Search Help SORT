@@ -1,0 +1,58 @@
+FUNCTION /pbk/sh_snr_jobs.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  TABLES
+*"      RECORD_TAB STRUCTURE  SEAHLPRES
+*"      SHLP_TAB TYPE  SHLP_DESCR_TAB_T
+*"  CHANGING
+*"     REFERENCE(SHLP) TYPE  SHLP_DESCR_T
+*"     REFERENCE(CALLCONTROL) TYPE  DDSHF4CTRL
+*"----------------------------------------------------------------------
+
+  TYPES:
+    BEGIN OF ts_result,
+      scenario_id	TYPE /pbk/d_psm_scnr-scenario_id,
+      short_text  TYPE /pbk/d_psm_scnr-short_text,
+      jobtype_id  TYPE /pbk/d_psm_scnr-jobtype_id,
+    END OF ts_result.
+
+  TYPES: tts_result TYPE STANDARD TABLE OF ts_result.
+
+  DATA: lt_result TYPE tts_result.
+
+  IF callcontrol-step = 'SELECT'.
+
+    SELECT scenario_id, short_text, jobtype_id FROM /pbk/d_psm_scnr "#EC CI_ALL_FIELDS_NEEDED
+      INTO TABLE @DATA(lt_jobs).
+
+    SORT lt_jobs BY scenario_id DESCENDING.
+
+    lt_result = VALUE #( FOR ls_jobs IN lt_jobs ( scenario_id   = ls_jobs-scenario_id
+                                                  short_text    = ls_jobs-short_text
+                                                  jobtype_id    = ls_jobs-jobtype_id ) ).
+
+    CALL FUNCTION 'F4UT_RESULTS_MAP'
+      TABLES
+        shlp_tab    = shlp_tab
+        record_tab  = record_tab
+        source_tab  = lt_result
+      CHANGING
+        shlp        = shlp
+        callcontrol = callcontrol.
+
+    callcontrol-step = 'DISP'.
+
+    CALL FUNCTION 'F4UT_PARAMETER_SORT'
+      EXPORTING
+        parameter_sort = 'SCENARIO_ID'
+        descending     = 'X'
+      TABLES
+        shlp_tab       = shlp_tab
+        record_tab     = record_tab
+      CHANGING
+        shlp           = shlp
+        callcontrol    = callcontrol.
+
+  ENDIF.
+
+ENDFUNCTION.
