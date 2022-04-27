@@ -1,0 +1,5 @@
+CALL FUNCTION 'Z_20PLM_IBASE_VISU_MAIN_SEARCH'
+  EXPORTING
+    it_rg_status   = VALUE z20plmty_rg_status( ( sign = 'I' option = 'EQ' low = 'In use' ) )
+  IMPORTING
+    et_main_search = return.
