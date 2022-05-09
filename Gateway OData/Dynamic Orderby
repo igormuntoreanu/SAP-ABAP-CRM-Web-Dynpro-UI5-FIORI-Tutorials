@@ -1,6 +1,6 @@
       map_and_sort(
         EXPORTING
-          it_order       = it_order
+          it_order       = it_order "/iwbep/t_mgw_sorting_order
           iv_entity_name = iv_entity_name
         CHANGING
           ct_table       = et_entityset ).
