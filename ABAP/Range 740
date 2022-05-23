@@ -1,0 +1,6 @@
+DATA(lr_rg_vbeln_latest) = VALUE z20plmty_rg_zzvbeln_latest( FOR ls_rg_vbeln_latest
+                                                                    IN it_rg_vbeln_latest
+                                                                     ( sign   = ls_rg_vbeln_latest-sign
+                                                                       option = ls_rg_vbeln_latest-option
+                                                                       low    = |{ ls_rg_vbeln_latest-low ALPHA = IN }|
+                                                                       high   = |{ ls_rg_vbeln_latest-high ALPHA = IN }| ) ).
