@@ -1,0 +1,48 @@
+1) Implement /IWBEP/IF_MGW_APPL_SRV_RUNTIME~EXECUTE_ACTION
+
+2) Code
+
+METHOD /iwbep/if_mgw_appl_srv_runtime~execute_action.
+
+  DATA: ls_return      TYPE bapiret2,
+        lv_equi        TYPE c LENGTH 18,
+        ls_equi_header TYPE zif_z_20cs_equipment_getdeta2=>z20css_alm_me_tob_header.
+  DATA(lv_destination) = /iwbep/cl_sb_gen_dpc_rt_util=>get_rfc_destination( io_dp_facade = /iwbep/if_mgw_conv_srv_runtime~get_dp_facade( ) ).
+
+  CASE iv_action_name.
+    WHEN 'EquiDismantle'.
+
+      READ TABLE it_parameter INTO DATA(ls_parameter) WITH KEY name = 'Equnr'.
+      IF sy-subrc = 0.
+        lv_equi = ls_parameter-value.
+
+        CALL FUNCTION 'Z20PLM_EQUI_DISMANTLE_RFC' DESTINATION lv_destination
+          EXPORTING
+            i_equnr        = lv_equi
+          IMPORTING
+            es_return      = ls_return
+          EXCEPTIONS
+            system_failure = 1000
+            OTHERS         = 1002.
+
+        IF sy-subrc = 0 AND ls_return-type NE 'E'.
+
+          CALL FUNCTION 'Z_20CS_EQUIPMENT_GETDETAIL' DESTINATION lv_destination
+            EXPORTING
+              iv_equnr       = lv_equi
+            IMPORTING
+              es_equi_header = ls_equi_header
+            EXCEPTIONS
+              system_failure = 1000
+              OTHERS         = 1002.
+
+          copy_data_to_ref( EXPORTING is_data = ls_equi_header
+                            CHANGING cr_data = er_data ).
+        ELSE.
+          mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = ls_return-message ).
+          RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+        ENDIF.
+      ENDIF.
+    WHEN OTHERS.
+  ENDCASE.
+ENDMETHOD.
