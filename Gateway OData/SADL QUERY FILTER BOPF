@@ -1,0 +1,60 @@
+Method: IF_SADL_GW_QUERY_CONTROL~SET_QUERY_OPTIONS
+
+  METHOD if_sadl_gw_query_control~set_query_options.
+
+    DATA: lt_parameters TYPE if_sadl_public_types=>tt_entity_parameters.
+
+    IF iv_entity_set = 'SelectedPlantsInfoSet'.
+
+      io_query_options->get_filter_condition(
+        IMPORTING
+          et_filter_condition = DATA(lt_filter_cond)
+      ).
+
+      READ TABLE lt_filter_cond WITH KEY element = 'SCENARIOID' ASSIGNING FIELD-SYMBOL(<ls_filter>).
+      IF sy-subrc = 0.
+
+        APPEND VALUE if_sadl_public_types=>ty_entity_parameters( entity_alias = 'SelectedPlantsInfoSet'
+                                                                 parameters = VALUE #( ( name = 'IV_SCENARIOID' value = <ls_filter>-low ) )
+                                                                ) TO lt_parameters.
+
+
+        io_query_options->set_entity_parameters( it_parameters = lt_parameters  ).
+      ENDIF.
+
+
+    ELSEIF iv_entity_set = 'ScenarioSet' AND sy-uname EQ 'SCHEFJO'.
+
+      DATA: ls_filter_cond TYPE LINE OF if_sadl_public_types=>tt_condensed_condition,
+            ls_filter      TYPE LINE OF sabp_t_name_range_pairs.
+
+      io_query_options->get_filter_condition(
+        IMPORTING
+          et_filter_condition = lt_filter_cond
+      ).
+
+      SELECT name FROM /pbk/d_psm_admwf INTO TABLE @DATA(lt_jobtypenames) WHERE is_hidden = 'X'.
+
+      LOOP AT lt_jobtypenames INTO DATA(ls_jobtypename).
+        ls_filter_cond-element = 'JOBTYPE_ID'.
+        ls_filter_cond-operator = 'NE'.
+        ls_filter_cond-low = ls_jobtypename-name.
+        IF lines( lt_filter_cond ) > 1.
+          APPEND ls_filter_cond TO lt_filter_cond.
+          APPEND VALUE #( operator = 'AND' ) TO lt_filter_cond.
+        ELSE.
+          APPEND ls_filter_cond TO lt_filter_cond.
+          APPEND VALUE #( operator = 'AND' ) TO lt_filter_cond.
+        ENDIF.
+      ENDLOOP.
+
+      TRY.
+          io_query_options->set_filter(
+            EXPORTING
+              it_filter_condition = lt_filter_cond
+          ).
+        CATCH cx_sadl_gw_contract_violation. " GW property is not mapped to SADL
+      ENDTRY.
+    ENDIF.
+
+  ENDMETHOD.
