@@ -1,5 +1,7 @@
 Method: IF_SADL_GW_QUERY_CONTROL~SET_QUERY_OPTIONS
 
+https://help.sap.com/docs/ABAP_PLATFORM_NEW/23969e5c00e1475283553381af0b1a12/212da88123a64d2d82a8864edbd162d9.html?locale=en-US
+
   METHOD if_sadl_gw_query_control~set_query_options.
 
     DATA: lt_parameters TYPE if_sadl_public_types=>tt_entity_parameters.
