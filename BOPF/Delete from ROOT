@@ -1,0 +1,72 @@
+  METHOD delete_scenarios.
+*----------------------------------------------------------------------*
+* - 2018/01/11 SBALINO - delete scenarios
+*----------------------------------------------------------------------*
+    DATA lt_scenario_msg TYPE bal_tt_msg.
+    DATA lt_modification_scenario TYPE /bobf/t_frw_modification.
+
+    CHECK it_scenarios_for_deletion IS NOT INITIAL.
+
+    LOOP AT it_scenarios_for_deletion ASSIGNING FIELD-SYMBOL(<ls_scenario>).
+
+      APPEND VALUE /bobf/s_frw_modification(
+        node = /pbk/if_psm_scenario_c=>sc_node-root
+        change_mode = /bobf/if_frw_c=>sc_modify_delete
+        node_cat = /pbk/if_psm_scenario_c=>sc_node_category-root-root
+        key = <ls_scenario>-db_key
+        )
+     TO lt_modification_scenario.
+
+    ENDLOOP.
+
+    /bobf/cl_tra_serv_mgr_factory=>get_service_manager(
+         /pbk/if_psm_scenario_c=>sc_bo_key
+     )->modify(
+         EXPORTING
+           it_modification = lt_modification_scenario
+         IMPORTING
+           eo_message      = DATA(lo_message)
+         ).
+
+    IF lo_message IS NOT BOUND  OR ( lo_message IS BOUND AND lo_message->check( ) EQ abap_false ).
+
+      /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( )->save(
+      IMPORTING
+        ev_rejected            = DATA(lv_rejected)
+        eo_message             = lo_message
+    ).
+
+    ENDIF.
+
+    IF lv_rejected = abap_false
+       AND ( lo_message IS NOT BOUND
+          OR ( lo_message IS BOUND AND lo_message->check( ) EQ abap_false ) ).
+
+      "write succesfull message into log - for each scenario
+      APPEND VALUE bal_s_msg( msgty = /pbk/if_psm_szm_msg_constants=>gc_msgty_i
+                                   msgid = /pbk/if_psm_szm_msg_constants=>gc_msg_class
+                                   msgno = /pbk/if_psm_szm_msg_constants=>gc_msg_nr-msg_039 ) "Scenario was deleted.
+                        TO lt_scenario_msg.
+
+
+    ELSE. "there were problems
+      /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( )->cleanup( ).
+
+      "write error message into log - for each scenario
+      APPEND VALUE bal_s_msg( msgty = /pbk/if_psm_szm_msg_constants=>gc_msgty_e
+                          msgid = /pbk/if_psm_szm_msg_constants=>gc_msg_class
+                          msgno = /pbk/if_psm_szm_msg_constants=>gc_msg_nr-msg_040 ) "Scenario could not be deleted.
+                          TO lt_scenario_msg.
+
+      COMMIT WORK.
+
+    ENDIF.
+
+    store_scm_log_data(
+      EXPORTING
+        it_messages               = lt_scenario_msg
+        io_message                = lo_message
+        it_scenarios_for_deletion = it_scenarios_for_deletion
+    ).
+
+  ENDMETHOD.
