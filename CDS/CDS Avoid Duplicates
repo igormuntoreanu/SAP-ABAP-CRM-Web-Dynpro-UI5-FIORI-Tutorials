@@ -1,0 +1,17 @@
+@AbapCatalog.sqlViewName: '/PBK/V_MDM_BCAP2'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'CDS without duplicates'
+define view /PBK/CDS_MDM_BCAP_DISTINCT as select from /PBK/CDS_MDM_BCAP {    
+    key vehicle_type,
+    key mjahr_comment, 
+    plant_id,
+    max(comment_field) as comment_field,
+    max(distribution_date) as distribution_date,
+    max(end_date) as end_date,    
+    max(crea_date_time) as crea_date_time,
+    max(crea_uname) as crea_uname,
+    max(lchg_date_time) as lchg_date_time,
+    max(lchg_uname) as lchg_uname
+} group by vehicle_type, mjahr_comment, plant_id
