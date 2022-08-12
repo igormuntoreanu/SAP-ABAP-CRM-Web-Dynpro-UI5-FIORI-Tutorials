@@ -1,0 +1,148 @@
+FUNCTION z_20plm_ibase_visu_u_merkmale ##RFC_PERFORMANCE_OK.
+*"----------------------------------------------------------------------
+*"*"Lokale Schnittstelle:
+*"  IMPORTING
+*"     VALUE(OBJECTKEY) LIKE  BAPI1003_KEY-OBJECT OPTIONAL
+*"     VALUE(OBJECTTABLE) LIKE  BAPI1003_KEY-OBJECTTABLE
+*"     VALUE(CLASSNUM) LIKE  BAPI1003_KEY-CLASSNUM
+*"     VALUE(CLASSTYPE) LIKE  BAPI1003_KEY-CLASSTYPE
+*"     VALUE(STATUS) LIKE  BAPI1003_KEY-STATUS DEFAULT '1'
+*"     VALUE(STANDARDCLASS) LIKE  BAPI1003_KEY-STDCLASS OPTIONAL
+*"     VALUE(CHANGENUMBER) LIKE  BAPI1003_KEY-CHANGENUMBER OPTIONAL
+*"     VALUE(KEYDATE) LIKE  BAPI1003_KEY-KEYDATE DEFAULT SY-DATUM
+*"     VALUE(NO_DEFAULT_VALUES) LIKE  BAPI1003_KEY-FLAG DEFAULT SPACE
+*"     VALUE(KEEP_SAME_DEFAULTS) LIKE  BAPI1003_KEY-FLAG DEFAULT SPACE
+*"     VALUE(OBJECTKEY_LONG) LIKE  BAPI1003_KEY-OBJECT_LONG OPTIONAL
+*"  EXPORTING
+*"     VALUE(CLASSIF_STATUS) LIKE  BAPI1003_KEY-STATUS
+*"  TABLES
+*"      ALLOCVALUESNUMNEW STRUCTURE  BAPI1003_ALLOC_VALUES_NUM
+*"      ALLOCVALUESCHARNEW STRUCTURE  Z20PLMS_IBASE_ALLOC_VALUES_CHA
+*"      ALLOCVALUESCURRNEW STRUCTURE  BAPI1003_ALLOC_VALUES_CURR
+*"      RETURN STRUCTURE  BAPIRET2
+*"----------------------------------------------------------------------
+
+  DATA: lt_kskk_i    TYPE rmclkssk_tab,
+        lt_alloc_new TYPE TABLE OF bapi1003_alloc_values_char,
+        lt_kskk_d    TYPE cl_ngc_core_clf_persistency=>lty_t_rmcldel,
+        lt_inob_i    TYPE tt_inob,
+        lt_inob_d    TYPE cl_ngc_core_clf_persistency=>lty_t_rinob,
+        ls_ausp      TYPE LINE OF rmclausp_tab,
+        lt_ausp      TYPE rmclausp_tab,
+        lv_atinn     TYPE ausp-atinn,
+        lt_clmdcp    TYPE cl_ngc_core_clf_persistency=>lty_t_clmdcp.
+
+  DATA: lt_allocvaluesnum  TYPE TABLE OF bapi1003_alloc_values_num,
+        lt_allocvalueschar TYPE TABLE OF bapi1003_alloc_values_char,
+        lt_allocvaluescurr TYPE TABLE OF bapi1003_alloc_values_curr.
+
+  lt_alloc_new[] = CORRESPONDING #( allocvaluescharnew[] ).
+
+  CALL FUNCTION 'BAPI_OBJCL_GETDETAIL'
+    EXPORTING
+      objectkey       = objectkey
+      objecttable     = objecttable
+      classnum        = classnum
+      classtype       = classtype
+    TABLES
+      allocvaluesnum  = lt_allocvaluesnum
+      allocvalueschar = lt_allocvalueschar
+      allocvaluescurr = lt_allocvaluescurr
+      return          = return.
+  READ TABLE return WITH KEY type = 'E' TRANSPORTING NO FIELDS.
+  IF sy-subrc EQ 0.
+    EXIT.
+  ENDIF.
+
+  LOOP AT lt_allocvalueschar ASSIGNING FIELD-SYMBOL(<fs_allocvalueschar>).
+    READ TABLE lt_alloc_new ASSIGNING FIELD-SYMBOL(<fs_alloc_new>) WITH KEY charact = <fs_allocvalueschar>-charact.
+    IF sy-subrc = 0.
+      CLEAR <fs_allocvalueschar>.
+      MOVE-CORRESPONDING <fs_alloc_new> TO <fs_allocvalueschar>.
+    ENDIF.
+  ENDLOOP.
+
+  CALL FUNCTION 'BAPI_OBJCL_CHANGE'
+    EXPORTING
+      objectkey          = objectkey
+      objecttable        = objecttable
+      classnum           = classnum
+      classtype          = classtype
+      status             = status
+      standardclass      = standardclass
+      changenumber       = changenumber
+      keydate            = keydate
+      no_default_values  = no_default_values
+      keep_same_defaults = keep_same_defaults
+      objectkey_long     = objectkey_long
+    IMPORTING
+      classif_status     = classif_status
+    TABLES
+      allocvaluesnumnew  = lt_allocvaluesnum
+      allocvaluescharnew = lt_allocvalueschar
+      allocvaluescurrnew = lt_allocvaluescurr
+      return             = return.
+
+  READ TABLE return WITH KEY type = 'E' TRANSPORTING NO FIELDS.
+  IF sy-subrc <> 0.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait = abap_true.
+
+    READ TABLE allocvaluescharnew INTO DATA(ls_allocvaluescharnew) WITH KEY charact = 'IB_000001'. "Paper Technology
+    IF sy-subrc NE 0.
+      READ TABLE allocvaluescharnew INTO ls_allocvaluescharnew WITH KEY charact = '0000061402'. "Paper Technology
+    ENDIF.
+    IF sy-subrc = 0.
+      DATA(lo_classification) = cl_ngc_core_clf_db_update=>get_instance( ).
+      CALL FUNCTION 'CONVERSION_EXIT_ATINN_INPUT'
+        EXPORTING
+          input  = ls_allocvaluescharnew-charact
+        IMPORTING
+          output = lv_atinn.
+
+      SELECT ausp~*
+        FROM ausp
+        INNER JOIN inob ON ( ausp~objek = inob~cuobj )
+        INTO TABLE @DATA(lt_ausp_db)
+        WHERE inob~obtab = 'EQUI'
+          AND inob~objek = @objectkey
+          AND ausp~atinn = @lv_atinn.
+      IF sy-subrc = 0.
+        LOOP AT  lt_ausp_db INTO DATA(ls_ausp_db).
+          DATA(lv_tabix) = sy-tabix.
+          READ TABLE allocvaluescharnew WITH KEY value_char = ls_ausp_db-atwrt TRANSPORTING NO FIELDS.
+          IF sy-subrc = 0.
+            DELETE lt_ausp_db INDEX lv_tabix.
+          ELSE.
+            MOVE-CORRESPONDING ls_ausp_db TO ls_ausp.
+            ls_ausp-statu = 'L'. "Löschen
+            ls_ausp-delkz = abap_true.
+            APPEND ls_ausp TO lt_ausp.
+            CLEAR ls_ausp.
+          ENDIF.
+        ENDLOOP.
+        IF lt_ausp IS NOT INITIAL.
+          "Necessary to delete the old Characteristic value, because the standard BAPI "BAPI_OBJCL_CHANGE"
+          "just add new values and do not remove the old Characteristic ( for complex deep Characteristics like Paper Technology )
+          lo_classification->clf_db_update(
+            EXPORTING
+              it_kssk_insert_fm     = lt_kskk_i
+              it_kssk_delete_fm     = lt_kskk_d
+              it_inob_insert_fm     = lt_inob_i
+              it_inob_delete_fm     = lt_inob_d
+              it_ausp_fm            = lt_ausp
+              it_clmdcp             = lt_clmdcp
+              iv_in_update_task     = abap_false ).
+
+          CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+            EXPORTING
+              wait = abap_true.
+
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+ENDFUNCTION.
