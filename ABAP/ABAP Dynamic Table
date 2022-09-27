@@ -1,0 +1,873 @@
+*&---------------------------------------------------------------------*
+*& Report ZRERPMM005
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zrerpfi013.
+
+TABLES: acdoca, sscrfields.
+
+INCLUDE: <ICON>.
+
+************************************************************************
+* Constantes
+************************************************************************
+CONSTANTS: c_a     TYPE char01 VALUE 'A',
+           c_v     TYPE char01 VALUE 'V',
+           c_in    TYPE char02 VALUE '=',
+           c_x     TYPE char01 VALUE 'X',
+           c_and   TYPE char03 VALUE 'AND',
+           c_bukrs TYPE char05 VALUE 'BUKRS',
+           c_gjahr TYPE char05 VALUE 'GJAHR',
+           c_rldnr TYPE char05 VALUE 'RLDNR'.
+
+************************************************************************
+* Types
+************************************************************************
+TYPE-POOLS : abap.
+
+TYPES: BEGIN OF itab ,
+         tablename TYPE char20,
+         descricao TYPE ddtext,
+         chk(1),
+         color(4),
+       END OF itab.
+
+
+TYPES: BEGIN OF st_saida,
+         bukrs        TYPE bukrs,
+         gjahr        TYPE gjahr,
+         rldnr        TYPE rldnr,
+         table        TYPE char50,
+         zstatus      TYPE char12,
+         sdataintegr  TYPE dats,
+         zhoraintegr  TYPE tims,
+         zuserintegr  TYPE char12,
+         zmoterintegr TYPE char50,
+       END OF st_saida.
+
+TYPES: BEGIN OF st_empresas,
+         bukrs TYPE t001-bukrs,
+       END OF st_empresas.
+
+************************************************************************
+* Objeto
+************************************************************************
+DATA: gr_alv   TYPE REF TO cl_salv_table,
+      gr_error TYPE REF TO cx_salv_msg.
+
+DATA: lr_columns TYPE REF TO cl_salv_columns_table,
+      lr_column  TYPE REF TO cl_salv_column_table.
+
+************************************************************************
+* Tabela Interna
+************************************************************************
+DATA: it_table    TYPE REF TO data,
+      it_ifc      TYPE lvc_t_fcat,
+      it_itab     TYPE STANDARD TABLE OF itab,
+      it_saida    TYPE STANDARD TABLE OF st_saida,
+      it_empresas TYPE STANDARD TABLE OF st_empresas,
+      it_lock_4t4 TYPE STANDARD TABLE OF zterpfi_lock_4t4.
+
+************************************************************************
+* Workarea
+************************************************************************
+DATA: wa_line TYPE REF TO data,
+      wa_ifc  TYPE lvc_s_fcat.
+
+************************************************************************
+* FIELD-SYMBOLS
+************************************************************************
+FIELD-SYMBOLS: <dyn_table> TYPE STANDARD TABLE,
+               <dyn_wa>    TYPE any.
+
+************************************************************************
+* Variáveis
+************************************************************************
+DATA: l_cond TYPE char200,
+      l_exit TYPE char01.
+
+DATA: l_sel_button TYPE smp_dyntxt.
+
+************************************************************************
+* Tela de seleção
+************************************************************************
+SELECTION-SCREEN: FUNCTION KEY 1.
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-001.
+
+  "SELECT-OPTIONS: s_bukrs FOR acdoca-rbukrs NO INTERVALS OBLIGATORY.                "Empresa
+
+  PARAMETERS :
+    p_gjahr TYPE acdoca-gjahr OBLIGATORY,                "Ano
+    p_rldnr TYPE acdoca-rldnr OBLIGATORY,                "Ledger
+    p_perio TYPE char02 OBLIGATORY.                               "Periodo
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+AT SELECTION-SCREEN.
+  IF sy-ucomm = 'FC01'.
+    PERFORM f_exibir_log.
+  ENDIF.
+
+************************************************************************
+* Eventos
+************************************************************************
+INITIALIZATION.
+  l_sel_button-icon_id = icon_protocol.
+  l_sel_button-text    = 'LOG'.
+
+  sscrfields-functxt_01 = l_sel_button.
+
+START-OF-SELECTION.
+  PERFORM selecionar_tabelas.    "Verificar perfil
+  PERFORM monta_dados.           "Monta Dados
+
+
+************************************************************************
+* Macro
+************************************************************************
+*&---------------------------------------------------------------------*
+*& Macro definition mc_set_column_position
+*&---------------------------------------------------------------------*
+  DEFINE mc_set_column_position.
+
+    CALL METHOD lr_columns->set_column_position
+      EXPORTING
+        columnname = &1
+        position   = &2.
+
+  END-OF-DEFINITION.
+
+*&---------------------------------------------------------------------*
+*& Macro definition mc_set_output_lengh
+*&---------------------------------------------------------------------*
+*   &1 = Column Name
+*   &2 = Lenght
+*----------------------------------------------------------------------*
+  DEFINE mc_set_output_length.
+    TRY.
+        lr_column = lr_columns->get_column( &1 ).
+        lr_column->set_output_length( &2 ).
+
+      CATCH cx_salv_not_found.
+      CATCH cx_salv_existing.
+      CATCH cx_salv_data_error.
+    ENDTRY.
+
+  END-OF-DEFINITION.
+
+*&---------------------------------------------------------------------*
+*&      Form  get_structure
+*&---------------------------------------------------------------------*
+FORM get_structure USING p_table TYPE char20.
+
+  DATA : t_idetails  TYPE abap_compdescr_tab,
+         wa_xdetails TYPE abap_compdescr.
+
+  DATA : ref_table_des TYPE REF TO cl_abap_structdescr.
+
+  REFRESH: it_ifc, t_idetails.
+
+  CLEAR wa_xdetails.
+
+* Pegando estrutura da tabela
+  ref_table_des ?=
+      cl_abap_typedescr=>describe_by_name( p_table ).
+
+  t_idetails[] = ref_table_des->components[].
+
+  LOOP AT t_idetails INTO wa_xdetails.
+
+    CLEAR wa_ifc.
+
+    wa_ifc-fieldname = wa_xdetails-name .
+
+    CASE wa_xdetails-type_kind.
+      WHEN 'C'.
+        wa_ifc-datatype = 'CHAR'.
+      WHEN 'N'.
+        wa_ifc-datatype = 'NUMC'.
+      WHEN 'D'.
+        wa_ifc-datatype = 'DATE'.
+      WHEN 'P'.
+        wa_ifc-datatype = 'PACK'.
+      WHEN OTHERS.
+        wa_ifc-datatype = wa_xdetails-type_kind.
+
+    ENDCASE.
+
+    wa_ifc-inttype  = wa_xdetails-type_kind.
+    wa_ifc-intlen   = wa_xdetails-length.
+    wa_ifc-decimals = wa_xdetails-decimals.
+
+    APPEND wa_ifc TO it_ifc.
+
+  ENDLOOP.
+ENDFORM.                    "get_structure
+
+*&---------------------------------------------------------------------*
+*&      Form  create_dynamic_itab
+*&---------------------------------------------------------------------*
+FORM criar_tabela_dinamica.
+
+* Criar tabela dinamica e assign to FS
+  CALL METHOD cl_alv_table_create=>create_dynamic_table
+    EXPORTING
+      it_fieldcatalog  = it_ifc
+      i_length_in_byte = abap_false
+    IMPORTING
+      ep_table         = it_table.
+
+  ASSIGN it_table->* TO <dyn_table>.
+
+* Criando work area dynamic e assign FS
+  CREATE DATA wa_line LIKE LINE OF <dyn_table>.
+
+  ASSIGN wa_line->* TO <dyn_wa>.
+
+ENDFORM.                    "create_dynamic_itab
+
+
+*&---------------------------------------------------------------------*
+*&      Form  selecionar_dados
+*&---------------------------------------------------------------------*
+*       Selecionar dados de tabela
+*----------------------------------------------------------------------*
+*      -->P_TABLE    Nome da tabela
+*----------------------------------------------------------------------*
+FORM selecionar_dados USING p_table TYPE char20.
+
+  DATA: wa_lock_4t4 TYPE zterpfi_lock_4t4.
+
+  TYPES: BEGIN OF struct2,
+           cds       TYPE ddlname,
+           tabela    TYPE char20,
+           estrutura TYPE string,
+           empresa   TYPE string,
+           ano       TYPE gjahr,
+           mes       TYPE char02,
+           rldnr     TYPE rldnr.
+  TYPES     END OF struct2.
+
+  TYPES: BEGIN OF ts_pr_error,
+           error             TYPE string,
+           error_description TYPE string,
+           description       TYPE string,
+         END   OF ts_pr_error.
+
+  DATA: it_json         TYPE STANDARD TABLE OF struct2,
+        ls_pr_4t4_error TYPE ts_pr_error.
+
+  DATA: wa_json  TYPE struct2,
+        wa_saida TYPE st_saida.
+
+  DATA: lv_cds TYPE ddlname,
+        lv_tab TYPE char16.
+
+  PERFORM selecionar_cds USING p_table CHANGING lv_cds.
+
+  lv_tab = p_table.
+  PERFORM selecionar_tabela_lock USING lv_tab .
+
+
+*** Envio
+  wa_json-ano     = p_gjahr.
+  wa_json-mes     = p_perio.
+  wa_json-rldnr   = p_rldnr.
+  wa_json-cds     = lv_cds.
+  wa_json-tabela  = p_table.
+
+*** Lock tabela
+  wa_lock_4t4-tabela = p_table.
+  "wa_lock_4t4-rldnr  = p_rldnr.
+  "wa_lock_4t4-gjahr  = p_gjahr.
+  "wa_lock_4t4-poper  = p_perio.
+  wa_lock_4t4-datum  = sy-datum.
+
+  "LOOP AT s_bukrs.
+
+    DATA(lv_tabix) = sy-tabix.
+
+    "Verificar lock na tabela
+    READ TABLE it_lock_4t4 INTO wa_lock_4t4 WITH KEY tabela = p_table.
+
+    IF sy-subrc IS INITIAL.
+      IF wa_lock_4t4-status = abap_true.
+        MESSAGE e000(zfi) WITH 'Aguardando processamento do Hyperion da tabela:' p_table.
+      ENDIF.
+    ENDIF.
+
+*    IF lv_tabix = 1.
+*      wa_json-empresa = s_bukrs-low .
+*    ELSE.
+*      wa_json-empresa = wa_json-empresa && ',' && s_bukrs-low && ''.
+*    ENDIF.
+
+    "wa_lock_4t4-bukrs = s_bukrs-low.
+
+    APPEND wa_lock_4t4 TO it_lock_4t4.
+
+  "ENDLOOP.
+
+  LOOP AT it_ifc INTO DATA(wa_ifc).
+
+    IF sy-tabix = 1.
+      wa_json-estrutura = wa_ifc-fieldname .
+    ELSE.
+      wa_json-estrutura = wa_json-estrutura && ',' && wa_ifc-fieldname && ''.
+    ENDIF.
+
+  ENDLOOP.
+
+  IF sy-subrc IS INITIAL.
+
+    DATA(lo_http_util) =  NEW zcl_http_client( ).
+    lo_http_util->get_cpi_access_data( EXPORTING iv_service_name  = 'ReplicateParamOrc'
+*    lo_http_util->get_cpi_access_data( EXPORTING iv_service_name  = 'ApproveReprovePRAriba'
+                                       IMPORTING  ev_url           = DATA(lv_url)        ev_ssl_id        = DATA(lv_ssl_id)
+                                                  ev_proxy_host    = DATA(lv_proxy_host) ev_proxy_service = DATA(lv_proxy_service)
+                                                  ev_username      = DATA(lv_username)   ev_password      = DATA(lv_password)   ).
+
+    cl_http_client=>create_by_url( EXPORTING  url                = lv_url        ssl_id        = lv_ssl_id
+                                              proxy_host         = lv_proxy_host proxy_service = lv_proxy_service
+                                   IMPORTING  client             = DATA(lo_http_client)
+                                   EXCEPTIONS argument_not_found = 1   plugin_not_active  = 2
+                                              internal_error     = 3   OTHERS             = 4 ).
+    CHECK sy-subrc IS INITIAL.
+    lo_http_client->authenticate( EXPORTING username = lv_username password = lv_password ).
+
+    TRY.
+
+        DATA(lv_json_xstring) = cl_bcs_convert=>string_to_xstring( /ui2/cl_json=>serialize( data = wa_json compress = abap_true pretty_name = /ui2/cl_json=>pretty_mode-low_case ) ).
+        lo_http_client->request->set_method( if_http_request=>co_request_method_post ).
+        lo_http_client->request->set_content_type( 'application/json' ).
+        lo_http_client->request->set_data( lv_json_xstring ).
+
+        lo_http_client->send( EXCEPTIONS http_communication_failure = 1 http_invalid_state = 2 ).
+        lo_http_client->receive( EXCEPTIONS http_communication_failure = 1  http_invalid_state         = 2
+                                            http_processing_failed     = 3  OTHERS                     = 4 ).
+
+        DATA(lv_json_response) = lo_http_client->response->get_cdata( ).
+        lo_http_client->response->get_status( IMPORTING code = DATA(lv_http_status) ).
+
+        CLEAR wa_saida.
+
+        IF lv_http_status NE 200.
+
+          /ui2/cl_json=>deserialize( EXPORTING json        = lv_json_response
+                                               pretty_name =  /ui2/cl_json=>pretty_mode-none
+                                     CHANGING  data        = ls_pr_4t4_error ).
+
+          wa_saida-zmoterintegr = ls_pr_4t4_error-description.
+
+        ELSE.
+          wa_saida-zmoterintegr = 'Sucesso'.
+        ENDIF.
+
+        LOOP AT it_lock_4t4 INTO wa_lock_4t4.
+
+          IF lv_http_status EQ 200.
+            wa_lock_4t4-status = abap_true.
+          ELSE.
+            wa_lock_4t4-status = 'E'.
+          ENDIF.
+
+          MODIFY zterpfi_lock_4t4 FROM wa_lock_4t4.
+
+        ENDLOOP.
+
+        COMMIT WORK.
+
+        "LOOP AT s_bukrs.
+
+          "wa_saida-bukrs        = s_bukrs-low.
+          wa_saida-gjahr        = p_gjahr.
+          wa_saida-rldnr        = p_rldnr.
+          wa_saida-table        = p_table.
+          wa_saida-zstatus      = lv_http_status.
+          wa_saida-sdataintegr  = sy-datum.
+          wa_saida-zhoraintegr  = sy-uzeit.
+          wa_saida-zuserintegr  = sy-uname.
+
+          APPEND wa_saida TO it_saida.
+
+        "ENDLOOP.
+
+      CATCH cx_root.
+        " Nothing to do
+    ENDTRY.
+
+  ENDIF.
+
+ENDFORM.                    "get_data
+
+*&---------------------------------------------------------------------*
+*&      Form  VERIFICA_CLAUSA_WHERE
+*&---------------------------------------------------------------------*
+*       Where
+*----------------------------------------------------------------------*
+* Verifica se existe algum campo na estrutura da tabela que tenha nos
+* parâmetros de tela (caso exista colocar na clausula where) .
+*----------------------------------------------------------------------*
+FORM verifica_clausa_where .
+
+  CLEAR l_cond.
+
+  LOOP AT it_ifc INTO wa_ifc.
+    CASE wa_ifc-fieldname.
+      WHEN 'BUKRS'. "Parâmetro BUKRS
+        IF  l_cond IS NOT INITIAL.
+          CONCATENATE l_cond c_and INTO l_cond SEPARATED BY space.
+        ENDIF.
+        CONCATENATE l_cond c_bukrs c_in 'P_BUKRS'  INTO l_cond SEPARATED BY space.
+      WHEN 'GJAHR'. "Parâmetro GJAHR
+        IF  l_cond IS NOT INITIAL.
+          CONCATENATE l_cond c_and INTO l_cond SEPARATED BY space.
+        ENDIF.
+        CONCATENATE l_cond c_gjahr c_in 'P_GJAHR'  INTO l_cond SEPARATED BY space.
+      WHEN 'RLDNR'. "Parâmetro RLDNR
+        IF  l_cond IS NOT INITIAL.
+          CONCATENATE l_cond c_and INTO l_cond SEPARATED BY space.
+        ENDIF.
+        CONCATENATE l_cond c_rldnr c_in 'P_RLDNR'  INTO l_cond SEPARATED BY space.
+    ENDCASE.
+
+  ENDLOOP.
+
+
+ENDFORM.                    " VERIFICA_CLAUSA_WHERE
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  LIMPA_DADOS
+*&---------------------------------------------------------------------*
+*       Limpar dados
+*----------------------------------------------------------------------*
+FORM limpa_dados .
+
+************************************************************************
+* Tabela Interna
+************************************************************************
+  REFRESH:    it_ifc  .
+
+************************************************************************
+* Workarea
+************************************************************************
+  CLEAR: wa_line,
+         wa_ifc,
+         it_table.
+
+************************************************************************
+* FIELD-SYMBOLS
+************************************************************************
+  UNASSIGN: <dyn_table>,
+            <dyn_wa>.
+
+************************************************************************
+* Variáveis
+************************************************************************
+  CLEAR: l_cond.
+
+ENDFORM.                    " LIMPA_DADOS
+
+*&---------------------------------------------------------------------*
+*& Form selecionar_tabelas
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+FORM selecionar_tabelas .
+
+  TYPE-POOLS: slis.
+
+  DATA: x_fieldcat  TYPE slis_fieldcat_alv,
+        it_fieldcat TYPE slis_t_fieldcat_alv,
+        l_layout    TYPE slis_layout_alv,
+        x_events    TYPE slis_alv_event,
+        it_events   TYPE slis_t_event.
+
+  DATA: wa_itab TYPE  itab.
+
+  DATA selfield TYPE slis_selfield.
+
+*  SELECT mandt, name, type, numb, sign, opti, low, high, clie_indep
+*    FROM tvarvc
+*    INTO TABLE @DATA(t_val)
+*    WHERE name = 'ZFI_TAB_INTERFACE_4T4'.
+
+*  IF sy-subrc <> 0.
+**     Change this message to whatever you like
+*    MESSAGE i001(00) WITH 'Parâmetros de STVARV '
+*                          ' não encontrados'.
+*
+*    EXIT.
+*  ELSE.
+    PERFORM f_grava_parametros.
+
+    "LOOP AT t_val INTO DATA(wa_val).
+      "wa_itab-tablename = wa_val-low.
+      wa_itab-tablename = 'ZVERPCO_ACDOCAUN'.
+
+      PERFORM selecionar_nome_cds
+        USING wa_itab-tablename
+        CHANGING wa_itab-descricao.
+
+      APPEND wa_itab TO it_itab.
+    "ENDLOOP.
+  "ENDIF.
+
+*  x_fieldcat-fieldname = 'CHK'.
+*  x_fieldcat-tabname   = 'IT_ITAB'.
+*  x_fieldcat-col_pos   = 1.
+*  x_fieldcat-input     = abap_true.
+*  x_fieldcat-edit      = abap_true.
+*  x_fieldcat-checkbox  = abap_true.
+*  APPEND x_fieldcat TO it_fieldcat.
+*  CLEAR x_fieldcat.
+*
+*  x_fieldcat-fieldname = 'TABLENAME'.
+*  x_fieldcat-seltext_l = 'TABLENAME'.
+*  x_fieldcat-hotspot = abap_false.
+*  x_fieldcat-tabname = 'IT_ITAB'.
+*  x_fieldcat-outputlen = 40.
+*  x_fieldcat-col_pos = 2.
+*  APPEND x_fieldcat TO it_fieldcat.
+*  CLEAR x_fieldcat.
+*
+*  x_fieldcat-fieldname = 'DESCRICAO'.
+*  x_fieldcat-seltext_l = 'DESCRIÇÃO'.
+*  x_fieldcat-hotspot = abap_false.
+*  x_fieldcat-tabname = 'IT_ITAB'.
+*  x_fieldcat-outputlen = 60.
+*  x_fieldcat-col_pos = 3.
+*  APPEND x_fieldcat TO it_fieldcat.
+*  CLEAR x_fieldcat.
+*
+*  CALL FUNCTION 'REUSE_ALV_POPUP_TO_SELECT'
+*    EXPORTING
+*      i_title                 = 'Selecionar tabelas'
+*      i_selection             = abap_true
+*      i_zebra                 = abap_false
+*      i_screen_start_column   = 5
+*      i_screen_start_line     = 5
+*      i_screen_end_column     = 120
+*      i_screen_end_line       = 20
+*      i_checkbox_fieldname    = 'CHK'
+*      i_tabname               = 'IT_ITAB'
+*      i_scroll_to_sel_line    = abap_false
+*      it_fieldcat             = it_fieldcat
+*      i_callback_program      = sy-repid
+*      i_callback_user_command = 'USER_COMMAND'
+*    IMPORTING
+*      es_selfield             = selfield
+*    TABLES
+*      t_outtab                = it_itab
+*    EXCEPTIONS
+*      program_error           = 1.
+
+ENDFORM.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  MONTA_DADOS
+*&---------------------------------------------------------------------*
+*       Montar dados de saida
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM monta_dados .
+
+  DATA: l_table TYPE char20,
+        l_bukrs TYPE bukrs.
+
+  LOOP AT it_itab INTO DATA(wa_itab). "WHERE chk = abap_true.
+
+    l_table = wa_itab-tablename.
+
+*** Executando processo
+    PERFORM get_structure    USING l_table. "Selecionar estrutura
+    PERFORM verifica_clausa_where.          "Clausula Where
+    PERFORM criar_tabela_dinamica.          "Criar tabela dinamica
+    PERFORM selecionar_dados USING l_table. "Selecionar Dados
+
+  ENDLOOP.
+
+  IF it_saida IS NOT INITIAL.
+
+    PERFORM exibir_dados.
+  ENDIF.
+
+ENDFORM.                    " MONTA_DADOS
+
+*&---------------------------------------------------------------------*
+*& Form STATUS
+*&---------------------------------------------------------------------*
+* text
+*----------------------------------------------------------------------*
+* -->P_EXTAB text
+*----------------------------------------------------------------------*
+FORM status USING p_extab TYPE slis_t_extab.
+
+  SET PF-STATUS 'STATUS'.
+ENDFORM. " STATUS
+
+*&---------------------------------------------------------------------*
+*& Form USER_COMMAND
+*&---------------------------------------------------------------------*
+* text
+*----------------------------------------------------------------------*
+* -->R_UCOMM text
+* -->RS_SELFIELD text
+*----------------------------------------------------------------------*
+FORM user_command USING r_ucomm LIKE sy-ucomm
+rs_selfield TYPE slis_selfield.
+
+  DATA: gd_repid TYPE sy-repid, "Exists
+        ref_grid TYPE REF TO cl_gui_alv_grid.
+
+  IF ref_grid IS INITIAL.
+    CALL FUNCTION 'GET_GLOBALS_FROM_SLVC_FULLSCR'
+      IMPORTING
+        e_grid = ref_grid.
+  ENDIF.
+
+  IF NOT ref_grid IS INITIAL.
+    CALL METHOD ref_grid->check_changed_data .
+  ENDIF.
+
+  LOOP AT it_itab INTO DATA(wa_itab) WHERE chk = 'X' .
+    wa_itab-color = 'C300'.
+    MODIFY it_itab FROM wa_itab INDEX sy-tabix TRANSPORTING color.
+  ENDLOOP.
+  rs_selfield-refresh = 'X'.
+  BREAK-POINT.
+
+ENDFORM. "USER_COMMAND
+
+
+*&---------------------------------------------------------------------*
+*& Form exibir_dados
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM exibir_dados .
+
+  DATA: lr_functions TYPE REF TO cl_salv_functions_list.
+
+* Create instance
+  TRY.
+      CALL METHOD cl_salv_table=>factory
+        EXPORTING
+          list_display = if_salv_c_bool_sap=>false
+        IMPORTING
+          r_salv_table = gr_alv
+        CHANGING
+          t_table      = it_saida.
+
+    CATCH cx_salv_msg INTO gr_error.
+      MESSAGE e000(zfi) WITH 'Não é possivel exibir o relatório!'.
+  ENDTRY.
+
+  PERFORM enable_layout_settings.
+
+* get columns' object
+  lr_columns = gr_alv->get_columns( ).
+* column LEAVES_HOME
+  lr_functions = gr_alv->get_functions( ).
+*  lr_functions->set_default( abap_true ).
+  lr_functions->set_all( abap_true ).
+
+  PERFORM modificar_texto_col USING 'TABLE'        'Tabela'.
+  PERFORM modificar_texto_col USING 'ZSTATUS'      'Status'.
+  PERFORM modificar_texto_col USING 'SDATAINTEGR'  'Data'.
+  PERFORM modificar_texto_col USING 'ZHORAINTEGR'  'Hora'.
+  PERFORM modificar_texto_col USING 'ZUSERINTEGR'  'Usuário'.
+  PERFORM modificar_texto_col USING 'ZMOTERINTEGR' 'Retorno'.
+
+*...Events
+  DATA: lo_events TYPE REF TO cl_salv_events_table.
+*
+*   all events
+  lo_events = gr_alv->get_event( ).
+
+  gr_alv->display( ).
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form modificar_texto_col
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> P_FILED
+*&      --> PTEXT
+*&---------------------------------------------------------------------*
+FORM modificar_texto_col  USING    p_colum TYPE char30
+                                   p_text TYPE char50.
+
+  DATA: l_shorttext  TYPE char10.
+  DATA: l_mediumtext TYPE scrtext_m.
+  DATA: l_longtext   TYPE scrtext_l.
+
+  DATA: gx_salv_not_found  TYPE REF TO cx_salv_not_found.
+
+  TRY.
+
+* get columns' object
+      lr_columns = gr_alv->get_columns( ).
+* column LEAVES_HOME
+      lr_column ?= lr_columns->get_column( columnname = p_colum ).
+* use compatible data object to avoid runtime error
+      l_shorttext  = p_text(10).
+      l_mediumtext = l_longtext =  p_text.
+* set short text
+      lr_column->set_short_text( value = l_shorttext ).
+      lr_column->set_medium_text( value = l_mediumtext ).
+      lr_column->set_long_text( value = l_longtext ).
+
+    CATCH cx_salv_not_found INTO gx_salv_not_found.
+      DATA(gv_error_message) = gx_salv_not_found->get_text( ).
+      WRITE gv_error_message.
+  ENDTRY.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+FORM enable_layout_settings.
+
+  DATA layout_settings TYPE REF TO cl_salv_layout.
+  DATA layout_key      TYPE salv_s_layout_key.
+
+  layout_settings = gr_alv->get_layout( ).
+
+  layout_key-report = sy-repid.
+  layout_settings->set_key( layout_key ).
+
+  layout_settings->set_save_restriction( if_salv_c_layout=>restrict_none ).
+ENDFORM.                    "enable_layout_settings
+
+*&---------------------------------------------------------------------*
+*& Form selecionar_cds
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> P_TABLE
+*&      <-- CDS
+*&---------------------------------------------------------------------*
+FORM selecionar_cds  USING    p_p_table TYPE char20
+                     CHANGING p_cds     TYPE ddlname.
+
+
+  SELECT SINGLE  ddlname INTO p_cds
+  FROM ddldependency
+  WHERE objectname = p_p_table AND
+   objecttype   = 'VIEW'.
+
+ENDFORM.
+
+FORM selecionar_nome_cds  USING    p_p_table TYPE char20
+                          CHANGING p_text     TYPE ddtext.
+
+  SELECT SINGLE  ddtext INTO p_text
+  FROM dd25t
+  WHERE viewname = p_p_table.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form selecionar_tabela_lock
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM selecionar_tabela_lock USING p_table TYPE char16.
+
+  DATA: lv_data TYPE sy-datum.
+
+  lv_data = sy-datum + 15.
+
+  CLEAR  it_lock_4t4.
+
+  SELECT mandt
+        tabela
+        status
+        datum
+        sistema
+        mens
+     INTO TABLE  it_lock_4t4
+     FROM zterpfi_lock_4t4
+      WHERE tabela = p_table
+        AND datum GE lv_data.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form f_grava_parametros
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_grava_parametros .
+
+  DATA: wa_zterpfi001 TYPE zterpfi001.
+
+  wa_zterpfi001-rldnr = p_rldnr.
+  wa_zterpfi001-gjahr = p_gjahr.
+  wa_zterpfi001-poper = p_perio.
+  CONCATENATE p_gjahr p_perio '01'        INTO wa_zterpfi001-budat.
+  CONCATENATE p_gjahr wa_zterpfi001-poper INTO wa_zterpfi001-fiscyearper.
+
+  MODIFY zterpfi001 FROM wa_zterpfi001.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form f_exibir_log
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM f_exibir_log .
+
+  DATA: it_lock TYPE TABLE OF zterpfi_lock_4t4.
+
+  SELECT *
+    FROM zterpfi_lock_4t4
+  INTO TABLE
+    it_lock.
+
+  IF it_lock[] IS NOT INITIAL.
+
+    CALL FUNCTION 'POPUP_WITH_TABLE_DISPLAY'
+      EXPORTING
+        endpos_col = 110
+        endpos_row = 20
+        startpos_col = 10
+        startpos_row = 5
+        titletext = 'Tabela de lock'
+      "IMPORTING
+        "CHOISE = 10
+      tables
+        valuetab = it_lock
+      EXCEPTIONS
+        BREAK_OFF = 1
+        OTHERS = 2 .
+
+    ELSE.
+
+      MESSAGE e000(zfi) WITH 'Não há dados de log'.
+
+    ENDIF.
+
+ENDFORM.
