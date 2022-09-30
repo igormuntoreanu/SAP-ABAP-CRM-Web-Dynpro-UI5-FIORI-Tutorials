@@ -1,19 +1,4 @@
-**********************************************************************
-*** Include      : ZI_REQ_SEND_CPI                                 ***
-*** Titulo       : Envia Estratégia de Liberação ao SN             ***
-*** Autor        : Elton Bruno M. Araujo   -   Cognizant           ***
-*** Data Criação : 07/06/2021                                      ***
-*** Especificação: ID da especificação                             ***
-*** -------------------------------------------------------------- ***
-*** Descrição do Processo:                                         ***
-*** Envia Estratégia de Liberação ao SN                            ***
-*** -------------------------------------------------------------- ***
-*** Alterações :                                                   ***
-*** Data       Responsável    Identificação   Descrição            ***
-*** ----       -----------    -------------   ---------            ***
-*** 02/06/2021 S4DK909839     37183824829                          ***
-***                                                                ***
-**********************************************************************
+
 
 
 * Internal Tables
