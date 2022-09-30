@@ -1,6 +1,4 @@
 
-
-
 * Internal Tables
 DATA: it_items TYPE mmpur_requisition_items.
 
