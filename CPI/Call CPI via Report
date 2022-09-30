@@ -1,0 +1,270 @@
+**********************************************************************
+*** Include      : ZI_REQ_SEND_CPI                                 ***
+*** Titulo       : Envia Estratégia de Liberação ao SN             ***
+*** Autor        : Elton Bruno M. Araujo   -   Cognizant           ***
+*** Data Criação : 07/06/2021                                      ***
+*** Especificação: ID da especificação                             ***
+*** -------------------------------------------------------------- ***
+*** Descrição do Processo:                                         ***
+*** Envia Estratégia de Liberação ao SN                            ***
+*** -------------------------------------------------------------- ***
+*** Alterações :                                                   ***
+*** Data       Responsável    Identificação   Descrição            ***
+*** ----       -----------    -------------   ---------            ***
+*** 02/06/2021 S4DK909839     37183824829                          ***
+***                                                                ***
+**********************************************************************
+
+
+* Internal Tables
+DATA: it_items TYPE mmpur_requisition_items.
+
+* Estruturas
+DATA: ls_item        TYPE mmpur_requisition_item,
+      ls_req_item_cy TYPE mereq_item,
+      ls_item_if     TYPE REF TO if_purchase_requisition_item,
+      ls_req_item    TYPE mereq_item.
+
+* Variáveis
+DATA: lv_service_name TYPE string,
+      lv_payload      TYPE string,
+      lv_frgrl        TYPE flag,
+      lv_ebeln        TYPE eban-ebeln,
+      lv_statu        TYPE eban-statu,
+      lv_open_items   TYPE flag.
+
+
+* Check Tipo de Documento
+DATA: iv_klart TYPE klah-klart VALUE '032'.
+DATA: iv_class TYPE klah-class VALUE 'LIB_REQUISICAO'.
+
+DATA  lr_bsart TYPE RANGE OF bbsrt.
+DATA  wa_bsart LIKE LINE OF lr_bsart.
+
+SELECT SINGLE *
+        INTO @DATA(ls_klah)
+        FROM klah
+        WHERE klart EQ @iv_klart
+          AND class EQ @iv_class.
+IF sy-subrc EQ 0.
+  SELECT SINGLE *
+          INTO @DATA(ls_ksml)
+          FROM ksml
+          WHERE clint EQ @ls_klah-clint.
+  IF sy-subrc EQ 0.
+    SELECT SINGLE *
+            INTO @DATA(ls_kssk)
+            FROM kssk
+            WHERE klart EQ @ls_ksml-klart
+              AND clint EQ @ls_ksml-clint
+              AND adzhl EQ @ls_ksml-adzhl.
+    IF sy-subrc EQ 0.
+      SELECT *
+              INTO TABLE @DATA(lt_ausp)
+              FROM ausp
+              WHERE objek EQ @ls_kssk-objek.
+      IF sy-subrc EQ 0.
+        LOOP AT lt_ausp INTO DATA(ls_ausp).
+          wa_bsart-sign   = 'I'.
+          wa_bsart-option = 'EQ'.
+          wa_bsart-low    = ls_ausp-atwrt.
+          APPEND wa_bsart TO lr_bsart.
+        ENDLOOP.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+ENDIF.
+* Check Tipo de Documento
+
+* Get tabela de Itens
+it_items        = im_header->get_items( ).
+DATA(lv_memory) = im_header->get_data( )-memory.
+
+CLEAR lv_frgrl.
+
+* Nova Requisição
+SELECT COUNT(*)
+  FROM eban
+ WHERE banfn EQ im_banfn.
+DATA(lv_is_new)     = xsdbool( sy-subrc IS NOT INITIAL ).
+DATA(lv_is_changed) = abap_false.
+
+* Dados da Base
+IF lv_is_new EQ abap_false.
+  SELECT *
+    FROM eban
+    INTO TABLE @DATA(lt_eban)
+   WHERE banfn EQ @im_banfn.
+ENDIF.
+
+
+* Check Tipo de Documento
+READ TABLE it_items INTO ls_item INDEX 1.
+IF sy-subrc EQ 0.
+  ls_item_if  = ls_item-item.
+  ls_req_item = ls_item_if->get_data( ).
+  IF NOT ls_req_item-bsart IN lr_bsart.
+    EXIT.
+  ENDIF.
+ENDIF.
+* Check Tipo de Documento
+
+* Verifica se há algum item disponivel para envio ao SN (FRGRL = X)
+LOOP AT it_items INTO ls_item.
+
+  ls_item_if = ls_item-item.
+  ls_req_item = ls_item_if->get_data( ).
+
+  IF ls_req_item-frgrl EQ abap_true.
+    lv_frgrl = abap_true.
+  ENDIF.
+
+  lv_statu = ls_req_item-statu.
+
+  IF ls_req_item-ebeln IS NOT INITIAL.
+    lv_ebeln = ls_req_item-ebeln.
+  ENDIF.
+
+  IF ls_req_item-loekz IS INITIAL.
+    lv_open_items = abap_true.
+  ENDIF.
+
+  IF lv_is_new EQ abap_false.
+    IF lv_is_changed EQ abap_true.
+      CONTINUE.
+    ENDIF.
+
+    READ TABLE lt_eban ASSIGNING FIELD-SYMBOL(<ls_eban>)
+      WITH KEY bnfpo = ls_req_item-bnfpo.
+    IF sy-subrc IS NOT INITIAL.
+      lv_is_changed = abap_true.
+      CONTINUE.
+    ENDIF.
+
+    DATA(lo_structdescr) = CAST cl_abap_structdescr( cl_abap_structdescr=>describe_by_data( ls_req_item ) ).
+    LOOP AT lo_structdescr->components ASSIGNING FIELD-SYMBOL(<ls_component>).
+      ASSIGN COMPONENT <ls_component>-name OF STRUCTURE ls_req_item TO FIELD-SYMBOL(<lv_field_to>).
+      CHECK sy-subrc IS INITIAL AND <lv_field_to> IS ASSIGNED.
+
+      ASSIGN COMPONENT <ls_component>-name OF STRUCTURE <ls_eban>   TO FIELD-SYMBOL(<lv_field_from>).
+      CHECK sy-subrc IS INITIAL AND <lv_field_from> IS ASSIGNED.
+
+      IF <lv_field_from> NE <lv_field_to> AND <ls_component>-name NE 'ERDAT'.
+        lv_is_changed = abap_true.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+ENDLOOP.
+
+*IF ( lv_frgrl EQ abap_true OR ( ( lv_is_new EQ abap_true OR lv_is_changed EQ abap_true ) AND lv_open_items EQ abap_true AND lv_ebeln IS INITIAL AND lv_statu EQ 'N' AND im_header->get_data( )-bsart EQ 'ZARB' ) ) AND lv_memory EQ abap_false.
+IF ( lv_frgrl EQ abap_true OR ( ( lv_is_new EQ abap_true OR lv_is_changed EQ abap_true ) AND lv_open_items EQ abap_true AND im_header->get_data( )-bsart EQ 'ZARB' ) ) AND lv_memory EQ abap_false.
+
+  lv_service_name = 'ReplicateWorkflowRequisicaoDeCompra'.
+  lv_payload = '{ "PurchaseRequisition":"'  && im_banfn && '"}'.
+
+* Envio de informações ao CPI após commit da requisição de compra
+  CALL FUNCTION 'ZFERPMM_SEND_CPI' IN UPDATE TASK
+    EXPORTING
+      iv_service_name = lv_service_name
+      iv_payload      = lv_payload.
+
+* Grava texto "Aprovação em Análise no Service Now" após commit da requisição de compra
+  CALL FUNCTION 'ZFERPMM_REQ_EM_ANALISE_SN' IN UPDATE TASK
+    EXPORTING
+      iv_banfn = im_banfn.
+
+ENDIF.
+
+
+
+
+
+
+
+
+
+FUNCTION zferpmm_send_cpi.
+*"----------------------------------------------------------------------
+*"*"Módulo função atualização:
+*"
+*"*"Interface local:
+*"  IMPORTING
+*"     VALUE(IV_SERVICE_NAME) TYPE  STRING
+*"     VALUE(IV_PAYLOAD) TYPE  STRING
+*"  EXCEPTIONS
+*"      ARGUMENT_NOT_FOUND
+*"      PLUGIN_NOT_ACTIVE
+*"      INTERNAL_ERROR
+*"      HTTP_COMMUNICATION_FAILURE
+*"      HTTP_INVALID_STATE
+*"      HTTP_PROCESSING_FAILED
+*"----------------------------------------------------------------------
+  DATA(lo_http_util) =  NEW zcl_http_client( ).
+
+  lo_http_util->get_cpi_access_data(
+  EXPORTING
+  iv_service_name  = iv_service_name
+  IMPORTING
+  ev_url           = DATA(lv_url)
+  ev_ssl_id        = DATA(lv_ssl_id)
+  ev_proxy_host    = DATA(lv_proxy_host)
+  ev_proxy_service = DATA(lv_proxy_service)
+  ev_username      = DATA(lv_username)
+  ev_password      = DATA(lv_password)
+        ).
+*** Use CL_HTTP_CLIENT to consume the OData service using the method "create_by_url"
+  cl_http_client=>create_by_url(
+  EXPORTING
+    url           = lv_url
+    ssl_id        = lv_ssl_id
+    proxy_host    = lv_proxy_host  "proxy URL
+    proxy_service = lv_proxy_service  "proxy port
+  IMPORTING
+    client             = DATA(lo_http_client)
+  EXCEPTIONS
+    argument_not_found = 1
+    plugin_not_active  = 2
+    internal_error     = 3
+    OTHERS             = 4 ).
+  CALL METHOD lo_http_client->authenticate(
+    EXPORTING
+      username = lv_username
+      password = lv_password
+  ).
+
+  DATA lv_payload TYPE string.
+
+  lv_payload = iv_payload.
+
+* Convert that payload to xstring.
+  DATA lv_payload_x TYPE xstring.
+
+  CALL FUNCTION 'SCMS_STRING_TO_XSTRING'
+    EXPORTING
+      text   = lv_payload
+    IMPORTING
+      buffer = lv_payload_x.
+
+* Set up the HTTP Post
+  CALL METHOD lo_http_client->request->set_method(
+    if_http_request=>co_request_method_post ).
+
+  lo_http_client->request->set_content_type( 'application/json' ).
+
+  lo_http_client->request->set_data( lv_payload_x ).
+
+  lo_http_client->send(
+  EXCEPTIONS
+    http_communication_failure = 1
+    http_invalid_state = 2 ).
+  lo_http_client->receive(
+  EXCEPTIONS
+    http_communication_failure = 1
+    http_invalid_state         = 2
+    http_processing_failed     = 3
+    OTHERS                     = 4 ).
+
+  DATA(lv_json_response) = lo_http_client->response->get_cdata( ).
+
+ENDFUNCTION.
