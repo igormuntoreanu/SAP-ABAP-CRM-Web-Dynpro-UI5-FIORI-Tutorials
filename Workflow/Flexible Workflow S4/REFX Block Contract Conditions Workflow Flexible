@@ -1,0 +1,186 @@
+METHOD if_ex_recn_contract~after_store .
+
+  DATA: lo_contract            TYPE REF TO cl_recn_contract.
+  DATA: lt_xml_table TYPE STANDARD TABLE OF smum_xmltb.
+  DATA: ls_recn_contract TYPE recn_contract,
+        lt_status        TYPE TABLE OF jstat,
+        ls_status        TYPE jstat,
+        lt_return        TYPE TABLE OF bapiret2.
+
+  DATA: iv_object_id           TYPE recaobjnr.
+  DATA: iv_bukrs               TYPE bukrs.
+  DATA: iv_recnnr              TYPE recnnumber.
+
+  DATA: iv_objtype             TYPE sibftypeid.
+  DATA: iv_event               TYPE sibfevent.
+  DATA: iv_objkey              TYPE sibfinstid.
+  DATA: iv_initiator           TYPE xubname.
+  DATA: lv_unitprice TYPE recdcondvaluemonthfe.
+  DATA: lr_doctype TYPE RANGE OF recncontracttype,
+        ls_doctype LIKE LINE OF lr_doctype,
+        lr_bukrs   TYPE RANGE OF bukrs,
+        ls_bukrs   LIKE LINE OF lr_bukrs,
+        lr_total   TYPE RANGE OF recdcondvaluemonthfe,
+        ls_total   LIKE LINE OF lr_total.
+
+  lo_contract ?= io_object.
+
+  CHECK lo_contract IS BOUND AND NOT sy-uname = 'SAP_WFRT'. "Do not perform when approving via Workflow
+
+  IF lo_contract->md_activity EQ '02'.
+    ls_recn_contract   = lo_contract->if_recn_contract~ms_detail.
+
+    DATA(lo_conditions) = lo_contract->get_condition_mngr( ).
+    IF lo_conditions IS BOUND.
+      lo_conditions->get_list( IMPORTING et_detail = DATA(lt_condition) ). "Conditions Table
+    ENDIF.
+
+    "Só bloqueia o contrato, caso o mesmo supra as configuracoes
+    "cadastradas no APP no Fiori de Administracao de Workflows.
+    SELECT stream
+      FROM swf_flex_proc
+      INTO TABLE @DATA(lt_swf_flex_proc)
+      WHERE scenario_id = 'WS99900005'
+        AND status = 'ACTIVE'.
+    IF sy-subrc = 0.
+      DATA(lv_conditions_accepted) = abap_false.
+      LOOP AT lt_swf_flex_proc ASSIGNING FIELD-SYMBOL(<fs_workflow>).
+        "Le configuracao workflow flexivel
+        CALL FUNCTION 'SMUM_XML_PARSE'
+          EXPORTING
+            xml_input = <fs_workflow>-stream
+          TABLES
+            xml_table = lt_xml_table
+            return    = lt_return.
+
+        LOOP AT lt_xml_table ASSIGNING FIELD-SYMBOL(<fs_parameter>) WHERE cname = 'parameterValue'.
+          IF ( sy-tabix + 1 ) <= lines( lt_xml_table ). "avoid dump
+            READ TABLE lt_xml_table INTO DATA(ls_value) INDEX sy-tabix + 1.
+            IF sy-subrc = 0.
+              "Seguir conforme configuracao das condicoes no Workflow 99900005
+              CASE ls_value-cvalue.
+                WHEN 'PCDocumentType'.
+                  ls_doctype-sign = 'I'.
+                  ls_doctype-option = 'EQ'.
+                  ls_doctype-low = <fs_parameter>-cvalue.
+                  APPEND ls_doctype TO lr_doctype. CLEAR ls_doctype.
+                WHEN 'CompanyCode'.
+                  ls_bukrs-sign = 'I'.
+                  ls_bukrs-option = 'EQ'.
+                  ls_bukrs-low = <fs_parameter>-cvalue.
+                  APPEND ls_bukrs TO lr_bukrs. CLEAR ls_bukrs.
+                WHEN 'TotalAmount'.
+                  ls_total-sign = 'I'.
+                  ls_total-option = 'GE'.
+                  ls_total-low = <fs_parameter>-cvalue.
+                  APPEND ls_total TO lr_total. CLEAR ls_total.
+                WHEN OTHERS.
+              ENDCASE.
+            ENDIF.
+          ENDIF.
+        ENDLOOP.
+        REFRESH lt_xml_table.
+      ENDLOOP.
+
+      LOOP AT lt_condition INTO DATA(ls_condition) WHERE condvalidfrom <= sy-datum AND
+                                                         condvalidto >= sy-datum.
+        lv_unitprice = ls_condition-unitprice + lv_unitprice.
+      ENDLOOP.
+
+      IF lr_bukrs IS NOT INITIAL.
+        IF ls_recn_contract-bukrs IN lr_bukrs.
+          lv_conditions_accepted = abap_true.
+        ELSE.
+          DATA(lv_bukrs_fail) = abap_true.
+        ENDIF.
+      ENDIF.
+
+      IF lr_doctype IS NOT INITIAL.
+        IF ls_recn_contract-recntype IN lr_doctype.
+          lv_conditions_accepted = abap_true.
+        ELSE.
+          DATA(lv_doctype_fail) = abap_true.
+        ENDIF.
+      ENDIF.
+
+      IF lr_total IS NOT INITIAL.
+        IF lv_unitprice IN lr_total.
+          lv_conditions_accepted = abap_true.
+        ELSE.
+          DATA(lv_price_fail) = abap_true.
+        ENDIF.
+      ENDIF.
+
+      IF lv_price_fail IS NOT INITIAL OR lv_doctype_fail IS NOT INITIAL OR lv_bukrs_fail IS NOT INITIAL.
+        lv_conditions_accepted = abap_false.
+      ENDIF.
+
+      IF lv_conditions_accepted = abap_true.
+
+        ls_status-inact = space.
+        ls_status-stat  = 'I0065'. "Block Contract
+        APPEND ls_status TO lt_status.
+
+        CALL FUNCTION 'STATUS_CHANGE_INTERN'
+          EXPORTING
+            objnr               = ls_recn_contract-objnr
+          TABLES
+            status              = lt_status
+          EXCEPTIONS
+            object_not_found    = 1
+            status_inconsistent = 2
+            status_not_allowed  = 3
+            OTHERS              = 4.
+        IF sy-subrc <> 0.
+          MESSAGE 'Erro ao bloquear contrato' TYPE 'I'.
+        ENDIF.
+
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+  "Atencao: o Workflow só é disparado se atender as condicoes do Workflow Flexivel
+  "Nao é necessário fazer a lógica acima para o disparo do workflow abaixo
+  "Pois isso já é controlado pelo Standard.
+  CHECK lo_contract->md_activity EQ '02'.
+  " Start Workflow only for Changed Contracts
+  iv_bukrs           = ls_recn_contract-bukrs.
+  iv_recnnr          = ls_recn_contract-recnnr.
+  iv_initiator       = sy-uname.
+  iv_object_id       = ls_recn_contract-objnr.
+  iv_objkey          = ls_recn_contract-objnr.
+  iv_objtype         = 'ZCL_FI_FX_WF_OBJECT_CTR'.
+  iv_event           = 'SUBMITTED_FOR_APPROVAL'.
+
+  DATA(lr_event_parameters) = cl_swf_evt_event=>get_event_container( im_objcateg = cl_swf_evt_event=>mc_objcateg_cl
+                                                                     im_objtype  = iv_objtype
+                                                                     im_event    = iv_event ).
+  TRY.
+      lr_event_parameters->set( EXPORTING name       =  'IV_INITIATOR'
+                                          value      =  iv_initiator ).
+
+      lr_event_parameters->set( EXPORTING name       =  'IV_OBJECT_ID'
+                                          value      =  iv_object_id ).
+
+    CATCH cx_swf_cnt_cont_access_denied. " Changed Access Not Allowed
+    CATCH cx_swf_cnt_elem_access_denied. " Value/Unit Must Not Be Changed
+    CATCH cx_swf_cnt_elem_not_found.     " Element Not in the Container
+    CATCH cx_swf_cnt_elem_type_conflict. " Type Conflict Between Value and Current Parameter
+    CATCH cx_swf_cnt_unit_type_conflict. " Type Conflict Between Unit and Current Parameter
+    CATCH cx_swf_cnt_elem_def_invalid.   " Element Definition Is Invalid (Internal Error)
+    CATCH cx_swf_cnt_container.          " Exception in the Container Service
+  ENDTRY.
+
+  TRY.
+      CALL METHOD cl_swf_evt_event=>raise
+        EXPORTING
+          im_objcateg        = cl_swf_evt_event=>mc_objcateg_cl
+          im_objtype         = iv_objtype
+          im_event           = iv_event
+          im_objkey          = iv_objkey
+          im_event_container = lr_event_parameters.
+    CATCH cx_swf_evt_invalid_objtype .
+    CATCH cx_swf_evt_invalid_event .
+  ENDTRY.
+
+ENDMETHOD.
