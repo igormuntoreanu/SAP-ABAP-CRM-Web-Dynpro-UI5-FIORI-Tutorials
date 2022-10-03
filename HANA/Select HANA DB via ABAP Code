@@ -1,0 +1,33 @@
+DATA  ct_outtab TYPE TABLE OF  v_glpos_c_ven_ct.
+DATA md_hint TYPE c LENGTH 200.
+DATA lcx_exception                  TYPE REF TO cx_root.
+DATA connection TYPE dbcon_name.
+
+md_hint = | dbsl_add_stmt with parameters ('placeholder' = ( '$$refdate$$' , '20221003' ),  'placeholder' = ( '$$langu$$'   , 'P'   )) |.
+TRY.
+    SELECT bukrs
+           SUM( counter ) AS counter
+           currkey_10
+           SUM( currval_10 ) AS currval_10
+           gjahr
+           lifnr
+           monat
+      FROM v_glpos_c_ven_ct
+      CONNECTION (connection)
+      APPENDING CORRESPONDING FIELDS OF TABLE ct_outtab
+             WHERE ( ( augdt EQ '00000000' OR augdt >  '20221003' )
+               AND ( budat LE '20221003' )
+               AND ( bukrs EQ '1000' )
+               AND ( koart EQ 'K' ) )
+               AND ( bstat = space AND umskz = space )
+      GROUP BY bukrs currkey_10 gjahr lifnr monat
+      %_HINTS HDB md_hint.
+*              HDB 'NO_CS_UNION_ALL'.
+
+  CATCH cx_sy_open_sql_db cx_sy_dynamic_osql_semantics INTO lcx_exception.
+    CALL METHOD lcx_exception->get_text RECEIVING result = DATA(ld_txt).
+    MESSAGE ld_txt TYPE 'S' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+ENDTRY.
+
+BREAK-POINT.
