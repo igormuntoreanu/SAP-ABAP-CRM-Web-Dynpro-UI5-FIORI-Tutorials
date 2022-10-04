@@ -1,3 +1,16 @@
+ "Option 1
+ DATA: lr_eqart TYPE RANGE OF eqart.
+
+  SELECT DISTINCT eqart
+    FROM z20qmt_sernp4
+    INTO TABLE @DATA(lt_z20qmt_sernp4)
+    WHERE eqart_h EQ @iv_eqart.
+  CHECK sy-subrc = 0.
+  lr_eqart = VALUE #( FOR i = 1 UNTIL i = lines( lt_z20qmt_sernp4 ) + 1 ( sign = 'I' option = 'EQ' low = lt_z20qmt_sernp4[ i ]-eqart ) ).
+
+"____________________________________
+"Option 2
+
 DATA(lr_rg_vbeln_latest) = VALUE z20plmty_rg_zzvbeln_latest( FOR ls_rg_vbeln_latest
                                                                     IN it_rg_vbeln_latest
                                                                      ( sign   = ls_rg_vbeln_latest-sign
