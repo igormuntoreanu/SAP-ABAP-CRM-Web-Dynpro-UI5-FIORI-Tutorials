@@ -1,0 +1,1 @@
+          mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = 'MESSAGE' ).
