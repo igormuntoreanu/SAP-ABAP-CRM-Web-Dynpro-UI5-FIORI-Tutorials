@@ -1,0 +1,11 @@
+define view zz_dummy_view as select from data_table {
+    cast( 
+      concat(
+        concat(
+          concat(substring(date_column, 5, 2), '/' ),
+          concat(substring(date_column, 7, 2), '/' )
+        ),
+        substring(date_column, 1, 4)        
+      )
+    as char10 preserving type) as converted_date
+}
