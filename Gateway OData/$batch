@@ -1,0 +1,111 @@
+METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_begin.
+  cv_defer_mode = abap_true.
+ENDMETHOD.
+
+METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_end.
+  COMMIT WORK.
+ENDMETHOD.
+
+METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_process.
+*  CD	Create Deep Entity
+*  CE	Create Entity
+*  CM	Create Stream
+*  DE	Delete Entity
+*  DM	Delete Stream
+*  EA	Execute Action
+*  XE	Expand Entity
+*  XS	Expand Entity Set
+*  GE	Get Entity
+*  GS	Get Entity Set
+*  GD	Get Entity Set Delta
+*  GM	Get Stream
+*  PE	Patch Entity
+*  UE	Update Entity
+*  UM	Update Stream
+*  HB	Changeset Begin
+*  HE	Changeset End
+*  HP	Changeset Process
+*  IC	Get Is Conditional Implemented
+  DATA: lo_request_context    TYPE REF TO /iwbep/cl_mgw_request,
+        lo_entry_provider     TYPE REF TO /iwbep/cl_mgw_entry_raw_prv,
+        ls_changeset_response TYPE LINE OF /iwbep/if_mgw_appl_types=>ty_t_changeset_response.
+
+  LOOP AT it_changeset_request ASSIGNING FIELD-SYMBOL(<fs_changeset_request>).
+    lo_request_context ?= <fs_changeset_request>-request_context.
+    DATA(ls_request_details) = lo_request_context->get_request_details( ).
+    lo_entry_provider ?= <fs_changeset_request>-entry_provider.
+
+    CASE <fs_changeset_request>-operation_type.
+      WHEN 'CE'.
+        CASE ls_request_details-target_entity.
+          WHEN 'Alunos'.
+            TRY.
+                me->alunosset_create_entity(
+                  EXPORTING
+                    iv_entity_name          = ls_request_details-target_entity
+                    iv_entity_set_name      = ls_request_details-target_entity_set
+                    iv_source_name          = ls_request_details-source_entity
+                    it_key_tab              = ls_request_details-context_params
+                    io_tech_request_context = lo_request_context
+                    it_navigation_path      = ls_request_details-navigation_path
+                    io_data_provider        = lo_entry_provider
+                  IMPORTING
+                    er_entity               = DATA(ls_aluno)
+                ).
+
+                copy_data_to_ref(
+                      EXPORTING
+                        is_data = ls_aluno
+                      CHANGING
+                        cr_data = ls_changeset_response-entity_data ).
+
+                ls_changeset_response-operation_no = <fs_changeset_request>-operation_no.
+
+                APPEND ls_changeset_response TO ct_changeset_response.
+                CLEAR ls_changeset_response.
+
+              CATCH /iwbep/cx_mgw_busi_exception. " business exception in mgw
+              CATCH /iwbep/cx_mgw_tech_exception. " mgw technical exception
+            ENDTRY.
+          WHEN OTHERS.
+        ENDCASE.
+      WHEN 'UE'.
+        CASE ls_request_details-target_entity.
+          WHEN 'Alunos'.
+            TRY.
+                me->alunosset_update_entity(
+                  EXPORTING
+                    iv_entity_name          = ls_request_details-target_entity
+                    iv_entity_set_name      = ls_request_details-target_entity_set
+                    iv_source_name          = ls_request_details-source_entity
+                    it_key_tab              = ls_request_details-context_params
+                    io_tech_request_context = lo_request_context
+                    it_navigation_path      = ls_request_details-navigation_path
+                    io_data_provider        = lo_entry_provider
+                  IMPORTING
+                    er_entity               = DATA(ls_aluno_upd)
+                ).
+
+                copy_data_to_ref(
+                      EXPORTING
+                        is_data = ls_aluno_upd
+                      CHANGING
+                        cr_data = ls_changeset_response-entity_data ).
+
+                ls_changeset_response-operation_no = <fs_changeset_request>-operation_no.
+
+                APPEND ls_changeset_response TO ct_changeset_response.
+                CLEAR ls_changeset_response.
+
+              CATCH /iwbep/cx_mgw_busi_exception. " business exception in mgw
+              CATCH /iwbep/cx_mgw_tech_exception. " mgw technical exception
+            ENDTRY.
+          WHEN OTHERS.
+        ENDCASE.
+
+      WHEN OTHERS.
+    ENDCASE.
+  ENDLOOP.
+ENDMETHOD.
+
+
