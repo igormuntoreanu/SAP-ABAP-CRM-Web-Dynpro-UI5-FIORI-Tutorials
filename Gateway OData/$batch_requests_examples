@@ -1,0 +1,149 @@
+/sap/opu/odata/sap/ZODATA_TEST_SRV/$batch
+##########################
+
+Content-Type multipart/mixed; boundary=batch
+
+##########################
+--batch
+Content-Type: application/http
+
+GET AlunosSet HTTP/1.1
+
+
+--batch--
+
+##########################
+--batch
+Content-Type: application/http
+
+GET AlunosSet HTTP/1.1
+
+
+--batch
+Content-Type: application/http
+
+GET CursosSet HTTP/1.1
+
+
+--batch--
+
+###########################
+--batch
+Content-Type: multipart/mixed; boundary=changeset_C01
+
+--changeset_C01
+Content-Type: application/http
+
+POST AlunosSet HTTP/1.1
+sap-context-accept: header
+Content-Type: application/json
+Accept: application/json
+
+{
+    "Alunoid" : "7",
+    "Nome" : "Teste 7",
+    "Ativo" : "X"
+}
+
+
+--changeset_C01--
+
+
+--batch--
+
+
+###########################  Batch with different ChangeSets
+--batch
+Content-Type: multipart/mixed; boundary=changeset_C01
+
+--changeset_C01
+Content-Type: application/http
+
+POST AlunosSet HTTP/1.1
+sap-context-accept: header
+Content-Type: application/json
+Accept: application/json
+
+{
+    "Alunoid" : "10",
+    "Nome" : "Teste 10",
+    "Ativo" : "X"
+}
+
+
+--changeset_C01--
+
+
+--batch
+Content-Type: multipart/mixed; boundary=changeset_C02
+
+--changeset_C02
+Content-Type: application/http
+
+PUT AlunosSet('1') HTTP/1.1
+sap-context-accept: header
+Content-Type: application/json
+Accept: application/json
+
+{
+    "Nome" : "Inativo",
+    "Ativo" : " "
+}
+
+
+--changeset_C02--
+
+
+--batch
+Content-Type: application/http
+
+GET AlunosSet HTTP/1.1
+
+
+--batch--
+########################### Batch with same ChangeSets
+--batch
+Content-Type: multipart/mixed; boundary=changeset_C01
+
+--changeset_C01
+Content-Type: application/http
+
+POST AlunosSet HTTP/1.1
+sap-context-accept: header
+Content-Type: application/json
+Accept: application/json
+
+{
+    "Alunoid" : "10",
+    "Nome" : "Teste 10",
+    "Ativo" : "X"
+}
+
+
+--changeset_C01
+Content-Type: application/http
+
+PUT AlunosSet('1') HTTP/1.1
+sap-context-accept: header
+Content-Type: application/json
+Accept: application/json
+
+{
+    "Nome" : "Inativo",
+    "Ativo" : " "
+}
+
+
+--changeset_C01--
+
+
+--batch
+Content-Type: application/http
+
+GET AlunosSet HTTP/1.1
+
+
+--batch--
+
+
+############################
