@@ -1,0 +1,65 @@
+[11.10 11:18] IM456, EXT-ID (059-Extern)
+DEFINE macro_message.        
+eo_message = /bobf/cl_frw_factory=>get_message( ).        
+eo_message->add_message(          
+  is_msg = VALUE #(          
+  msgid = &1          
+  msgty = &2          
+  msgno = &3
+END-OF-DEFINITION.
+
+TRY.        
+  lo_scenario_manager->publish_dobj_on_usertrigger(
+    is_ctx  = is_ctx          
+    it_key  = lt_keys          
+    io_read = io_read        ).    
+    
+macro_message: /pbk/if_psm_szm_msg_constants=>gc_msg_class /pbk/if_psm_szm_msg_constants=>gc_msgty_e /pbk/if_psm_szm_msg_constants=>gc_msg_nr-msg_112.      
+CATCH /bobf/cx_frw.    
+macro_message: /pbk/if_psm_szm_msg_constants=>gc_msg_class /pbk/if_psm_szm_msg_constants=>gc_msgty_e /pbk/if_psm_szm_msg_constants=>gc_msg_nr-msg_112.    
+
+ENDTRY.
+
+___________________________________________________________________
+
+UI5:
+success: function (oData) {
+
+                    var oResponse = ParseBatchResponse.parseBatchResponse(oData);
+
+                    if (oResponse.bSuccessful) {
+
+                        var sSuccessMessage;
+
+                        if (oData?.__batchResponses[0]?.headers["sap-message"]) {
+
+                            var sSapMessage = oData.__batchResponses[0].headers["sap-message"];
+
+                            if (sSapMessage.startsWith("{") && sSapMessage.endsWith("}")) {
+
+                                    var oSapMessage = JSON.parse(sSapMessage);
+
+                                    if (oSapMessage.message) {
+
+                                        sSuccessMessage = oSapMessage.message;
+
+                                    } else {
+
+                                        sSuccessMessage = this.getResourceBundle().getText("sendDataSuccesfulMsg");
+
+                                    }
+
+                            } else {
+
+                                sSuccessMessage = this.getResourceBundle().getText("sendDataSuccesfulMsg");
+
+                            }
+
+                        } else {
+
+                            sSuccessMessage = this.getResourceBundle().getText("sendDataSuccesfulMsg");
+
+                        }
+
+                 MessageToast.show(sSuccessMessage, {closeOnBrowserNavigation: false});this.getModel().refresh();} else {MessageBox.error(oResponse.sMessage);}}.bind(this)});
+
