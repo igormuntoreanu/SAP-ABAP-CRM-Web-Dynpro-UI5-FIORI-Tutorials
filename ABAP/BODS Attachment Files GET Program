@@ -1,0 +1,656 @@
+*&---------------------------------------------------------------------*
+*& Report YTESTE_IGOR
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT yteste_igor.
+
+*REPORT yjnm_display_gos_notes.
+
+*displays contents of notes attached to a business object.
+*
+*displays header info for attached files, and displays the
+*
+*attached files via drill-down.
+
+PARAMETERS:
+
+  p_botype LIKE tojtb-name DEFAULT 'BUS2012', " e.g. 'BUS2012'
+
+  p_bo_id  LIKE borident-objkey DEFAULT '4500002106'.
+
+DATA:
+
+  msg(80)                 TYPE c,
+
+  ntext                   LIKE tojtt-ntext,
+
+  folder_id               TYPE soodk,
+
+  object_id               LIKE soodk,
+
+  object_hd_display       TYPE sood2,
+
+  objects                 LIKE TABLE OF sood5,
+
+  rf                      TYPE REF TO cl_gos_document_service,
+
+  is_object               TYPE sibflporb,
+
+  et_links                TYPE obl_t_link,
+
+  et_links_s              TYPE obl_s_link,
+
+  document                TYPE sood4,
+
+  header_data             TYPE sood2,
+
+  icx_obl_parameter_error TYPE REF TO cx_obl_parameter_error,
+
+  icx_obl_internal_error  TYPE REF TO cx_obl_internal_error,
+
+  icx_obl_model_error     TYPE REF TO cx_obl_model_error,
+
+  header_row              TYPE solisti1,
+
+  content_row             TYPE solisti1,
+
+  object_header           LIKE TABLE OF header_row,
+
+  object_content          LIKE TABLE OF content_row,
+
+  document_data           TYPE sofolenti1,
+
+  subline                 LIKE content_row,
+
+  subline_fragment        LIKE subline-line,
+
+  subline_temp            LIKE subline,
+
+  sublines                LIKE TABLE OF subline,
+
+  all_sublines            LIKE TABLE OF subline,
+
+  document_id             TYPE sofolenti1-doc_id,
+
+  exception_string        TYPE string.
+
+INCLUDE:
+
+<icon>,
+
+rssocons.
+
+*include <CNTN01>.
+
+*----
+
+AT LINE-SELECTION.
+
+  CHECK NOT document IS INITIAL.
+
+  CALL FUNCTION 'SO_DYNP_DOCUMENT_DISPLAY'
+    EXPORTING
+      objects = document.
+
+*----
+
+*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+*----
+
+START-OF-SELECTION.
+
+  CLASS cl_gos_document_service DEFINITION LOAD.
+
+  CREATE OBJECT rf.
+
+*----
+
+  is_object-instid = p_bo_id.
+
+  is_object-typeid = p_botype.
+
+  is_object-catid = 'BO'.
+
+  PERFORM:
+
+  header,
+
+  notes,
+
+  attachments.
+
+*----
+
+*@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+*----
+
+FORM notes .
+
+*find links to the notes
+
+  TRY.
+
+      CALL METHOD cl_binary_relation=>read_links_of_binrel
+        EXPORTING
+          is_object   = is_object
+          ip_relation = 'NOTE'
+        IMPORTING
+          et_links    = et_links.
+
+    CATCH cx_obl_parameter_error INTO icx_obl_parameter_error.
+
+      exception_string = icx_obl_parameter_error->get_longtext( ).
+
+    CATCH cx_obl_internal_error INTO icx_obl_internal_error .
+
+      exception_string = icx_obl_internal_error->get_longtext( ).
+
+    CATCH cx_obl_model_error INTO icx_obl_model_error.
+
+      exception_string = icx_obl_model_error->get_longtext( ).
+
+  ENDTRY.
+
+*----
+
+*use the links to where the notes are stored
+
+  SORT et_links BY utctime.
+
+  LOOP AT et_links INTO et_links_s.
+
+    AT FIRST.
+
+      FORMAT RESET.
+
+      FORMAT COLOR COL_TOTAL.
+
+      SKIP.
+
+      WRITE: / 'Note(s):'.
+
+    ENDAT.
+
+*get the data for a note
+
+    REFRESH all_sublines.
+
+    document_id = et_links_s-instid_b .
+
+    CALL FUNCTION 'SO_DOCUMENT_READ_API1'
+      EXPORTING
+        document_id    = document_id
+      IMPORTING
+        document_data  = document_data
+      TABLES
+        object_header  = object_header
+        object_content = object_content.
+
+    "display a header for the note
+
+    FORMAT RESET.
+
+    SKIP.
+
+    FORMAT COLOR COL_HEADING.
+
+    WRITE: /3 'Note description:',
+
+    document_data-obj_descr,
+
+    /3 'Created by:',
+
+    document_data-creat_name,
+
+    document_data-creat_fnam,
+
+    'Last changed:',
+
+    document_data-chang_date.
+
+    "interpret and display the note contents
+
+    FORMAT RESET.
+
+    CLEAR subline_fragment.
+
+    "eol (end of line) in the table object_content has nothing to do
+
+    "with eol for the note.
+
+    "the table object_content is just a stream of characters - including
+
+    "embedded crlfs (carriage return & line feed) - that happens to be
+
+    "255-character rows.
+
+    LOOP AT object_content INTO content_row.
+
+      "split content row at embedded crlfs
+
+      SPLIT content_row-line AT cl_abap_char_utilities=>cr_lf INTO TABLE sublines.
+
+      LOOP AT sublines INTO subline.
+
+        "store in subline_temp for full visibility within at/endat
+
+        subline_temp = subline.
+
+        AT FIRST.
+
+          "subline_fragment from end of previous content_row needs to be
+
+          "stuck on to the first subline of this content_row
+
+          CONCATENATE subline_fragment subline_temp-line
+
+          INTO subline_temp-line.
+
+        ENDAT.
+
+        AT LAST.
+
+          "final subline may not be a complete line of the note -
+
+          "so save it to use with beginning of next content_row
+
+          subline_fragment = subline_temp-line.
+
+          EXIT.
+
+        ENDAT.
+
+        "if we reach here, subline_temp will be a complete note-line
+
+        APPEND subline_temp TO all_sublines.
+
+      ENDLOOP.
+
+    ENDLOOP.
+
+    subline-line = subline_fragment.
+
+    APPEND subline TO all_sublines.
+
+    LOOP AT all_sublines INTO subline.
+
+      WRITE: /3 subline-line.
+
+    ENDLOOP.
+
+  ENDLOOP.
+
+ENDFORM. " notes
+
+"----
+
+FORM attachments .
+
+  "find links to attachments
+
+  REFRESH et_links.
+
+  TRY.
+
+      CALL METHOD cl_binary_relation=>read_links_of_binrel
+        EXPORTING
+          is_object   = is_object
+          ip_relation = 'ATTA'
+        IMPORTING
+          et_links    = et_links.
+
+    CATCH cx_obl_parameter_error INTO icx_obl_parameter_error.
+
+      exception_string = icx_obl_parameter_error->get_longtext( ).
+
+    CATCH cx_obl_internal_error INTO icx_obl_internal_error .
+
+      exception_string = icx_obl_internal_error->get_longtext( ).
+
+    CATCH cx_obl_model_error INTO icx_obl_model_error.
+
+      exception_string = icx_obl_model_error->get_longtext( ).
+
+  ENDTRY.
+
+  "----
+
+  "use the links to where the attachments are stored
+
+  SORT et_links BY utctime.
+
+  LOOP AT et_links INTO et_links_s.
+
+    AT FIRST.
+
+      SKIP.
+
+      FORMAT RESET.
+
+      FORMAT COLOR COL_TOTAL.
+
+      WRITE: / 'Attachment(s):'.
+
+    ENDAT.
+
+    document-foltp = et_links_s-instid_b+0(3).
+
+    document-folyr = et_links_s-instid_b+3(2).
+
+    document-folno = et_links_s-instid_b+5(12).
+
+    document-objtp = et_links_s-instid_b+17(3).
+
+    document-objyr = et_links_s-instid_b+20(2).
+
+    document-objno = et_links_s-instid_b+22(12).
+
+    folder_id-objtp = document-foltp.
+
+    folder_id-objyr = document-folyr.
+
+    folder_id-objno = document-folno.
+
+    MOVE-CORRESPONDING document TO object_id.
+
+    CALL FUNCTION 'SO_OBJECT_READ'
+      EXPORTING
+        folder_id                  = folder_id
+        object_id                  = object_id
+      IMPORTING
+        object_hd_display          = object_hd_display
+      EXCEPTIONS
+        active_user_not_exist      = 1
+        communication_failure      = 2
+        component_not_available    = 3
+        folder_not_exist           = 4
+        folder_no_authorization    = 5
+        object_not_exist           = 6
+        object_no_authorization    = 7
+        operation_no_authorization = 8
+        owner_not_exist            = 9
+        parameter_error            = 10
+        substitute_not_active      = 11
+        substitute_not_defined     = 12
+        system_failure             = 13
+        x_error                    = 14
+        OTHERS                     = 15.
+
+    IF sy-subrc EQ 0.
+
+      SKIP.
+
+      FORMAT COLOR COL_HEADING.
+
+      WRITE: /3 icon_display AS ICON HOTSPOT,
+
+      object_hd_display-objdes,
+
+      object_hd_display-file_ext.
+
+      HIDE document.
+
+      WRITE: /3 'Created by:',
+
+      object_hd_display-cronam,
+
+      object_hd_display-croadr,
+
+      'Last changed:',
+
+      object_hd_display-chdat.
+
+      HIDE document.
+
+    ELSE.
+
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+
+    ENDIF.
+
+    CLEAR document. "in case of drill-down
+
+  ENDLOOP.
+
+ENDFORM. " attachments
+
+"----
+
+FORM header .
+
+  SELECT SINGLE ntext
+
+  FROM tojtt
+
+  INTO ntext
+
+  WHERE
+
+  name = p_botype AND
+
+  language = sy-langu.
+
+  IF sy-subrc EQ 0.
+
+    FORMAT RESET.
+
+    FORMAT COLOR COL_POSITIVE.
+
+    WRITE: / 'Business object:',
+
+    20 ntext.
+
+    WRITE: / 'Key:',
+
+    20 p_bo_id.
+
+  ELSE.
+
+    CONCATENATE 'Business-object type' p_botype 'not found.'
+
+    INTO msg SEPARATED BY space.
+
+    WRITE: / msg.
+
+  ENDIF.
+
+ENDFORM. " header
+
+
+*BREAK-POINT.
+*
+*  GET TIME.
+*
+*  DATA(lv_uzeit) = sy-uzeit.
+*
+*  lv_uzeit = lv_uzeit - 120.
+*
+*BREAK-POINT.
+
+************************ HISTORICO RECN **************************************************
+*SELECT *
+*  FROM cdpos
+*  INTO TABLE @DATA(lt_cdpos)
+*  WHERE objectclas LIKE 'RE%'
+*    AND objectid LIKE '%200382%'
+*    AND chngind EQ 'U'. "Update
+*
+*DELETE lt_cdpos WHERE value_new IS INITIAL AND value_old IS INITIAL.
+*LOOP AT lt_cdpos ASSIGNING FIELD-SYMBOL(<fs_cdpos>).
+*  SHIFT <fs_cdpos>-value_new LEFT DELETING LEADING space.
+*  SHIFT <fs_cdpos>-value_old LEFT DELETING LEADING space.
+*ENDLOOP.
+*
+*IF lt_cdpos IS NOT INITIAL.
+*  SELECT a~tabname, a~fieldname, b~ddtext
+*    FROM dd03l AS a
+*    INNER JOIN dd04t AS b ON ( a~rollname = b~rollname )
+*    INTO TABLE @DATA(lt_d003l)
+*    FOR ALL ENTRIES IN @lt_cdpos
+*    WHERE a~tabname    = @lt_cdpos-tabname
+*      AND a~fieldname  = @lt_cdpos-fname
+*      AND b~ddlanguage = @sy-langu.
+*  IF sy-subrc = 0.
+*
+*  ENDIF.
+*
+*ENDIF.
+*
+*BREAK-POINT.
+************************ HISTORICO RECN **************************************************
+
+************************ FLEXIBLE WORKFLOW CONDITIONS READ **************************************************
+************************ FLEXIBLE WORKFLOW CONDITIONS READ **************************************************
+*SELECT *
+*  FROM swf_flex_proc
+*  INTO TABLE @DATA(lt_swf_flex_proc)
+*  WHERE scenario_id = 'WS99900005'
+*    AND status = 'ACTIVE'.
+*IF sy-subrc = 0.
+*  READ TABLE lt_swf_flex_proc ASSIGNING FIELD-SYMBOL(<fs_workflow>) INDEX 1.
+*  IF sy-subrc = 0.
+*    DATA: lt_xml_table TYPE STANDARD TABLE OF smum_xmltb,
+*          lt_return    TYPE bapiret2_t.
+*    CALL FUNCTION 'SMUM_XML_PARSE'
+*      EXPORTING
+*        xml_input = <fs_workflow>-stream
+*      TABLES
+*        xml_table = lt_xml_table
+*        return    = lt_return.
+*
+*    DATA(lv_conditions_accepted) = abap_false.
+*    DATA: lr_doctype TYPE RANGE OF recncontracttype,
+*          ls_doctype LIKE LINE OF lr_doctype,
+*          lr_bukrs   TYPE RANGE OF bukrs,
+*          ls_bukrs   LIKE LINE OF lr_bukrs,
+*          lr_total   TYPE RANGE OF recdcondvaluemonthfe,
+*          ls_total   LIKE LINE OF lr_total.
+*
+*    LOOP AT lt_xml_table ASSIGNING FIELD-SYMBOL(<fs_parameter>) WHERE cname = 'parameterValue'.
+*      IF ( sy-tabix + 1 ) <= lines( lt_xml_table ). "avoid dump
+*        READ TABLE lt_xml_table INTO DATA(ls_value) INDEX sy-tabix + 1.
+*        IF sy-subrc = 0.
+*          "Seguir conforme configuracao das condicoes no Workflow 99900005
+*          CASE ls_value-cvalue.
+*            WHEN 'PCDocumentType'.
+*              ls_doctype-sign = 'I'.
+*              ls_doctype-option = 'EQ'.
+*              ls_doctype-low = <fs_parameter>-cvalue.
+*              APPEND ls_doctype TO lr_doctype. CLEAR ls_doctype.
+*            WHEN 'CompanyCode'.
+*              ls_bukrs-sign = 'I'.
+*              ls_bukrs-option = 'EQ'.
+*              ls_bukrs-low = <fs_parameter>-cvalue.
+*              APPEND ls_bukrs TO lr_bukrs. CLEAR ls_bukrs.
+*            WHEN 'TotalAmount'.
+*              ls_total-sign = 'I'.
+*              ls_total-option = 'GE'.
+*              ls_total-low = <fs_parameter>-cvalue.
+*              APPEND ls_total TO lr_total. CLEAR ls_total.
+*            WHEN OTHERS.
+*          ENDCASE.
+*        ENDIF.
+*      ENDIF.
+*    ENDLOOP.
+*  ENDIF.
+*ENDIF.
+*
+*data lv_RECDCONDVALUEMONTHFE TYPE RECDCONDVALUEMONTHFE VALUE '0.01'.
+*IF lv_recdcondvaluemonthfe IN lr_total.
+*BREAK-POINT.
+*ENDIF.
+*
+*BREAK-POINT.
+************************ FLEXIBLE WORKFLOW CONDITIONS READ **************************************************
+************************ FLEXIBLE WORKFLOW CONDITIONS READ **************************************************
+
+************************ HANA VIEW READ **************************************************
+************************ HANA VIEW READ **************************************************
+*DATA  ct_outtab TYPE TABLE OF  v_glpos_c_ven_ct.
+*DATA md_hint TYPE c LENGTH 200.
+*DATA lcx_exception                  TYPE REF TO cx_root.
+*DATA connection TYPE dbcon_name.
+*
+*md_hint = | dbsl_add_stmt with parameters ('placeholder' = ( '$$refdate$$' , '20221003' ),  'placeholder' = ( '$$langu$$'   , 'P'   )) |.
+*TRY.
+*    SELECT bukrs
+*           SUM( counter ) AS counter
+*           currkey_10
+*           SUM( currval_10 ) AS currval_10
+*           gjahr
+*           lifnr
+*           monat
+*      FROM v_glpos_c_ven_ct
+*      CONNECTION (connection)
+*      APPENDING CORRESPONDING FIELDS OF TABLE ct_outtab
+*             WHERE ( ( augdt EQ '00000000' OR augdt >  '20221003' )
+*               AND ( budat LE '20221003' )
+*               AND ( bukrs EQ '1000' )
+*               AND ( koart EQ 'K' ) )
+*               AND ( bstat = space AND umskz = space )
+*      GROUP BY bukrs currkey_10 gjahr lifnr monat
+*      %_HINTS HDB md_hint.
+**              HDB 'NO_CS_UNION_ALL'.
+*
+*  CATCH cx_sy_open_sql_db cx_sy_dynamic_osql_semantics INTO lcx_exception.
+*    CALL METHOD lcx_exception->get_text RECEIVING result = DATA(ld_txt).
+*    MESSAGE ld_txt TYPE 'S' DISPLAY LIKE 'E'.
+*    LEAVE LIST-PROCESSING.
+*ENDTRY.
+*
+*BREAK-POINT.
+************************ HANA VIEW READ **************************************************
+************************ HANA VIEW READ **************************************************
+
+************************ REFX-CONTRACT CHANGE **************************************************
+************************ REFX-CONTRACT CHANGE **************************************************
+*
+*
+*DATA: ls_recn_contract TYPE recn_contract,
+*      lt_return        TYPE TABLE OF bapiret2.
+*
+*DATA: lt_status TYPE TABLE OF bapi_re_status,
+*      ls_status TYPE bapi_re_status.
+*
+*
+*PARAMETERS: p_bukrs TYPE recn_contract-bukrs,
+*            p_contr TYPE recn_contract-recnnr.
+*
+*CALL FUNCTION 'BAPI_RE_CN_GET_DETAIL'
+*  EXPORTING
+*    compcode       = p_bukrs
+*    contractnumber = p_contr
+*  TABLES
+*    status         = lt_status
+*    return         = lt_return.
+*
+*BREAK-POINT .
+*
+*READ TABLE lt_return INTO DATA(ls_return) WITH KEY type = 'E'.
+*IF sy-subrc NE 0.
+*  REFRESH: lt_return.
+*
+*  CALL FUNCTION 'BAPI_RE_CN_CHANGE'
+*    EXPORTING
+*      compcode       = p_bukrs
+*      contractnumber = p_contr
+*      trans          = 'PSSM' "Lock by Master Data "Release = PSEM
+*    TABLES
+**     status         = lt_status
+*      return         = lt_return.
+*
+*  READ TABLE lt_return INTO ls_return WITH KEY type = 'E'.
+*  IF sy-subrc NE 0.
+*    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+*      EXPORTING
+*        wait = abap_true.
+*  ENDIF.
+*
+*ENDIF.
+************************ REFX-CONTRACT CHANGE **************************************************
+************************ REFX-CONTRACT CHANGE **************************************************
