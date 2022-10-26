@@ -1,0 +1,1 @@
+wa_it_message-line = |O contrato { lv_contrato }, empresa { iv_bukrs } foi modificado pelo usuário { <fs_contr>-username } às { lv_time } do dia { lv_date } e necessita ser aprovado.|.
