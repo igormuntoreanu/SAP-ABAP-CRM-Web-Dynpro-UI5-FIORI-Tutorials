@@ -1,0 +1,341 @@
+EXIT: ZXM06U02 - EXIT_SAPLEINM_002
+
+___________________________________
+*&---------------------------------------------------------------------*
+*& Include          ZXM06U02
+*&---------------------------------------------------------------------*
+
+INCLUDE arbcig_order_request_002 IF FOUND.
+INCLUDE arbcig_quote_request_002 IF FOUND.
+INCLUDE zmmi_ariba_order_request IF FOUND.
+INCLUDE zmmi_ariba_taxes IF FOUND.
+
+______________________________________
+
+*&---------------------------------------------------------------------*
+*& Include          ZMMI_ARIBA_TAXES
+*&---------------------------------------------------------------------*
+*"*"Global Interface:
+*"  IMPORTING
+*"     VALUE(XEKKO) LIKE  EKKO STRUCTURE  EKKO
+*"     VALUE(XLFA1) LIKE  LFA1 STRUCTURE  LFA1
+*"     VALUE(XLFB1) LIKE  LFB1 STRUCTURE  LFB1
+*"     VALUE(DOBJECT) LIKE  NAST STRUCTURE  NAST OPTIONAL
+*"  TABLES
+*"      INT_EDIDD STRUCTURE  EDIDD
+*"      XEKPO STRUCTURE  UEKPO OPTIONAL
+*"      XEKET STRUCTURE  UEKET OPTIONAL
+*"      DEKEK_X STRUCTURE  EKEK_X OPTIONAL
+*"      DEKEH STRUCTURE  IEKEH OPTIONAL
+*"      DSADR STRUCTURE  SADR OPTIONAL
+*"      DVBAK STRUCTURE  MMVBAK OPTIONAL
+*"      DVBAP STRUCTURE  MMVBAP OPTIONAL
+*"      DVBKD STRUCTURE  MMVBKD OPTIONAL
+*"  CHANGING
+*"     VALUE(ISC_ENHANCEMENT) TYPE  ISC_EXIT_SAPLEINM_002 OPTIONAL
+*"  EXCEPTIONS
+*"      ERROR_MESSAGE_RECEIVED
+*"      DATA_NOT_RELEVANT_FOR_SENDING
+*"----------------------------------------------------------------------
+
+  DATA: ls_e1arbcig_partner_info TYPE e1arbcig_partner_info,
+        ls_e1arbcig_hdrpartextn  TYPE e1arbcig_hdrpartextn,
+        ls_addr3_val             TYPE addr3_val,
+        ls_edidd                 TYPE edidd,
+        ls_usr03                 TYPE usr03,
+        ls_ekpo                  TYPE ekpo,
+        ls_e1edka1               TYPE e1edka1.
+
+  DATA: ls_e1edp04          TYPE e1edp04,
+        ls_e1edp01          TYPE e1edp01,
+        ls_e1arbcig_itmextn TYPE e1arbcig_itmextn,
+        lr_kschl            TYPE RANGE OF kschl,
+        lr_kschl2           TYPE RANGE OF kschl,
+        lt_komv             TYPE TABLE OF komv,
+        lt_emails           TYPE TABLE OF bapiadsmtp,
+        lt_return           TYPE TABLE OF bapiret2.
+
+  IF control_record_out-idoctp = 'ARBCIG_ORDERS'.
+
+    READ TABLE int_edidd WITH KEY segnam = 'E1EDP01' TRANSPORTING NO FIELDS.
+    IF sy-subrc = 0.
+
+      READ TABLE xekpo INTO DATA(ls_xekpo) INDEX 1.
+      IF sy-subrc = 0.
+        SELECT SINGLE ernam
+               FROM eban
+               INTO @DATA(lv_ernam)
+               WHERE banfn = @ls_xekpo-banfn
+                 AND bnfpo = @ls_xekpo-bnfpo.
+        IF sy-subrc = 0.
+          CALL FUNCTION 'SUSR_USER_ADDRESS_READ'
+            EXPORTING
+              user_name              = lv_ernam
+            IMPORTING
+              user_address           = ls_addr3_val
+              user_usr03             = ls_usr03
+            EXCEPTIONS
+              user_address_not_found = 1
+              OTHERS                 = 2.
+          IF sy-subrc <> 0.
+            CLEAR: ls_usr03, ls_addr3_val.
+          ELSE.
+*            SELECT addrnumber, persnumber, date_from, consnumber, smtp_addr
+*              FROM adr6
+*              INTO TABLE @DATA(lt_adr6)
+*              WHERE addrnumber = @ls_addr3_val-addrnumber.
+*            IF sy-subrc = 0.
+*              SORT lt_adr6 BY addrnumber.
+*            ENDIF.
+            CALL FUNCTION 'BAPI_USER_GET_DETAIL'
+              EXPORTING
+                username = lv_ernam
+              TABLES
+                return   = lt_return
+                addsmtp  = lt_emails.
+
+            LOOP AT int_edidd ASSIGNING FIELD-SYMBOL(<fs_edidd>) WHERE segnam EQ 'E1ARBCIG_PARTNER_INFO'. "Father. 'E1EDKA1'
+              READ TABLE int_edidd INTO ls_edidd INDEX sy-tabix - 1.
+              IF sy-subrc = 0 AND ls_edidd-segnam = 'E1EDKA1'.
+                ls_e1edka1 = ls_edidd-sdata.
+                IF ls_e1edka1-parvw = 'WE'.
+                  ls_e1arbcig_partner_info = <fs_edidd>-sdata.
+                  ls_e1arbcig_partner_info-deliver_to = abap_true.
+                  CONCATENATE ls_usr03-name1 ls_usr03-name2 INTO ls_e1arbcig_partner_info-name_co SEPARATED BY space.
+                  <fs_edidd>-sdata = ls_e1arbcig_partner_info.
+                ENDIF.
+              ENDIF.
+            ENDLOOP.
+          ENDIF.
+        ENDIF.
+
+        "Logic for E1ARBCIG_HDRPARTEXTN
+        READ TABLE int_edidd WITH KEY segnam = 'E1EDKA1' TRANSPORTING NO FIELDS.
+        IF sy-subrc = 0.
+          lv_tabix = sy-tabix.
+*          LOOP AT lt_adr6 ASSIGNING FIELD-SYMBOL(<fs_adr6>) WHERE smtp_addr IS NOT INITIAL.
+          LOOP AT lt_emails ASSIGNING FIELD-SYMBOL(<fs_email>).
+            ls_e1arbcig_hdrpartextn-objname   = 'PO'.
+            ls_e1arbcig_hdrpartextn-fieldname = 'EMAIL'.
+            ls_e1arbcig_hdrpartextn-fieldvalue = <fs_email>-e_mail. "<fs_adr6>-smtp_addr.
+
+            ls_edidd-sdata = ls_e1arbcig_hdrpartextn.
+            ls_edidd-segnam = 'E1ARBCIG_HDRPARTEXTN'.
+            READ TABLE int_edidd WITH KEY segnam = 'E1ARBCIG_HDRPARTEXTN'
+                                          sdata  = ls_edidd-sdata
+                                 TRANSPORTING NO FIELDS.
+            IF sy-subrc <> 0.
+              ADD 1 TO lv_tabix.
+              INSERT ls_edidd INTO int_edidd INDEX lv_tabix. CLEAR ls_edidd.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+
+        SELECT *
+          FROM tvarvc
+          INTO TABLE @DATA(lt_tvarvc)
+          WHERE name = 'Z_MM_PUR_CONDITIONS_ARIBA'.
+        IF sy-subrc = 0.
+
+          lr_kschl = VALUE #( FOR i = 1 UNTIL i = lines( lt_tvarvc ) + 1 ( sign = 'I' option = 'EQ' low = lt_tvarvc[ i ]-low ) ).
+          lr_kschl2 = VALUE #( FOR i = 1 UNTIL i = lines( lt_tvarvc ) + 1 ( sign = 'I' option = 'EQ' low = lt_tvarvc[ i ]-high ) ) .
+          APPEND LINES OF lr_kschl2 TO lr_kschl.
+
+          SELECT *
+            FROM t685t
+            INTO TABLE @DATA(lt_t685t)
+            WHERE spras = @sy-langu
+              AND kschl IN @lr_kschl.
+          IF sy-subrc = 0.
+            SORT lt_t685t BY kschl.
+          ENDIF.
+
+          LOOP AT int_edidd ASSIGNING <fs_edidd> WHERE segnam EQ 'E1EDP01'. "->E1EDP04
+            lv_tabix = sy-tabix.
+            ls_e1edp01 = <fs_edidd>-sdata.
+
+            READ TABLE xekpo ASSIGNING FIELD-SYMBOL(<fs_ekpo>) WITH KEY ebeln = xekko-ebeln
+                                                                        ebelp = ls_e1edp01-posex+1(5).
+            IF sy-subrc = 0.
+
+              "NCM  Data
+              ls_e1arbcig_itmextn-fieldname   = 'J_1BNBM'.
+              ls_e1arbcig_itmextn-fieldvalue  = <fs_ekpo>-j_1bnbm.
+              ls_e1arbcig_itmextn-objkey      = <fs_ekpo>-ebelp.
+              ls_e1arbcig_itmextn-objname     = 'EKPO'.
+
+              ls_edidd-sdata = ls_e1arbcig_itmextn.
+              ls_edidd-segnam = 'E1ARBCIG_ITMEXTN'.
+
+              READ TABLE int_edidd WITH KEY segnam = ls_edidd-segnam
+                                            sdata  = ls_edidd-sdata
+                                   TRANSPORTING NO FIELDS.
+              IF sy-subrc <> 0. "Evita insercao de duplicados
+                ADD 1 TO lv_tabix.
+                INSERT ls_edidd INTO int_edidd INDEX lv_tabix. CLEAR ls_edidd.
+              ENDIF.
+
+              CLEAR ls_ekpo.
+              MOVE-CORRESPONDING <fs_ekpo> TO ls_ekpo.
+
+              "Begin - Fix Problem With Pricing - Its applying discounts everywhere because of ADDITIONAL_RATE - Class  CL_TAX_CALC_BR:
+              CALL FUNCTION 'J_1B_APPEND_TAXINPRICE'
+                EXPORTING
+                  iv_kappl = 'M'
+                  iv_kalsm = xekko-kalsm
+                  iv_kschl = 'PBXX'.
+
+              "Calculate again
+              CALL FUNCTION 'Z_MMPOITEM_CALCULATE_TAXES'
+                EXPORTING
+                  i_ekko = xekko
+                  i_ekpo = ls_ekpo
+                  i_lfa1 = xlfa1
+                TABLES
+                  t_komv = lt_komv.
+
+              "End - Fix Problem With Pricing - Its applying discounts everywhere because of ADDITIONAL_RATE - Class  CL_TAX_CALC_BR:
+
+              DELETE: lt_komv WHERE kschl NOT IN lr_kschl,
+                      lt_komv WHERE kbetr = 0,
+                      lt_komv WHERE kawrt = 0.
+
+              LOOP AT lt_komv ASSIGNING FIELD-SYMBOL(<fs_komv>).
+
+                READ TABLE lt_tvarvc ASSIGNING FIELD-SYMBOL(<fs_tvarvc>) WITH KEY low = <fs_komv>-kschl.
+                IF sy-subrc = 0.
+                  CONTINUE.
+                ELSE.
+                  READ TABLE lt_tvarvc ASSIGNING <fs_tvarvc> WITH KEY high = <fs_komv>-kschl.
+                  IF sy-subrc <> 0.
+                    CONTINUE.
+                  ELSE.
+                    READ TABLE lt_komv INTO DATA(ls_komv_low) WITH KEY kschl = <fs_tvarvc>-low.
+                    IF sy-subrc <> 0.
+                      CONTINUE.
+                    ENDIF.
+                  ENDIF.
+                ENDIF.
+
+                READ TABLE lt_t685t ASSIGNING FIELD-SYMBOL(<fs_t685t>) WITH KEY kschl = <fs_komv>-kschl BINARY SEARCH.
+                IF sy-subrc = 0.
+                  ls_e1edp04-ktext = <fs_t685t>-vtext. SHIFT ls_e1edp04-ktext LEFT DELETING LEADING space.
+                ENDIF.
+
+                ls_e1edp04-msatz = ls_komv_low-kbetr / 10. CONDENSE ls_e1edp04-msatz.
+                ls_e1edp04-mwsbt = <fs_komv>-kwert. CONDENSE ls_e1edp04-mwsbt.
+                ls_e1edp04-mwskz = <fs_ekpo>-mwskz. CONDENSE ls_e1edp04-mwskz.
+
+                ls_e1edp04-txjcd = <fs_komv>-kschl. CONDENSE ls_e1edp04-txjcd.
+
+                ls_edidd-sdata = ls_e1edp04.
+                ls_edidd-segnam = 'E1EDP04'.
+
+                READ TABLE int_edidd WITH KEY segnam = ls_edidd-segnam
+                                              sdata  = ls_edidd-sdata
+                                     TRANSPORTING NO FIELDS.
+                IF sy-subrc <> 0. "Evita insercao de duplicados
+                  ADD 1 TO lv_tabix.
+                  INSERT ls_edidd INTO int_edidd INDEX lv_tabix.
+                  "Repara índice do segmento E1EDP04
+                  PERFORM repara_indice USING ls_edidd
+                                        CHANGING int_edidd[].
+                  CLEAR ls_edidd.
+                ENDIF.
+
+                CLEAR: ls_komv_low.
+              ENDLOOP.
+
+              REFRESH lt_komv[].
+
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+
+
+______________________________________
+
+*&---------------------------------------------------------------------*
+*& Include          ZXM06ZZZ
+*&---------------------------------------------------------------------*
+MODULE zz1_nf_num_pbo OUTPUT.
+
+  IF gv_trtyp = 'A'. "Display.
+
+    LOOP AT SCREEN.
+      CHECK screen-group1 = 'G1'.
+      screen-input = '0'.
+      MODIFY SCREEN.
+    ENDLOOP.
+
+  ELSE.
+
+    LOOP AT SCREEN.
+      CHECK screen-group1 = 'G1'.
+      screen-input = '1'.
+      MODIFY SCREEN.
+    ENDLOOP.
+
+  ENDIF.
+
+ENDMODULE.
+
+FORM repara_indice USING ps_idoc TYPE LINE OF idoc_data
+                   CHANGING pt_idoc TYPE idoc_data.
+
+  DATA: lv_tabix TYPE sy-tabix,
+        ls_idoc  TYPE LINE OF idoc_data.
+
+  "Place E1EDP04 in the Correct Line
+  IF ps_idoc-segnam = 'E1EDP04'.
+    READ TABLE pt_idoc INTO ls_idoc WITH KEY segnam = ps_idoc-segnam
+                                             sdata = ps_idoc-sdata.
+    IF sy-subrc = 0.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_ITMEXTN'        CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_PURCH_CSC'      CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_SCHED_LINE'     CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_PO_ITEMS_INFO'  CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_ACC_INFO'       CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_SERNR_INFO'     CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_CONTRACT_INFO'  CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_ASSET_INFO'     CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ARBCIG_PROD_HIER'      CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1EDP02'                 CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1CUREF'                 CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1ADDI1'                 CHANGING pt_idoc.
+      PERFORM atualiza_indice USING ps_idoc 'E1EDP03'                 CHANGING pt_idoc.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+
+FORM atualiza_indice USING ps_idoc TYPE LINE OF idoc_data
+                           pv_segmento TYPE edipsegtyp
+                     CHANGING pt_idoc  TYPE idoc_data.
+
+  DATA: lv_tabix TYPE sy-tabix.
+
+  READ TABLE pt_idoc[] WITH KEY segnam = pv_segmento TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    READ TABLE pt_idoc[] WITH KEY segnam = ps_idoc-segnam sdata = ps_idoc-sdata TRANSPORTING NO FIELDS.
+    IF sy-subrc = 0.
+      DELETE pt_idoc INDEX sy-tabix. "Delete segment from original position line
+    ENDIF.
+
+    "Get Last Line of Upper Segment
+    LOOP AT pt_idoc[] INTO DATA(ls_dummy) WHERE segnam = pv_segmento.
+      lv_tabix = sy-tabix.
+    ENDLOOP.
+
+    IF lv_tabix = lines( pt_idoc ).
+      APPEND ps_idoc TO pt_idoc[].
+    ELSE.
+      INSERT ps_idoc INTO pt_idoc[] INDEX lv_tabix + 1. "Insert segment in the correct line
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
