@@ -7,6 +7,14 @@
     WHERE eqart_h EQ @iv_eqart.
   CHECK sy-subrc = 0.
   lr_eqart = VALUE #( FOR i = 1 UNTIL i = lines( lt_z20qmt_sernp4 ) + 1 ( sign = 'I' option = 'EQ' low = lt_z20qmt_sernp4[ i ]-eqart ) ).
+  
+    SELECT sign, opti, low, high
+    FROM tvarvc
+    INTO TABLE @DATA(lt_contas)
+    WHERE name = 'ZFI_VIEW_JUROS_MULTAS_CONTAS'.
+  IF sy-subrc EQ 0.
+    lr_hkont = VALUE #( FOR i = 1 UNTIL i = lines( lt_contas ) + 1 ( sign = lt_contas[ i ]-sign option = lt_contas[ i ]-opti low = lt_contas[ i ]-low high = lt_contas[ i ]-high ) ).
+  ENDIF.
 
 "____________________________________
 "Option 2
