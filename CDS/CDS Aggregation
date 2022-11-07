@@ -1,0 +1,18 @@
+the CDS view sales_order, aggregate expressions calculate the sum, the minimum, and the maximum of the gross amounts of each business partner. Also, the number of requests is determined. An alternative element name is defined for each aggregation. The non-aggregated fields buyer_guid and currency_code are specified in the GROUP BY clause.
+
+@AbapCatalog.sqlViewName: 'SALES_ORDER_VW'
+define view sales_order as
+  select from snwd_so
+  { key buyer_guid,
+       @Semantics.currencyCode
+        currency_code,
+       @Semantics.amount.currencyCode: 'currency_code'
+        sum(gross_amount) as sum_gross_amount,
+       @Semantics.amount.currencyCode: 'currency_code'
+        min(gross_amount) as min_gross_amount,
+       @Semantics.amount.currencyCode: 'currency_code'
+        max(gross_amount) as max_gross_amount,
+       @Semantics.amount.currencyCode: 'currency_code'
+        avg(gross_amount) as avg_gross_amount,
+        count(*) as sales_orders_count }
+  group by buyer_guid, currency_code
