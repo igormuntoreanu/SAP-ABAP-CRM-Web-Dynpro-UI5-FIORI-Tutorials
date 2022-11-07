@@ -1,0 +1,18 @@
+@AbapCatalog.sqlViewName: 'ZZSALESORDERVW'
+define view zzsales_order
+  as select from snwd_so
+  association [1..*] to snwd_so_i as _item
+    on snwd_so.node_key = _item.parent_key
+{
+  key snwd_so.node_key,
+      gross_amount,
+      gross_amount - tax_amount                      as pre_tax_amount,
+      cast(gross_amount as abap.fltp)
+        + (cast( -gross_amount as abap.fltp) * 0.03) as reduced_amount,
+      cast(gross_amount as abap.fltp) * 0.03         as overall_savings,
+      _item.so_item_pos                              as item_position,
+      _item.gross_amount                             as item_gross_amount,
+      cast(_item.gross_amount as abap.fltp) * 0.97   as item_savings,
+      cast(gross_amount as abap.fltp)
+        + cast( net_amount as abap.fltp)             as sum_columns
+}
