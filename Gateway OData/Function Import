@@ -46,3 +46,6 @@ METHOD /iwbep/if_mgw_appl_srv_runtime~execute_action.
     WHEN OTHERS.
   ENDCASE.
 ENDMETHOD.
+
+3) URI Example: /ZODATA_TEST_SRV/DesativaAluno?Alunoid='1'
+Here Alunoid is the paramenter defined.
