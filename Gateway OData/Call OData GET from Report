@@ -1,0 +1,19 @@
+ DATA: lt_data TYPE TABLE OF YOUR_CUSTOM_ENTITY.
+  DATA(lv_uri) = 'http://XXXXXXX/sap/opu/odata/sap/YYYYYYY/ZZZZZZZZ'.
+  /iwfnd/cl_sutil_client_proxy=>get_instance( )->web_request(
+    EXPORTING
+      it_request_header = VALUE /iwfnd/sutil_property_t( ( name  = if_http_header_fields_sap=>request_method
+                                                           value = if_http_entity=>co_request_method_get ) (
+                                                           name  = if_http_header_fields_sap=>request_uri
+                                                           value = lv_uri ) )
+     IMPORTING
+       ev_status_code        = DATA(lv_status_code)
+       ev_response_body      = DATA(lv_response_body)
+       ev_error_text         = DATA(lv_error_text) ).
+
+  /iwfnd/cl_sutil_odata_mapper=>get_instance( )->convert_to_abap(
+       EXPORTING
+         iv_xdoc       = lv_response_body
+       IMPORTING
+         ed_data       = lt_data "Here comes your get return data as a internal table
+         ev_error_text = lv_error_text ).
