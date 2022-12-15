@@ -1,0 +1,76 @@
+@AbapCatalog.sqlViewName: 'ZCDSFBL3HVIEW'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'CDS para FBL3H'
+define view ZCDS_FBL3H_VIEW
+  as select from    bseg
+    inner join      bkpf
+      on  bseg.bukrs = bkpf.bukrs
+      and bseg.belnr = bkpf.belnr
+      and bseg.gjahr = bkpf.gjahr
+    inner join      skb1
+      on  bseg.bukrs = skb1.bukrs
+      and bseg.hkont = skb1.saknr
+    left outer join but000
+      on bseg.lifnr = but000.partner
+    left outer join cskt
+      on  bseg.kostl = cskt.kostl
+      and bseg.kokrs = cskt.kokrs
+      and cskt.spras = $session.system_language
+    left outer join cepct
+      on  bseg.kokrs  = cepct.kokrs
+      and bseg.prctr  = cepct.prctr
+      and cepct.spras = $session.system_language
+{
+  key bseg.bukrs,
+  key bseg.belnr,
+  key bseg.gjahr,
+  key bseg.buzei,
+      bseg.gsber,
+      bseg.bupla,
+      bseg.lifnr,
+      bkpf.bstat,
+      bseg.umskz,
+      @Semantics.currencyCode: true
+      bseg.pswsl,
+      bkpf.xblnr,
+      bkpf.blart,
+      bseg.shkzg,
+      @Semantics.amount.currencyCode: 'PSWSL'
+      case when bseg.shkzg = 'H' then bseg.dmbtr *-1
+      else bseg.dmbtr
+      end          as dmbtr,
+      bkpf.cpudt,
+      bseg.h_bldat as bldat,
+      bseg.h_budat as budat,
+      bseg.netdt,
+      bseg.augbl,
+      bseg.augdt,
+      bkpf.bktxt,
+      bseg.sgtxt,
+      bseg.zuonr,
+      bseg.zlspr,
+      bseg.zlsch,
+      bseg.hbkid,
+      bseg.hktid,
+      bseg.zterm,
+      bseg.werks,
+      bseg.kokrs,
+      bseg.kostl,
+      cskt.ktext   as kostl_ktext,
+      bseg.prctr,
+      cepct.ktext  as prctr_ktext,
+      but000.name_org1,
+      bseg.hkont,
+      skb1.stext   as skb1_stext,
+      bkpf.stblg,
+      bkpf.usnam   as ernam_rf,
+      bseg.gkont,
+      bseg.koart,
+      bseg.xhres,
+      bseg.xkres,
+      bseg.xlgclr,
+      bseg.awtyp,
+      bseg.h_bstat
+}
