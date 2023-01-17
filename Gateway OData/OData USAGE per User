@@ -1,0 +1,6 @@
+Use program /IWFND/R_METERING_VIEW to check OData Usage.
+Main Table: /IWFND/L_MET_DAT
+
+PS: The data is deleted after some period of time through the job SAP_IWFND_METERING_DEL(Program /IWFND/R_METERING_DELETE), 
+and will be added through the job SAP_IWFND_METERING_AGG(Program /IWFND/R_METERING_AGGREGATE). Take a look in your system
+the periodicity of the jobs.
