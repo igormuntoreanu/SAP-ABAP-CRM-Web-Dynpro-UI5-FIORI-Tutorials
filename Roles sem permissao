@@ -1,2 +1,6 @@
+Buscar roles através da transação SUIM. Caso não tenha acesso, cheque a tabela AGR_1251.
+
 Adiocionar Roles através da tabela AGR_USERS.
+
+
 Executar transacao PFUD, pulando os Authority checks.
