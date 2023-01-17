@@ -1,0 +1,7 @@
+SAP SICF Transaction
+
+default_host -> sap -> bc -> ping
+
+Test Service
+
+browser will open -> take everything until the end of the port
