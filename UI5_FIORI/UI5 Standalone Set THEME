@@ -1,0 +1,4 @@
+            In the Component.js file, at INIT event:
+            
+            sap.ui.getCore().setThemeRoot("voith_theme","http://sapdfe.euro1.voith.net:8000/sap/public/bc/themes/~client-900/UI5")
+            sap.ui.getCore().applyTheme("voith_theme");
