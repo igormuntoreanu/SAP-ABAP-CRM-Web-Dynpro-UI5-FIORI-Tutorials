@@ -9,3 +9,7 @@ The expand option's expand path contains an invalid property 'RecommendedService
 then:
 
 Fix the fields CREATED_TIMESTMP and CHANGED_TIMESTMP in table /IWFND/I_MED_SRH. Adjust the data, it must have a real timestamp and not '0' .
+
+
+
+https://launchpad.support.sap.com/#/notes/3279530
