@@ -1,0 +1,11 @@
+If you are getting an error due to V4 then register the Catalogs in transaction /IWFND/V4_ADMIN
+If you are getting an error for V2 and having the issue in /IWFND/ERROR_LOG:
+
+Property 'UpdatedDate' has invalid value '0 ' 
+The expand option's expand path contains an invalid property 'RecommendedServices'
+/sap/opu/odata/IWFND/CATALOGSERVICE;v=2/RecommendedServiceCollection
+
+
+then:
+
+Fix the fields CREATED_TIMESTMP and CHANGED_TIMESTMP in table /IWFND/I_MED_SRH. Adjust the data, it must have a real timestamp and not '0' .
