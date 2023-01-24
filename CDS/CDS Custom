@@ -1,0 +1,156 @@
+@EndUserText.label: 'Überfällige Forderungen'
+@ObjectModel.query.implementedBy: 'ABAP:ZCL_GET_DUNNINGS'
+@Search.searchable: true
+@UI: {
+  headerInfo: {
+    typeName: 'Überfällige Forderungen',
+    typeNamePlural: 'Überfällige Forderungen',
+    title: {
+      type: #STANDARD,
+      label: 'Überfällige Forderungen'
+    },
+    description: {
+      value: 'belnr'
+    }
+  }
+ }
+define root custom entity ZI_DUNN_ABAP_CALL_2
+{
+  key gjahr            : gjahr;
+      @UI.facet        : [
+      /*   {  // Object Page Header Details
+           id             : 'ftype_desc',
+           purpose        : #HEADER,
+           position       : 20,
+           type           : #DATAPOINT_REFERENCE,
+           targetQualifier: 'ftype_desc'
+         },
+               {  // Object Page Header Details
+           id             : 'name1',
+           purpose        : #HEADER,
+           position       : 30,
+           type           : #DATAPOINT_REFERENCE,
+           targetQualifier: 'name1'
+         },
+               {  // Object Page Header Details
+           id             : 'budat',
+           purpose        : #HEADER,
+           position       : 40,
+           type           : #DATAPOINT_REFERENCE,
+           targetQualifier: 'budat'
+         },
+               {  // Object Page Header Details
+           id             : 'faedt',
+           purpose        : #HEADER,
+           position       : 50,
+           type           : #DATAPOINT_REFERENCE,
+           targetQualifier: 'faedt'
+         },
+               {  // Object Page Header Details
+           id             : 'utage',
+           purpose        : #HEADER,
+           position       : 60,
+           type           : #DATAPOINT_REFERENCE,
+           targetQualifier: 'utage'
+         },
+               {  // Object Page Header Details
+           id             : 'wrbtr',
+           purpose        : #HEADER,
+           position       : 70,
+           type           : #DATAPOINT_REFERENCE,
+           targetQualifier: 'wrbtr'
+         },*/
+      {  // Link the custom entity Header with the Positions- To be able to see it at Preview
+        id             : 'PositionsDetails',
+        purpose        : #STANDARD,
+        position       : 10,
+        //label          : 'PositionDetails',
+        type           : #LINEITEM_REFERENCE,
+        targetElement  : '_Positions'
+      },
+      {
+            targetQualifier: 'headerData',
+            type       : #FIELDGROUP_REFERENCE,
+            purpose    : #HEADER
+          }
+      //      {  // Link the custom entity Header with PDF- To be able to see it at Preview
+      //        id             : 'PdfDetails',
+      //        purpose        : #STANDARD,
+      //        position       : 20,
+      //        label          : 'Beleg',
+      //        type           : #IDENTIFICATION_REFERENCE,
+      //        targetQualifier: 'Pdf'
+      //      }
+      ]
+
+      @UI.lineItem     : [{position: 10, cssDefault.width: '8rem'}]
+      // @UI.identification: [{ position: 10, type: #FOR_ACTION, importance: #HIGH, dataAction: 'inkasso', label: 'Inkasso/Mahnen', emphasized: true }]
+      @UI.dataPoint    : { qualifier: 'belnr'}
+      @Search.defaultSearchElement: true
+  key belnr            : belnr_d;
+      //@UI.identification: [{ position: 20, type: #FOR_ACTION, importance: #HIGH, dataAction: 'verlaengern', label: 'Verlängern' }]
+  key bukrs            : bukrs;
+      //@UI.identification: [{ position: 30, type: #FOR_ACTION, importance: #HIGH, dataAction: 'ausbuchen', label: 'Ausbuchen' }]
+  key BUZEI            : buzei;
+  @UI.hidden: true
+      ftype            : zfi_e_nb_ftype;
+      @UI.lineItem     : [{position: 20, cssDefault.width: '10rem', emphasized: true}] --emphasized not working
+      @UI.dataPoint    : { qualifier: 'ftype_desc'}
+      @UI.fieldGroup   : [{type: #STANDARD, qualifier: 'headerData', position: 10}]
+      ftype_desc       : zfi_e_nb_ftype_desc;
+      @UI.hidden: true
+      ERFASSER         : usnam;
+      @UI.hidden: true
+      KUNNR            : kunnr;
+      @UI.lineItem     : [{position: 30, cssDefault.width: '12rem'}]
+      @UI.dataPoint    : { qualifier: 'name1'}
+      @UI.fieldGroup   : [{type: #STANDARD, qualifier: 'headerData', position: 20}]
+      @Search :{ defaultSearchElement: true, fuzzinessThreshold: 0.7}
+      NAME1            : z_fi_name1;
+      @UI.lineItem     : [{position: 40, cssDefault.width: '12rem'}]
+      @UI.dataPoint    : { qualifier: 'budat'}
+      @UI.fieldGroup   : [{type: #STANDARD, qualifier: 'headerData', position: 30}]
+      BUDAT            : z_fi_budat;
+      @UI.lineItem     : [{position: 50, cssDefault.width: '12rem'}]
+      @UI.dataPoint    : { qualifier: 'faedt'}
+      @UI.fieldGroup   : [{type: #STANDARD, qualifier: 'headerData', position: 40}]
+      FAEDT            : z_fi_dats;
+      @UI.lineItem     : [{position: 60, cssDefault.width: '10rem'}]
+      @UI.dataPoint    : { qualifier: 'utage'}
+      @UI.fieldGroup   : [{type: #STANDARD, qualifier: 'headerData', position: 50}]
+      UTAGE            : zfi_e_nb_utage2;
+      @Semantics.currencyCode: true
+      WAERS            : waers;
+      @Semantics.amount.currencyCode: 'WAERS'
+      @UI.lineItem     : [{position: 70, cssDefault.width: '19rem'}]
+      @UI.dataPoint    : { qualifier: 'wrbtr'}
+      @UI.fieldGroup   : [{type: #STANDARD, qualifier: 'headerData', position: 60}]
+      WRBTR            : z_fi_wrbtr;
+      //@UI.identification: [{ qualifier: 'Pdf' }]
+      ZFBDT            : dzfbdt;
+      @UI.hidden:true
+      PROJK            : abap.char( 8 ); //ps_psp_pnr;
+      @UI.hidden: true
+      PROJK_NAME       : ps_post1;
+      @UI.hidden: true
+      BETR_BOX         : char1;
+      @UI.hidden: true
+      BETREIBUNG_AKTIV : char1;
+      @UI.hidden: true
+      MAHN_BOX         : char1;
+      @UI.hidden: true
+      VERL_BOX         : char1;
+      @UI.hidden: true
+      VERL_DATUM       : dats;
+      @UI.hidden:true
+      AUSB_BOX         : char1;
+      //@UI.identification: [{ qualifier: 'Pdf' }]
+      @UI.hidden: true
+      pdf              : z_fi_pdf;
+      BEMERKUNG        : txt1024;
+      @UI.hidden:true
+      pdf_url          : z_fi_pdf_url;
+      _Positions       : composition [1..*] of ZFI_I_POSITION_DETAILS_2;
+      _Actions         : composition [1..1] of ZFI_DUNN_ACTION_2;
+}
+
