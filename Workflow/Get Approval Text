@@ -1,0 +1,18 @@
+SELECT wi_id,INSTID FROM sww_wi2obj INTO TAB
+                 FOR ALL ENTRIES IN @it_wiid
+                 WHERE wi_id EQ @WORKFLOW_ID  <-------
+                   AND wi_reltype EQ '11'.
+
+ CALL FUNCTION 'SO_DOCUMENT_READ_API1'
+   EXPORTING
+     document_id                = sww_wi2obj-INSTID
+   IMPORTING
+     document_data              = ls_document_data
+   TABLES
+     object_content             = lt_object_content <-------  HERE!!!
+     object_header              = lt_object_header
+   EXCEPTIONS
+     document_id_not_exist      = 1
+     operation_no_authorization = 2
+     x_error                    = 3
+     OTHERS                     = 4.
