@@ -1,0 +1,40 @@
+Pre Requirement: ABAP >= 7.55:
+
+________________________
+@AbapCatalog.sqlViewName: 'ZCDSFINDINTER'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Notas de Débito Intercompany'
+define view ZCDSFI_ND_INTER
+  as select distinct from acdoca
+    left outer join       j_1bbranch
+      on acdoca.rbusa = j_1bbranch.branch
+{
+  key rldnr,
+  key rbukrs,
+  key gjahr,
+  key belnr,
+  key docln,
+      racct,
+      blart,
+      bschl,
+      budat,
+      hsl,
+      rhcur,
+      augbl,
+      prctr,
+      sgtxt,
+      rbusa,
+      sbusa,
+      rassc,
+      pprctr,
+      rcntr,
+      scntr,
+      kunnr,
+      j_1bbranch.bukrs                                                                                                      as EmpresaSocParc,
+      SUBSTRING(acdoca.racct, 1, 1)                                                                                         as ContaDigito,
+      cast( case SUBSTRING(acdoca.racct, 1, 1) when '1' then 'ATIVO' when '2' then 'PASSIVO' else ' ' end as abap.char(7) ) as ContaPatrimonial2,
+      cast( CONCAT( acdoca.rbukrs, j_1bbranch.bukrs ) as abap.char(8)  )                                                    as Chave,
+      cast( case acdoca.sbusa when '' then '' else CONCAT( 'INT', acdoca.sbusa ) end as abap.char(7)  )                     as BP
+}
