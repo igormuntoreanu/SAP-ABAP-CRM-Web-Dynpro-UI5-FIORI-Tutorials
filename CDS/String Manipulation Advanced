@@ -9,7 +9,7 @@ ________________________
 define view ZCDSFI_ND_INTER
   as select distinct from acdoca
     left outer join       j_1bbranch
-      on acdoca.rbusa = j_1bbranch.branch
+      on acdoca.sbusa = j_1bbranch.branch
 {
   key rldnr,
   key rbukrs,
@@ -33,8 +33,10 @@ define view ZCDSFI_ND_INTER
       scntr,
       kunnr,
       j_1bbranch.bukrs                                                                                                      as EmpresaSocParc,
-      SUBSTRING(acdoca.racct, 1, 1)                                                                                         as ContaDigito,
-      cast( case SUBSTRING(acdoca.racct, 1, 1) when '1' then 'ATIVO' when '2' then 'PASSIVO' else ' ' end as abap.char(7) ) as ContaPatrimonial2,
-      cast( CONCAT( acdoca.rbukrs, j_1bbranch.bukrs ) as abap.char(8)  )                                                    as Chave,
+      cast( case SUBSTRING(acdoca.racct, 1, 1) when '1' then 'ATIVO' when '2' then 'PASSIVO' else ' ' end as abap.char(7) ) as ContaPatrimonial,
+      //      cast( CONCAT( acdoca.rbukrs, j_1bbranch.bukrs ) as abap.char(8)  )                                                    as Chave,
+      cast( case SUBSTRING(acdoca.racct, 1, 1) when '1' then CONCAT( acdoca.rbukrs, j_1bbranch.bukrs )
+                                               when '2' then CONCAT( acdoca.rassc, j_1bbranch.bukrs )
+                                               else ' ' end as abap.char(8) )                                               as Chave,
       cast( case acdoca.sbusa when '' then '' else CONCAT( 'INT', acdoca.sbusa ) end as abap.char(7)  )                     as BP
 }
