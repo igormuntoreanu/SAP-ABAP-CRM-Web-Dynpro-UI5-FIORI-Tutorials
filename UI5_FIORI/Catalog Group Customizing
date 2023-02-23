@@ -1,0 +1,5 @@
+Add Parameters to your user at SU3 transaction
+
+/UI2/WD_TRKORR_CONF                            UI2 Transport Request for Web Dynpro Configurations
+
+/UI2/WD_TRKORR_CUST                             UI2 Transport Request for Web Dynpro Customizings
