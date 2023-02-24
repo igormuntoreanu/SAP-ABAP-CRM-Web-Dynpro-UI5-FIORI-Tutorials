@@ -1,0 +1,8 @@
+Table: /UI2/PB_C_CHIPM -> Relationship Between Catalog and Group
+ 
+
+Give the Catalog name like *Z_CATALOG* at BASECHIPID field
+
+or
+
+Give the Group name at PARENTID
