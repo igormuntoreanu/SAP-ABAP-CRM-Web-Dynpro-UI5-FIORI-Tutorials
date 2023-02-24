@@ -1,0 +1,11 @@
+      DATA(lv_language) = VALUE #( lr_language[ 1 ]-low OPTIONAL ).
+
+      ls_entityset-variantdescription = VALUE #( lt_variantstext[ relid     = <fs_variants>-relid
+                                                                  report    = <fs_variants>-report
+                                                                  handle    = <fs_variants>-handle
+                                                                  log_group = <fs_variants>-log_group
+                                                                  username  = <fs_variants>-username
+                                                                  variant   = <fs_variants>-variant
+                                                                  type      = <fs_variants>-type
+                                                                  langu     = lv_language
+                                                                  ]-text OPTIONAL ).
