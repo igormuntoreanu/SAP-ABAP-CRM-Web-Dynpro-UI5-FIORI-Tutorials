@@ -1,0 +1,1 @@
+/sap/opu/odata/sap/Z70PLM_IBASE_VISU_SRV/EquiRefSet?$filter=FilterLanguage  eq  'DE-DE'  and  IvKlart  eq  'ZFC'  and  IvClass  eq  'P4020000_IB'  and ( FilterChar  eq  'IB_000005' or FilterChar eq 'IB_000046' ) and ( FilterCharValue  eq  '1112' or FilterCharValue  eq  '02')
