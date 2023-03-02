@@ -1,0 +1,131 @@
+URI Example
+GET EquiRefSet?$filter=FilterLanguage eq 'DE-DE' and IvKlart eq 'ZFC' and IvClass eq 'P4020000_IB' and ((FilterChar eq 'IB_000005' and (FilterCharValue eq '1112' or FilterCharValue eq '1111' or FilterCharValue eq '1113')) and (FilterChar eq 'IB_000048' and (FilterCharValue eq '01' or FilterCharValue eq '02')) and (FilterChar eq 'IB_000046' and FilterCharValue eq '02'))
+
+METHOD equirefset_get_entityset.
+
+  DATA: lv_language         TYPE zcl70plm_ibase_visu_mpc=>ts_equiref-filterlanguage,
+        lv_class            TYPE zcl70plm_ibase_visu_mpc=>ts_equiref-iv_class,
+        lv_klart            TYPE zcl70plm_ibase_visu_mpc=>ts_equiref-iv_klart,
+        lv_equnr            TYPE zcl70plm_ibase_visu_mpc=>ts_equiref-equnr,
+        lr_filterchar       TYPE RANGE OF zcl70plm_ibase_visu_mpc=>ts_equiref-filterchar,
+        ls_rfilterchar      LIKE LINE OF lr_filterchar,
+        lr_filtercharvalues TYPE RANGE OF zcl70plm_ibase_visu_mpc=>ts_equiref-filtercharvalue.
+
+  DATA: lt_entityset TYPE zcl70plm_ibase_visu_mpc=>tt_equiref.
+  "Due to high complexity of filter the logic needed to be transformed as below
+  DATA(lo_filter_tree) = io_tech_request_context->get_filter_expression_tree( ).
+
+  IF lo_filter_tree IS BOUND.
+    NEW cl_sadl_gw_filter_tree_parser( )->get_complex_condition(
+      EXPORTING
+        io_filter_tree = lo_filter_tree
+        iv_use_placeholders = abap_false
+      IMPORTING
+        et_condition   = DATA(lt_condition) ).
+
+    NEW cl_sadl_cond_to_ranges( )->convert_sadl_cond_to_ranges(
+      EXPORTING
+        it_sadl_conditions = lt_condition
+      IMPORTING
+        et_ranges          = DATA(lt_ranges) ).
+  ENDIF.
+
+* Get RFC destination
+  DATA(lo_dp_facade) = /iwbep/if_mgw_conv_srv_runtime~get_dp_facade( ).
+  DATA(lv_destination) = /iwbep/cl_sb_gen_dpc_rt_util=>get_rfc_destination( io_dp_facade = lo_dp_facade ).
+
+  READ TABLE lt_ranges INTO DATA(ls_filter) WITH KEY name = 'FILTERCHAR'.
+
+  LOOP AT ls_filter-range INTO DATA(ls_filterchar).
+    DATA(lv_tabix) = sy-tabix.
+    READ TABLE lt_ranges INTO DATA(ls_language) WITH KEY name = 'FILTERLANGUAGE'.
+    READ TABLE lt_ranges INTO DATA(ls_class)    WITH KEY name = 'IV_CLASS'.
+    READ TABLE lt_ranges INTO DATA(ls_klart)    WITH KEY name = 'IV_KLART'.
+    READ TABLE lt_ranges INTO DATA(ls_equi)     WITH KEY name = 'EQUNR'.
+    READ TABLE lt_ranges INTO DATA(ls_atwrt)    WITH KEY name = 'FILTERCHARVALUE'.
+
+    lv_language          = VALUE #( ls_language-range[ 1 ]-low OPTIONAL ).
+    lv_class             = VALUE #( ls_class-range[ 1 ]-low OPTIONAL ).
+    lv_klart             = VALUE #( ls_klart-range[ 1 ]-low OPTIONAL ).
+    lv_equnr             = VALUE #( ls_equi-range[ 1 ]-low OPTIONAL ).
+    CLEAR lr_filterchar.
+    MOVE-CORRESPONDING ls_filterchar TO ls_rfilterchar.
+    APPEND ls_rfilterchar TO lr_filterchar.
+
+    CLEAR lr_filtercharvalues.
+    MOVE-CORRESPONDING ls_atwrt-range[] TO lr_filtercharvalues[].
+
+    DATA(lv_rfc_name) = 'Z_20PLM_IBASE_VISU_EQUI_REF'.
+
+    IF lv_destination IS INITIAL OR lv_destination EQ 'NONE'.
+
+      TRY.
+          CALL FUNCTION lv_rfc_name
+            EXPORTING
+              iv_klart       = lv_klart
+              iv_class       = lv_class
+              iv_equnr       = lv_equnr
+              iv_language    = lv_language
+              it_rg_atnam    = lr_filterchar
+              it_rg_atwrt    = lr_filtercharvalues
+            IMPORTING
+              et_equi_list   = lt_entityset
+            EXCEPTIONS
+              system_failure = 1000 message lv_exc_msg
+              OTHERS         = 1002.
+
+          DATA(lv_subrc) = sy-subrc.
+*in case of co-deployment the exception is raised and needs to be caught
+        CATCH cx_root INTO DATA(lx_root).
+          lv_subrc = 1001.
+          DATA(lv_exc_msg) = lx_root->if_message~get_text( ).
+      ENDTRY.
+
+    ELSE.
+
+      CALL FUNCTION lv_rfc_name DESTINATION lv_destination
+        EXPORTING
+          iv_klart       = lv_klart
+          iv_class       = lv_class
+          iv_equnr       = lv_equnr
+          iv_language    = lv_language
+          it_rg_atnam    = lr_filterchar
+          it_rg_atwrt    = lr_filtercharvalues
+        IMPORTING
+          et_equi_list   = lt_entityset
+        EXCEPTIONS
+          system_failure = 1000
+          OTHERS         = 1002.
+
+    ENDIF.
+
+    IF lv_tabix = 1.
+      DATA(lt_entityset_main) = lt_entityset.
+    ELSE.
+      LOOP AT lt_entityset_main INTO DATA(ls_entityset_main).
+        DATA(lv_tabix_main) = sy-tabix.
+        READ TABLE lt_entityset WITH KEY equnr = ls_entityset_main-equnr TRANSPORTING NO FIELDS.
+        IF sy-subrc NE 0.
+          DELETE lt_entityset_main INDEX lv_tabix_main.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+  ENDLOOP.
+
+  APPEND LINES OF lt_entityset_main TO et_entityset.
+
+  map_and_sort(
+        EXPORTING
+          it_order       = it_order "/iwbep/t_mgw_sorting_order
+          iv_entity_name = iv_entity_name
+        CHANGING
+          ct_table       = et_entityset ).
+
+  "Paging
+  CALL METHOD /iwbep/cl_mgw_data_util=>paging
+    EXPORTING
+      is_paging = is_paging
+    CHANGING
+      ct_data   = et_entityset.
+
+ENDMETHOD.
