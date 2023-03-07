@@ -1,0 +1,834 @@
+PROGRAM zrggbs000 .
+*---------------------------------------------------------------------*
+* Corrections/ repair
+* wms092357 070703 Note 638886: template routines to be used for
+*                  workaround to substitute bseg-bewar from bseg-xref1/2
+*---------------------------------------------------------------------*
+*                                                                     *
+*   Substitutions: EXIT-Formpool for Uxxx-Exits                       *
+*                                                                     *
+*   This formpool is used by SAP for testing purposes only.           *
+*                                                                     *
+*   Note: If you define a new user exit, you have to enter your       *
+*         user exit in the form routine GET_EXIT_TITLES.              *
+*                                                                     *
+*---------------------------------------------------------------------*
+INCLUDE fgbbgd00.              "Standard data types
+
+
+*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*
+*    PLEASE INCLUDE THE FOLLOWING "TYPE-POOL"  AND "TABLES" COMMANDS  *
+*        IF THE ACCOUNTING MODULE IS INSTALLED IN YOUR SYSTEM         *
+TYPE-POOLS: gb002. " TO BE INCLUDED IN                       "wms092357
+TABLES: bkpf,      " ANY SYSTEM THAT                         "wms092357
+        bseg,      " HAS 'FI' INSTALLED                      "wms092357
+        cobl,                                               "wms092357
+        csks,                                               "wms092357
+        anlz,                                               "wms092357
+        glu1,                                               "wms092357
+* IKM - 04.JUL.2021 - inicio
+        prps,
+* IKM - 04.JUL.2021 - fim
+        coas.
+*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*
+
+
+*----------------------------------------------------------------------*
+*       FORM GET_EXIT_TITLES                                           *
+*----------------------------------------------------------------------*
+*       returns name and title of all available standard-exits         *
+*       every exit in this formpool has to be added to this form.      *
+*       You have to specify a parameter type in order to enable the    *
+*       code generation program to determine correctly how to          *
+*       generate the user exit call, i.e. how many and what kind of    *
+*       parameter(s) are used in the user exit.                        *
+*       The following parameter types exist:                           *
+*                                                                      *
+*       TYPE                Description              Usage             *
+*    ------------------------------------------------------------      *
+*       C_EXIT_PARAM_NONE   Use no parameter         Subst. and Valid. *
+*                           except B_RESULT                            *
+*       C_EXIT_PARAM_FIELD  Use one field as param.  Only Substitution *
+*       C_EXIT_PARAM_CLASS  Use a type as parameter  Subst. and Valid  *
+*                                                                      *
+*----------------------------------------------------------------------*
+*  -->  EXIT_TAB  table with exit-name and exit-titles                 *
+*                 structure: NAME(5), PARAM(1), TITEL(60)
+*----------------------------------------------------------------------*
+FORM get_exit_titles TABLES etab.
+
+  DATA: BEGIN OF exits OCCURS 50,
+          name(5)   TYPE c,
+          param     LIKE c_exit_param_none,
+          title(60) TYPE c,
+        END OF exits.
+
+  exits-name  = 'U001'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t01.             "Atribuição de Centro
+  APPEND exits.
+
+  exits-name  = 'U002'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t02.             "Alteração de Texto do Item
+  APPEND exits.
+
+  exits-name  = 'U100'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-100.             "Cost center from CSKS
+  APPEND exits.
+
+  exits-name  = 'U101'.
+  exits-param = c_exit_param_field.
+  exits-title = TEXT-101.             "Cost center from CSKS
+  APPEND exits.
+
+* begin of insertion                                          "wms092357
+  exits-name  = 'U200'.
+  exits-param = c_exit_param_field.
+  exits-title = TEXT-200.             "Cons. transaction type
+  APPEND exits.                       "from xref1/2
+* end of insertion                                            "wms092357
+
+* begin of insertion                                          "wms092357
+  exits-name  = 'U003'.
+  exits-param = c_exit_param_field.
+  exits-title = TEXT-100.             "Cons. transaction type
+  APPEND exits.                       "from xref1/2
+* end of insertion
+
+
+  exits-name  = 'UFP00'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t01.             "Atribuição de divisão
+  APPEND exits.
+
+  exits-name  = 'UFP01'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t01.             "Atribuição de divisão
+  APPEND exits.
+
+  exits-name  = 'U004'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-300.             "Número do Cedente
+  APPEND exits.
+
+  exits-name  = 'U005'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-400.             "Descrição do Lançamento
+  APPEND exits.
+
+
+  exits-name  = 'U006'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t03.             "Atribuição Divisão Na Alteração do Dado Mestre AA
+  APPEND exits.
+
+  exits-name  = 'U007'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t07.             "Condicao de pagamento Z91
+  APPEND exits.
+
+  exits-name  = 'U008'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t08.             "Condicao de pagamento Z93
+  APPEND exits.
+
+  exits-name  = 'U009'.
+  exits-param = c_exit_param_none.
+  exits-title = TEXT-t09.             "Condicao de pagamento Z94
+  APPEND exits.
+
+************************************************************************
+* PLEASE DELETE THE FIRST '*' FORM THE BEGINING OF THE FOLLOWING LINES *
+*        IF THE ACCOUNTING MODULE IS INSTALLED IN YOUR SYSTEM:         *
+*  EXITS-NAME  = 'U102'.
+*  EXITS-PARAM = C_EXIT_PARAM_CLASS.
+*  EXITS-TITLE = TEXT-102.             "Sum is used for the reference.
+*  APPEND EXITS.
+
+
+***********************************************************************
+** EXIT EXAMPLES FROM PUBLIC SECTOR INDUSTRY SOLUTION
+**
+** PLEASE DELETE THE FIRST '*' FORM THE BEGINING OF THE FOLLOWING LINE
+** TO ENABLE PUBLIC SECTOR EXAMPLE SUBSTITUTION EXITS
+***********************************************************************
+  INCLUDE rggbs_ps_titles.
+
+  REFRESH etab.
+  LOOP AT exits.
+    etab = exits.
+    APPEND etab.
+  ENDLOOP.
+
+ENDFORM.                    "GET_EXIT_TITLES
+
+
+* eject
+*---------------------------------------------------------------------*
+*       FORM U001                                                     *
+*---------------------------------------------------------------------*
+*       TRM - Atribuição de Centro                                    *
+*---------------------------------------------------------------------*
+FORM u001.
+
+  IF bseg-werks IS INITIAL.
+
+    bseg-werks = bseg-gsber.
+
+  ENDIF.
+
+ENDFORM.
+
+
+* eject
+*---------------------------------------------------------------------*
+*       FORM U002                                                     *
+*---------------------------------------------------------------------*
+*       FI - Alteração de Texto do Item                               *
+*---------------------------------------------------------------------*
+FORM u002.
+
+  DATA:
+    lv_account_name(20) TYPE c,
+    lv_sortl(10)        TYPE c,
+    lv_ltext(20)        TYPE c,
+    lv_ktopl(4)         TYPE c,
+    lv_txt20(20)        TYPE c.
+
+  IF bseg-sgtxt IS INITIAL.
+
+* Document type
+    SELECT SINGLE ltext
+      FROM t003t
+      INTO lv_ltext
+     WHERE spras = sy-langu
+       AND blart = bkpf-blart.
+
+    CASE bseg-koart.
+
+      WHEN 'D'.
+        SELECT SINGLE sortl
+          FROM kna1
+          INTO lv_sortl
+         WHERE kunnr = bseg-kunnr.
+
+        lv_account_name = lv_sortl.
+
+      WHEN 'K'.
+        SELECT SINGLE sortl
+          FROM lfa1
+          INTO lv_sortl
+         WHERE lifnr = bseg-lifnr.
+
+        lv_account_name = lv_sortl.
+
+      WHEN OTHERS.
+        SELECT SINGLE ktopl
+          FROM t001
+          INTO lv_ktopl
+         WHERE bukrs = bseg-bukrs.
+
+        SELECT SINGLE txt20
+          FROM skat
+          INTO lv_txt20
+         WHERE spras = sy-langu
+           AND ktopl = lv_ktopl
+           AND saknr = bseg-hkont.
+
+        lv_account_name = lv_txt20.
+
+    ENDCASE.
+
+    CONCATENATE lv_ltext lv_account_name bkpf-xblnr INTO bseg-sgtxt SEPARATED BY space.
+
+  ENDIF.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM U004                                                     *
+*---------------------------------------------------------------------*
+*       FI - Alteração de Texto do Item                               *
+*---------------------------------------------------------------------*
+FORM u004.
+
+  TYPES: BEGIN OF ty_arquivo,
+           rec(240) TYPE c,
+         END OF ty_arquivo.
+
+  DATA: bdata_ap    TYPE TABLE OF ty_arquivo,
+        ls_bdata_ap TYPE ty_arquivo,
+        lv_wrbtr    TYPE char18,
+        lv_index    TYPE i.
+
+  CLEAR lv_wrbtr.
+
+  "Importar a tabela com os dados do arquivo vindo do programa J_1BBR20
+  IMPORT bdata_ap TO bdata_ap FROM MEMORY ID 'ZARQ'.
+
+  "Manter somente os itens do arquivo
+  LOOP AT bdata_ap INTO ls_bdata_ap.
+    IF ls_bdata_ap-rec+7(1) NE '3' OR ( ls_bdata_ap-rec+170(3) EQ '202' OR ls_bdata_ap-rec+170(3) EQ '205').
+      DELETE bdata_ap INDEX sy-tabix.
+    ENDIF.
+  ENDLOOP.
+
+  lv_wrbtr = bseg-wrbtr.
+  TRANSLATE lv_wrbtr USING '. '.
+  CONDENSE lv_wrbtr NO-GAPS.
+
+  CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+    EXPORTING
+      input  = lv_wrbtr
+    IMPORTING
+      output = lv_wrbtr.
+
+  "verificar qual registro estamos lendo pelo valor do lançamento
+  LOOP AT bdata_ap INTO ls_bdata_ap.
+
+    lv_index = sy-tabix.
+
+    IF ls_bdata_ap-rec+169(3) EQ '202' AND ls_bdata_ap-rec+150(18) = lv_wrbtr.
+      bseg-zuonr = ls_bdata_ap-rec+201(18).
+      IF lv_index > 1.
+        DELETE bdata_ap INDEX 1.
+      ENDIF.
+      EXIT.
+    ELSEIF ls_bdata_ap-rec+169(3) EQ '205' AND ls_bdata_ap-rec+150(18) = lv_wrbtr.
+      bseg-zuonr = ls_bdata_ap-rec+201(18).
+      IF lv_index > 1.
+        DELETE bdata_ap INDEX 1.
+      ENDIF.
+      EXIT.
+    ENDIF.
+
+  ENDLOOP.
+
+  FREE MEMORY ID 'ZARQ'.
+  EXPORT bdata_ap[] TO MEMORY ID 'ZARQ'.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM U005                                                     *
+*---------------------------------------------------------------------*
+*       FI - Alteração BKTXT                                          *
+*---------------------------------------------------------------------*
+FORM u005.
+
+  TYPES: BEGIN OF ty_arquivo,
+           rec(240) TYPE c,
+         END OF ty_arquivo.
+
+  DATA: bdata_ap    TYPE TABLE OF ty_arquivo,
+        ls_bdata_ap TYPE ty_arquivo.
+
+  "Importar a tabela com os dados do arquivo vindo do programa J_1BBR20
+  IMPORT bdata_ap TO bdata_ap FROM MEMORY ID 'ZCAB'.
+
+  IF bdata_ap[] IS INITIAL.
+    IMPORT bdata_ap TO bdata_ap FROM MEMORY ID 'ZARQ'.
+  ENDIF.
+
+  "Manter somente os itens do arquivo
+  LOOP AT bdata_ap INTO ls_bdata_ap.
+    IF ls_bdata_ap-rec+7(1) NE '3' OR ( ls_bdata_ap-rec+170(3) EQ '202' OR ls_bdata_ap-rec+170(3) EQ '205').
+      DELETE bdata_ap INDEX sy-tabix.
+    ENDIF.
+  ENDLOOP.
+
+  READ TABLE bdata_ap INTO ls_bdata_ap INDEX 1.
+
+  IF sy-subrc EQ 0.
+    bkpf-bktxt = ls_bdata_ap-rec+176(25).
+  ENDIF.
+
+  DELETE bdata_ap INDEX 1.
+  FREE MEMORY ID 'ZCAB'.
+  EXPORT bdata_ap[] TO MEMORY ID 'ZCAB'.
+
+ENDFORM.
+
+
+* eject
+*---------------------------------------------------------------------*
+*       FORM U006                                                     *
+*---------------------------------------------------------------------*
+*      FI - Atribuição de Divisão Documentos do Ativo Imobilizado     *
+*---------------------------------------------------------------------*
+FORM u006.
+
+  DATA: lv_gsber(4) TYPE c.
+
+  CLEAR: lv_gsber.
+* Divisão
+  SELECT SINGLE gsber
+    FROM anlz
+    INTO lv_gsber
+   WHERE bukrs = bseg-bukrs
+     AND anln1 = bseg-anln1
+     AND anln2 = bseg-anln2
+     AND bdatu = '99991231'.
+
+  IF sy-subrc EQ 0.
+    bseg-gsber =  lv_gsber.
+  ENDIF.
+
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM U007                                                     *
+*---------------------------------------------------------------------*
+*      FI - Condicao de pagamento Z91 - Considerar dias uteis         *
+*---------------------------------------------------------------------*
+FORM u007.
+
+  DATA: lv_dif TYPE i.
+
+  SELECT SINGLE ztag1
+         FROM t052
+         INTO @DATA(lv_tag)
+         WHERE zterm = @bseg-zterm.
+  IF sy-subrc = 0.
+    bseg-zbd1t = lv_tag.
+    DATA(lv_vencimento) = bseg-zfbdt.
+
+    CALL FUNCTION 'RP_CALC_DATE_IN_INTERVAL'
+      EXPORTING
+        date      = lv_vencimento
+        days      = CONV dlydy( bseg-zbd1t )
+        months    = 0
+        years     = 0
+      IMPORTING
+        calc_date = lv_vencimento.
+
+    DATA(lv_vencimento_util) = lv_vencimento.
+  ENDIF.
+  "Calcula proximo dia util
+  CALL FUNCTION 'DATE_CONVERT_TO_FACTORYDATE'
+    EXPORTING
+      date                         = lv_vencimento
+      factory_calendar_id          = 'BR' "Brazil
+    IMPORTING
+      date                         = lv_vencimento_util
+    EXCEPTIONS
+      calendar_buffer_not_loadable = 1
+      correct_option_invalid       = 2
+      date_after_range             = 3
+      date_before_range            = 4
+      date_invalid                 = 5
+      factory_calendar_not_found   = 6
+      OTHERS                       = 7.
+  IF sy-subrc EQ 0.
+
+    IF lv_vencimento_util <> lv_vencimento.
+      lv_dif = lv_vencimento_util - lv_vencimento.
+
+      CALL FUNCTION 'RP_CALC_DATE_IN_INTERVAL'
+        EXPORTING
+          date      = bseg-zfbdt
+          days      = CONV dlydy( lv_dif )
+          months    = 0
+          years     = 0
+        IMPORTING
+          calc_date = bseg-zfbdt.
+
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM U008                                                     *
+*---------------------------------------------------------------------*
+*      FI - Condicao de pagamento Z93 - Considerar 20 e dia util      *
+*---------------------------------------------------------------------*
+FORM u008.
+
+  DATA: lv_dif TYPE i,
+        lv_zfbdt TYPE bseg-zfbdt.
+
+  CLEAR bseg-zbd1t.
+  
+  IMPORT lv_zfbdt TO lv_zfbdt FROM MEMORY ID 'BSEG-ZFBDT-U008'.
+  CHECK lv_zfbdt <> bseg-zfbdt.  
+
+  DATA(lv_vencimento) = bseg-netdt.
+  DATA(lv_vencimento_util) = bseg-netdt.
+
+  IF lv_vencimento+6(2) > 20.
+    lv_vencimento+6(2) = '20'.
+    CALL FUNCTION 'RP_CALC_DATE_IN_INTERVAL'
+      EXPORTING
+        date      = lv_vencimento
+        days      = 0
+        months    = 1
+        years     = 0
+      IMPORTING
+        calc_date = lv_vencimento.
+  ELSE.
+    lv_vencimento+6(2) = '20'.
+  ENDIF.
+
+  "Verifica e Calcula proximo dia util
+  CALL FUNCTION 'DATE_CONVERT_TO_FACTORYDATE'
+    EXPORTING
+      date                         = lv_vencimento
+      factory_calendar_id          = 'BR' "Brazil
+    IMPORTING
+      date                         = lv_vencimento_util
+    EXCEPTIONS
+      calendar_buffer_not_loadable = 1
+      correct_option_invalid       = 2
+      date_after_range             = 3
+      date_before_range            = 4
+      date_invalid                 = 5
+      factory_calendar_not_found   = 6
+      OTHERS                       = 7.
+  IF sy-subrc EQ 0.
+
+    bseg-zfbdt = lv_vencimento_util.
+    FREE MEMORY ID 'BSEG-ZFBDT-U008'.
+    lv_zfbdt = bseg-zfbdt.
+    EXPORT lv_zfbdt FROM lv_zfbdt TO MEMORY ID 'BSEG-ZFBDT-U008'.
+  ENDIF.
+
+ENDFORM.
+
+*---------------------------------------------------------------------*
+*       FORM U009                                                     *
+*---------------------------------------------------------------------*
+*      FI - Condicao de pagamento Z94 - Considerar 30 e dia util      *
+*---------------------------------------------------------------------*
+FORM u009.
+
+  DATA: lv_dif       TYPE i,
+        lv_zfbdt TYPE bseg-zfbdt.
+
+  CLEAR bseg-zbd1t.
+  
+  IMPORT lv_zfbdt TO lv_zfbdt FROM MEMORY ID 'BSEG-ZFBDT-U009'.
+  CHECK lv_zfbdt <> bseg-zfbdt.
+
+  DATA(lv_vencimento) = bseg-netdt.
+  DATA(lv_vencimento_util) = bseg-netdt.
+
+  IF ( bseg-zfbdt+4(2) = '01' AND bseg-netdt+6(2) > 30 ) OR bseg-zfbdt+4(2) = '02'. "Checa se janeiro 31 ou fevereiro
+
+    lv_vencimento+6(2) = '01'.
+    lv_vencimento+4(2) = '02'.
+
+    CALL FUNCTION 'RP_LAST_DAY_OF_MONTHS'
+      EXPORTING
+        day_in            = lv_vencimento
+      IMPORTING
+        last_day_of_month = lv_vencimento
+      EXCEPTIONS
+        day_in_no_date    = 1
+        OTHERS            = 2.
+
+  ELSEIF bseg-zfbdt+6(2) > 30.
+
+    lv_vencimento+6(2) = '30'.
+
+    CALL FUNCTION 'RP_CALC_DATE_IN_INTERVAL'
+      EXPORTING
+        date      = lv_vencimento
+        days      = 0
+        months    = 1
+        years     = 0
+      IMPORTING
+        calc_date = lv_vencimento.
+  ELSE.
+    lv_vencimento+6(2) = '30'.
+  ENDIF.
+
+  "Verifica e Calcula proximo dia util
+  CALL FUNCTION 'DATE_CONVERT_TO_FACTORYDATE'
+    EXPORTING
+      date                         = lv_vencimento
+      factory_calendar_id          = 'BR' "Brazil
+    IMPORTING
+      date                         = lv_vencimento_util
+    EXCEPTIONS
+      calendar_buffer_not_loadable = 1
+      correct_option_invalid       = 2
+      date_after_range             = 3
+      date_before_range            = 4
+      date_invalid                 = 5
+      factory_calendar_not_found   = 6
+      OTHERS                       = 7.
+  IF sy-subrc EQ 0.
+    bseg-zfbdt = lv_vencimento_util.
+    FREE MEMORY ID 'BSEG-ZFBDT-U009'.
+    lv_zfbdt = bseg-zfbdt.
+    EXPORT lv_zfbdt FROM lv_zfbdt TO MEMORY ID 'BSEG-ZFBDT-U009'.
+  ENDIF.
+
+ENDFORM.
+
+* eject
+*---------------------------------------------------------------------*
+*       FORM U100                                                     *
+*---------------------------------------------------------------------*
+*       Reads the cost-center from the CSKS table .                   *
+*---------------------------------------------------------------------*
+FORM u100.
+
+  BREAK-POINT.
+
+  SELECT prctr FROM csks INTO coas-prctr
+    WHERE kostl EQ coas-akstl
+      AND kokrs EQ coas-kokrs
+      AND datbi >= sy-datum
+      AND datab <= sy-datum.
+  ENDSELECT.
+
+ENDFORM.                                                    "U100
+
+* eject
+*---------------------------------------------------------------------*
+*       FORM U101                                                     *
+*---------------------------------------------------------------------*
+*       Reads the cost-center from the CSKS table for accounting      *
+*       area '0001'.                                                  *
+*       This exit uses a parameter for the cost_center so it can      *
+*       be used irrespective of the table used in the callup point.   *
+*---------------------------------------------------------------------*
+FORM u101 USING cost_center.
+
+*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+* PLEASE DELETE THE FIRST '*' FORM THE BEGINING OF THE FOLLOWING LINES *
+*        IF THE ACCOUNTING MODULE IS INSTALLED IN YOUR SYSTEM:         *
+*  SELECT * FROM CSKS
+*            WHERE KOSTL EQ COST_CENTER
+*              AND KOKRS EQ '0001'.
+*    IF CSKS-DATBI >= SY-DATUM AND
+*       CSKS-DATAB <= SY-DATUM.
+*
+*      MOVE CSKS-ABTEI TO COST_CENTER .
+*
+*    ENDIF.
+*  ENDSELECT.
+
+ENDFORM.                                                    "U101
+
+* eject
+*---------------------------------------------------------------------*
+*       FORM U102                                                     *
+*---------------------------------------------------------------------*
+*       Inserts the sum of the posting into the reference field.      *
+*       This exit can be used in FI for the complete document.        *
+*       The complete data is passed in one parameter.                 *
+*---------------------------------------------------------------------*
+
+
+*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+* PLEASE DELETE THE FIRST '*' FORM THE BEGINING OF THE FOLLOWING LINES *
+*        IF THE ACCOUNTING MODULE IS INSTALLED IN YOUR SYSTEM:         *
+*FORM u102 USING bool_data TYPE gb002_015.
+*DATA: SUM(10) TYPE C.
+*
+*    LOOP AT BOOL_DATA-BSEG INTO BSEG
+*                    WHERE    SHKZG = 'S'.
+*       BSEG-ZUONR = 'Test'.
+*       MODIFY BOOL_DATA-BSEG FROM BSEG.
+*       ADD BSEG-DMBTR TO SUM.
+*    ENDLOOP.
+*
+*    BKPF-XBLNR = TEXT-001.
+*    REPLACE '&' WITH SUM INTO BKPF-XBLNR.
+*
+*ENDFORM.
+
+
+***********************************************************************
+** EXIT EXAMPLES FROM PUBLIC SECTOR INDUSTRY SOLUTION
+**
+** PLEASE DELETE THE FIRST '*' FORM THE BEGINING OF THE FOLLOWING LINE
+** TO ENABLE PUBLIC SECTOR EXAMPLE SUBSTITUTION EXITS
+***********************************************************************
+*INCLUDE rggbs_ps_forms.
+
+
+*eject
+* begin of insertion                                          "wms092357
+*&---------------------------------------------------------------------*
+*&      Form  u200
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM u200 USING e_rmvct TYPE bseg-bewar.
+  PERFORM xref_to_rmvct USING bkpf bseg 1 CHANGING e_rmvct.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  xref_to_rmvct
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM xref_to_rmvct
+     USING    is_bkpf         TYPE bkpf
+              is_bseg         TYPE bseg
+              i_xref_field    TYPE i
+     CHANGING c_rmvct         TYPE rmvct.
+
+  DATA l_msgv TYPE symsgv.
+  STATICS st_rmvct TYPE HASHED TABLE OF rmvct WITH UNIQUE DEFAULT KEY.
+
+* either bseg-xref1 or bseg-xref2 must be used as source...
+  IF i_xref_field <> 1 AND i_xref_field <> 2.
+    MESSAGE x000(gk) WITH 'UNEXPECTED VALUE I_XREF_FIELD ='
+      i_xref_field '(MUST BE = 1 OR = 2)' ''.
+  ENDIF.
+  IF st_rmvct IS INITIAL.
+    SELECT trtyp FROM t856 INTO TABLE st_rmvct.
+  ENDIF.
+  IF i_xref_field = 1.
+    c_rmvct = is_bseg-xref1.
+  ELSE.
+    c_rmvct = is_bseg-xref2.
+  ENDIF.
+  IF c_rmvct IS INITIAL.
+    WRITE i_xref_field TO l_msgv LEFT-JUSTIFIED.
+    CONCATENATE TEXT-m00 l_msgv INTO l_msgv SEPARATED BY space.
+*   cons. transaction type is not specified => send an error message...
+    MESSAGE e123(g3) WITH l_msgv.
+*   Bitte geben Sie im Feld &1 eine Konsolidierungsbewegungsart an
+  ENDIF.
+* c_rmvct <> initial...
+  READ TABLE st_rmvct TRANSPORTING NO FIELDS FROM c_rmvct.
+  CHECK NOT sy-subrc IS INITIAL.
+* cons. transaction type does not exist => send error message...
+  WRITE i_xref_field TO l_msgv LEFT-JUSTIFIED.
+  CONCATENATE TEXT-m00 l_msgv INTO l_msgv SEPARATED BY space.
+  MESSAGE e124(g3) WITH c_rmvct l_msgv.
+* KonsBewegungsart &1 ist ungültig (bitte Eingabe im Feld &2 korrigieren
+ENDFORM.
+* end of insertion
+FORM ufp00.
+
+************************************************************************
+  DATA lv_gsber TYPE bseg-gsber.
+
+  DATA(lv_bukrs) = bseg-bukrs.
+  DATA(lv_saknr) = bseg-hkont.
+
+  IF bseg IS INITIAL.
+    lv_bukrs = cobl-bukrs.
+    lv_saknr = cobl-hkont.
+  ENDIF.
+
+  SELECT SINGLE gsber
+    FROM ztfi001
+    INTO lv_gsber
+    WHERE bukrs EQ lv_bukrs
+      AND saknr EQ lv_saknr.
+
+  IF sy-subrc EQ 0.
+
+    IF bseg IS NOT INITIAL.
+      bseg-gsber = lv_gsber.
+    ELSE.
+      cobl-gsber = lv_gsber.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+FORM ufp01.
+
+
+  DATA lv_prctr TYPE vbrp-prctr.
+  FIELD-SYMBOLS <fs_prctr> TYPE vbrp-prctr.
+  FIELD-SYMBOLS <fs_vgbel> TYPE char10.
+
+*  CASE sy-tcode.
+*    WHEN 'VF01'.
+  ASSIGN ('(SAPMV60A)XVBRP-PRCTR') TO <fs_prctr> .
+  IF sy-subrc EQ 0.
+    IF  bseg-prctr IS INITIAL.
+      bseg-prctr =  <fs_prctr>.
+    ENDIF.
+  ELSE.
+
+    ASSIGN ('(SAPLVBRK)XKOMFKGN-VGBEL') TO <fs_vgbel> .
+    IF sy-subrc EQ 0.
+
+      SELECT SINGLE prctr
+       FROM vbap
+       INTO lv_prctr
+      WHERE vbeln EQ <fs_vgbel>.
+
+      IF sy-subrc EQ 0.
+        IF  bseg-prctr IS INITIAL.
+          bseg-prctr = lv_prctr.
+        ENDIF.
+      ENDIF.
+
+    ELSE.
+
+      SELECT SINGLE prctr
+        FROM vbrp
+        INTO lv_prctr
+       WHERE vbeln EQ bkpf-belnr.
+
+      IF sy-subrc EQ 0.
+        IF  bseg-prctr IS INITIAL.
+          bseg-prctr = lv_prctr.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+*    WHEN 'VF02'.
+*
+*      SELECT SINGLE prctr
+*        FROM vbrp
+*        INTO lv_prctr
+*       WHERE vbeln EQ bkpf-belnr.
+*
+*      IF sy-subrc EQ 0.
+*        IF  bseg-prctr IS INITIAL.
+*          bseg-prctr = lv_prctr.
+*        ENDIF.
+*      ENDIF.
+*  ENDCASE.
+
+ENDFORM.
+
+************************************************************************
+*                         COGNIZANT CONSULTORIA                        *
+************************************************************************
+* TITULO     :  AUTOMAÇÃO PEP                                          *
+* PROGRAMA   :                                                         *
+* PROGRAMADOR: Ildo Kit Müller                                         *
+* DATA       : 04.07.2021                                              *
+*----------------------------------------------------------------------*
+* LOG DE ALTERAÇÃO:                                                    *
+* DATA       | AUTOR               | REQUEST    | DESCRIÇÃO            *
+* 04.07.2021 | ILDO KIT MÜLLER     |S4DK911581  | Codificação          *
+************************************************************************
+FORM u003
+    USING    is_prctr          TYPE prctr.
+
+
+  IF prps-posid+0(2) <> 'PD'.
+
+    SELECT SINGLE prctr gsber func_area
+             INTO  ( prps-prctr, prps-pgsbr,  prps-func_area )
+             FROM   csks
+            WHERE   kostl = prps-akstl.
+  ELSE.
+    SELECT SINGLE gsber func_area
+            INTO  ( prps-pgsbr,  prps-func_area )
+             FROM   csks
+            WHERE   kostl = prps-akstl.
+
+  ENDIF.
+
+ENDFORM.
