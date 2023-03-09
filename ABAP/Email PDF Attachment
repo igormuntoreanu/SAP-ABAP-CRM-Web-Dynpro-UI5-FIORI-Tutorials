@@ -1,0 +1,842 @@
+*&---------------------------------------------------------------------*
+*& Report  YBMON_SEND_EMAIL
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT ybmon_send_email.
+
+*DATA:
+* i_coll_data TYPE TABLE OF ybmon_coll_data.
+
+
+* Internal table declaration
+DATA: it_otf             TYPE STANDARD TABLE OF itcoo,
+      it_docs            TYPE STANDARD TABLE OF docs,
+      it_lines           TYPE STANDARD TABLE OF tline WITH HEADER LINE,
+      lt_ybmon_coll_data TYPE TABLE OF ybmon_coll_data.
+* Declaration of local variables.
+DATA:
+  st_job_output_info      TYPE ssfcrescl,
+  st_document_output_info TYPE ssfcrespd,
+  st_job_output_options   TYPE ssfcresop,
+  st_output_options       TYPE ssfcompop,
+  st_control_parameters   TYPE ssfctrlop,
+  v_len_in                TYPE so_obj_len,
+  v_language              TYPE sflangu VALUE 'E',
+  v_e_devtype             TYPE rspoptype,
+  v_bin_filesize          TYPE i,
+  v_name                  TYPE string,
+  v_path                  TYPE string,
+  v_fullpath              TYPE string,
+  v_filter                TYPE string,
+  v_uact                  TYPE i,
+  v_guiobj                TYPE REF TO cl_gui_frontend_services,
+  v_filename              TYPE string,
+  v_fm_name               TYPE rs38l_fnam,
+  i_coll_data             TYPE TABLE OF ybmon_coll_data WITH HEADER LINE,
+  collected_data          TYPE ybmontt_collected_data WITH HEADER LINE,
+  i_comm                  TYPE TABLE OF ybmon_comm WITH HEADER LINE,
+  i_thresholds            TYPE TABLE OF ybmon_thresholds,
+  v_strlen                TYPE i.
+
+DATA:
+      ls_thresholds LIKE LINE OF i_thresholds.
+
+DATA: gt_otfdata       TYPE TABLE OF itcoo,
+      gv_send_request  TYPE REF TO cl_bcs,
+      gv_pdf_content   TYPE solix_tab,
+      gv_pdf_xstring   TYPE xstring,
+      gv_document      TYPE REF TO cl_document_bcs,
+      lc_pdf           TYPE so_obj_tp VALUE 'PDF',
+      gv_pdf_size      TYPE so_obj_len,
+      lc_subject       TYPE so_obj_des,
+      lv_email         TYPE adr6-smtp_addr,
+      gv_recipient     TYPE REF TO cl_cam_address_bcs,
+      lc_x             TYPE os_boolean  VALUE 'X',
+      gv_sent_to_all   TYPE os_boolean,
+      gt_pdftab        TYPE TABLE OF tline,
+      gv_bcs_exception TYPE REF TO cx_bcs,
+      l_dumps          TYPE i,
+      l_wd             TYPE i,
+      l_wd2            TYPE i.
+
+DATA:
+  lt_text         TYPE bcsy_text,
+  ls_text         TYPE soli,
+  lv_partner      LIKE i_coll_data-partner,
+  lv_sid          LIKE i_coll_data-sid,
+  lv_collect_time LIKE i_coll_data-collect_time.
+
+CONSTANTS c_formname TYPE tdsfname VALUE 'YBMON_REPORT'.
+
+
+********************** Tela de seleção ***********************************
+
+PARAMETERS p_data TYPE ybmon_coll_data-collect_date.
+
+********************** Fim da tela ***************************************
+
+IMPORT lt_ybmon_coll_data[] FROM MEMORY ID 'YGET_SAP_SID_INFO'.
+
+IF sy-subrc IS INITIAL.
+
+  i_coll_data[] = lt_ybmon_coll_data[].
+
+ELSE.
+
+  SELECT * FROM ybmon_coll_data INTO TABLE i_coll_data WHERE collect_date EQ p_data.
+ENDIF.
+
+IF sy-subrc IS NOT INITIAL.
+*  MESSAGE text-001 DISPLAY LIKE 'S'.
+  EXIT.
+ENDIF.
+
+SORT i_coll_data BY partner sid collect_time.
+
+SELECT * INTO TABLE i_comm
+FROM ybmon_comm
+FOR ALL ENTRIES IN i_coll_data
+WHERE partner EQ i_coll_data-partner
+AND sid       EQ i_coll_data-sid.
+
+
+SELECT * INTO TABLE i_thresholds
+FROM ybmon_thresholds
+FOR ALL ENTRIES IN i_coll_data
+WHERE partner EQ i_coll_data-partner
+AND sid     EQ i_coll_data-sid.
+
+SORT i_thresholds BY partner sid comp_type.
+
+LOOP AT i_coll_data.
+
+  READ TABLE i_thresholds INTO ls_thresholds
+  WITH KEY partner   = i_coll_data-partner
+  sid       = i_coll_data-sid
+  comp_type = i_coll_data-comp_type BINARY SEARCH.
+
+  IF sy-subrc IS NOT INITIAL AND i_coll_data-comp_type EQ 'MJ'.
+
+    ls_thresholds-comp_type = 'MJ'.
+
+  ENDIF.
+
+  CASE i_coll_data-comp_type.
+
+    WHEN  'FS'.     "Espaço Livre de File Syste
+      collected_data-transaction = 'ST06'.
+      collected_data-value = i_coll_data-value.
+      i_coll_data-value = i_coll_data-value(4).
+      PACK collected_data-value(4) TO collected_data-value(4).
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-017.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'MS'.     "Serviço DO MESSAGE Server
+      collected_data-transaction  = 'SMMS'.
+      collected_data-value        = i_coll_data-value.
+      collected_data-description  = TEXT-016.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value CHANGING collected_data.
+      ENDIF.
+
+      IF i_coll_data-value IS NOT INITIAL.
+        i_coll_data-value = i_coll_data-value+10.
+      ENDIF.
+
+    WHEN 'R8'.     "Request com RC 8
+      collected_data-transaction  = 'STMS'.
+      collected_data-value        = i_coll_data-value.
+      i_coll_data-value           = i_coll_data-value(4).
+      PACK collected_data-value(4) TO collected_data-value(4).
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-015.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'OS'.     "RFC SAP OSS
+      collected_data-transaction = 'SM59'.
+      collected_data-value = i_coll_data-value.
+      collected_data-description = TEXT-014.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+
+    WHEN 'LD'.     "Número de Locks NO Banco de Dados
+      collected_data-transaction = 'DB01'.
+      collected_data-value = i_coll_data-value.
+      PACK collected_data-value(4) TO collected_data-value.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-012.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'LN'.     "Número de Locks NO SAP
+      collected_data-transaction = 'SM12'.
+      collected_data-value = i_coll_data-value.
+      i_coll_data-value = i_coll_data-value(4).
+      PACK collected_data-value(4) TO collected_data-value(4).
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-011.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'TW'.     "Tempo de Espera dos Workprocess (ON
+      collected_data-transaction = 'SM50'.
+      collected_data-value = i_coll_data-value.
+      i_coll_data-value = i_coll_data-value(4).
+      PACK collected_data-value(4) TO collected_data-value(4).
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-010.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'UM'.     "Usuários com Alto Consumo de Memória
+      collected_data-transaction = 'SM66'.
+      collected_data-value = i_coll_data-value.
+      i_coll_data-value = i_coll_data-value(4).
+      PACK collected_data-value(4) TO collected_data-value(4).
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-008.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'S0'.     "Fila de Spool
+      collected_data-transaction = 'SP01'.
+      collected_data-value = i_coll_data-value.
+      PACK collected_data-value(4) TO collected_data-value.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-007.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'SP'.     "Fila de Spool
+      collected_data-transaction = 'SPAD'.
+      collected_data-value = i_coll_data-value.
+      PACK collected_data-value(4) TO collected_data-value.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-007.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+
+    WHEN 'MJ'.     "Monitoramento de Jobs específicos
+      collected_data-transaction = 'SM36'.
+      collected_data-value       = i_coll_data-value(10).
+      collected_data-description = TEXT-006.
+      collected_data-solution    = i_coll_data-value+10.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'TI'.     "Tempo de Resposta (DIALOG)
+      collected_data-transaction = 'SMLG'.
+      collected_data-value = i_coll_data-value.
+      i_coll_data-value = i_coll_data-value(3).
+      PACK collected_data-value(3) TO collected_data-value(3).
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-005.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'UQ'.   " Falha de Backup (DBACOCKPIT)
+      collected_data-transaction = 'SM13'.
+      collected_data-value = i_coll_data-value.
+      PACK collected_data-value(4) TO collected_data-value.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+
+      collected_data-description = TEXT-013.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'JD'.   " JD	Jobs com Delay no SAP
+      collected_data-transaction = 'SM37'.
+      collected_data-value = i_coll_data-value.
+      PACK collected_data-value(4) TO collected_data-value.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+
+      collected_data-description = TEXT-003.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'JC'.  " JC  Jobs Cancelados no SAP
+      collected_data-transaction = 'SM37'.
+      collected_data-value = i_coll_data-value.
+      PACK collected_data-value(4) TO collected_data-value.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+
+      collected_data-description = TEXT-002.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'WD'.  " Workprocess Disponíveis
+      collected_data-transaction = 'SM50'.
+      collected_data-value = i_coll_data-value.
+      IF i_coll_data-value(4) = i_coll_data-value+7(4).
+*          i_coll_data-value = ls_thresholds-threshold_green.
+        i_coll_data-value = '1000'.
+      ELSE.
+        i_coll_data-value = i_coll_data-value(4).
+      ENDIF.
+      PACK collected_data-value+7(4) TO collected_data-value+7(4).
+      PACK collected_data-value(4) TO collected_data-value(4).
+      v_strlen = strlen( collected_data-value ) - 7.
+      SHIFT collected_data-value+7(v_strlen) LEFT DELETING LEADING space.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-009.
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds i_coll_data-value(4) CHANGING collected_data.
+      ENDIF.
+
+    WHEN 'DM'.
+      collected_data-transaction = 'ST22'.
+      MOVE i_coll_data-value TO l_dumps.
+      collected_data-value = l_dumps.
+      SHIFT collected_data-value LEFT DELETING LEADING space.
+      collected_data-description = TEXT-004 .
+
+      " Sinal
+      IF ls_thresholds IS NOT INITIAL.
+        PERFORM zf_thresholds USING ls_thresholds l_dumps CHANGING collected_data.
+      ENDIF.
+
+    WHEN OTHERS.
+      CONTINUE.
+
+  ENDCASE.
+
+  APPEND collected_data.
+
+  "  Envia o email
+  IF  lv_partner IS NOT INITIAL
+  AND ( lv_partner     NE i_coll_data-partner
+  OR lv_sid          NE i_coll_data-sid
+  OR lv_collect_time NE i_coll_data-collect_time )
+  AND collected_data[] IS NOT INITIAL.
+
+
+    CALL FUNCTION 'SSF_GET_DEVICE_TYPE'
+      EXPORTING
+        i_language    = v_language
+        i_application = 'SAPDEFAULT'
+      IMPORTING
+        e_devtype     = v_e_devtype.
+
+    st_output_options-tdprinter = v_e_devtype.
+    st_control_parameters-no_dialog = 'X'.
+    st_control_parameters-getotf = 'X'.
+
+*.................GET SMARTFORM FUNCTION MODULE NAME.................*
+    CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+      EXPORTING
+        formname           = c_formname
+      IMPORTING
+        fm_name            = v_fm_name
+      EXCEPTIONS
+        no_form            = 1
+        no_function_module = 2
+        OTHERS             = 3.
+
+*...........................CALL SMARTFORM............................*
+    CALL FUNCTION v_fm_name
+      EXPORTING
+        control_parameters   = st_control_parameters
+        output_options       = st_output_options
+        g_partner            = lv_partner
+        g_sid                = lv_sid
+      IMPORTING
+        document_output_info = st_document_output_info
+        job_output_info      = st_job_output_info
+        job_output_options   = st_job_output_options
+      TABLES
+        collected_data       = collected_data
+      EXCEPTIONS
+        formatting_error     = 1
+        internal_error       = 2
+        send_error           = 3
+        user_canceled        = 4
+        OTHERS               = 5.
+
+
+    gt_otfdata[] = st_job_output_info-otfdata[].
+
+
+    CALL FUNCTION 'CONVERT_OTF'
+      EXPORTING
+        format                = lc_pdf
+        max_linewidth         = 10
+      IMPORTING
+        bin_filesize          = v_bin_filesize
+        bin_file              = gv_pdf_xstring
+      TABLES
+        otf                   = gt_otfdata[]
+        lines                 = gt_pdftab[]
+      EXCEPTIONS
+        err_max_linewidth     = 1
+        err_format            = 2
+        err_conv_not_possible = 3
+        err_bad_otf           = 4
+        OTHERS                = 5.
+
+
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+    TRY.
+        gv_send_request = cl_bcs=>create_persistent( ).
+        gv_pdf_content = cl_document_bcs=>xstring_to_solix( gv_pdf_xstring ).
+
+        lc_subject = '[Accenture] Monitoramento Diário SAP'.
+
+        FREE lt_text.
+
+        APPEND '' TO lt_text.
+        APPEND 'Anexo você encontrará os resultados do monitoramento automático do ambiente SAP.' TO lt_text.
+        APPEND 'Cada item monitorado respeita um threshold que foi configurado préviamente e que podem ser ajustados para melhor a precisão do seu cenário se necessário.' TO lt_text.
+        APPEND 'Este e-mail é enviado automáticamente a cada execução do monitoramento do seu ambiente SAP.' TO lt_text.
+        APPEND 'No report anexo você encontrará a situação atual dos itens listados abaixo:' TO lt_text.
+        APPEND '' TO lt_text.
+        APPEND 'SM50 - Quantidade de work process livres/consumidos e tempos de resposta' TO lt_text.
+        APPEND 'ST22 - Quantidade de dumps' TO lt_text.
+        APPEND 'SM37 - Jobs cancelados e jobs com atraso e/ou monitoring de jobs específicos' TO lt_text.
+        APPEND 'SP01 - Fila de spool' TO lt_text.
+        APPEND 'SPAD - Output devices' TO lt_text.
+        APPEND 'SM13 - Fila de update' TO lt_text.
+        APPEND 'SMLG - Situação do logon group e tempos de resposta' TO lt_text.
+        APPEND 'SM66 - Top consumo de memória por usuário (PRIV)' TO lt_text.
+        APPEND 'SM12 - Quantidade de table locks' TO lt_text.
+        APPEND 'SM12 - Duração de table locks' TO lt_text.
+        APPEND 'DB01 - Database locks' TO lt_text.
+        APPEND 'SM59 - Status de rfcs específicas' TO lt_text.
+        APPEND 'STMS - Resultado das requests importadas' TO lt_text.
+        APPEND 'SMMS - Status do message server' TO lt_text.
+        APPEND '' TO lt_text.
+        APPEND 'Dúvidas ou sugestões contate-nos!' TO lt_text.
+        APPEND '' TO lt_text.
+        APPEND 'Basis Monitoring Team' TO lt_text.
+        APPEND 'Brazil.IO.Accenture.SAP.Basis.Pool@accenture.com' TO lt_text.
+
+        gv_document = cl_document_bcs=>create_document(
+        i_text    = lt_text
+        i_type    = 'RAW'
+        i_hex     = gv_pdf_content
+        i_length  = gv_pdf_size
+        i_subject = lc_subject ).            "Subject for Email
+
+
+        CALL METHOD gv_document->add_attachment
+          EXPORTING
+            i_attachment_type    = lc_pdf
+            i_attachment_subject = lc_subject
+            i_att_content_hex    = gv_pdf_content.
+
+
+        gv_send_request->set_document( gv_document ).
+
+        LOOP AT i_comm WHERE partner EQ i_coll_data-partner
+        AND sid     EQ i_coll_data-sid.
+
+          lv_email = i_comm-email.
+          gv_recipient = cl_cam_address_bcs=>create_internet_address( lv_email ).
+          gv_send_request->add_recipient( gv_recipient ).
+        ENDLOOP.
+
+        gv_sent_to_all = gv_send_request->send( i_with_error_screen = lc_x ).
+        COMMIT WORK.
+        IF gv_sent_to_all IS INITIAL.
+          MESSAGE i500(sbcoms) WITH lv_email.
+        ELSE.
+          MESSAGE s022(so).
+        ENDIF.
+
+      CATCH cx_bcs INTO gv_bcs_exception.
+        MESSAGE i865(so) WITH gv_bcs_exception->error_type.
+    ENDTRY.
+
+    " Fim do envio do email
+
+    CLEAR collected_data[].
+  ENDIF.
+
+  lv_partner      = i_coll_data-partner.
+  lv_sid          = i_coll_data-sid.
+  lv_collect_time = i_coll_data-collect_time.
+
+  CLEAR collected_data.
+
+ENDLOOP.
+
+
+IF collected_data[] IS INITIAL.
+
+  EXIT.
+ENDIF.
+
+CALL FUNCTION 'SSF_GET_DEVICE_TYPE'
+  EXPORTING
+    i_language    = v_language
+    i_application = 'SAPDEFAULT'
+  IMPORTING
+    e_devtype     = v_e_devtype.
+
+st_output_options-tdprinter = v_e_devtype.
+st_control_parameters-no_dialog = 'X'.
+st_control_parameters-getotf = 'X'.
+
+*.................GET SMARTFORM FUNCTION MODULE NAME.................*
+CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+  EXPORTING
+    formname           = c_formname
+  IMPORTING
+    fm_name            = v_fm_name
+  EXCEPTIONS
+    no_form            = 1
+    no_function_module = 2
+    OTHERS             = 3.
+
+*...........................CALL SMARTFORM............................*
+CALL FUNCTION v_fm_name
+  EXPORTING
+    control_parameters   = st_control_parameters
+    output_options       = st_output_options
+    g_partner            = lv_partner
+    g_sid                = lv_sid
+  IMPORTING
+    document_output_info = st_document_output_info
+    job_output_info      = st_job_output_info
+    job_output_options   = st_job_output_options
+  TABLES
+    collected_data       = collected_data
+  EXCEPTIONS
+    formatting_error     = 1
+    internal_error       = 2
+    send_error           = 3
+    user_canceled        = 4
+    OTHERS               = 5.
+
+
+gt_otfdata[] = st_job_output_info-otfdata[].
+
+CALL FUNCTION 'CONVERT_OTF'
+  EXPORTING
+    format                = lc_pdf
+    max_linewidth         = 10
+  IMPORTING
+    bin_filesize          = v_bin_filesize
+    bin_file              = gv_pdf_xstring
+  TABLES
+    otf                   = gt_otfdata[]
+    lines                 = gt_pdftab[]
+  EXCEPTIONS
+    err_max_linewidth     = 1
+    err_format            = 2
+    err_conv_not_possible = 3
+    err_bad_otf           = 4
+    OTHERS                = 5.
+
+IF sy-subrc <> 0.
+  MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+ENDIF.
+
+
+TRY.
+    gv_send_request = cl_bcs=>create_persistent( ).
+    gv_pdf_content = cl_document_bcs=>xstring_to_solix( gv_pdf_xstring ).
+
+    lc_subject = '[Accenture] Monitoramento Diário SAP'.
+
+    FREE lt_text.
+
+      APPEND 'Anexo você encontrará os resultados do monitoramento automático do ambiente SAP.' TO lt_text.
+      APPEND 'Cada item monitorado respeita um threshold que foi configurado previamente e que podem ser ajustados para melhor a precisão do seu cenário se necessário.' TO lt_text.
+      APPEND 'Este e-mail é enviado automaticamente a cada execução do monitoramento do seu ambiente SAP.' TO lt_text.
+      APPEND 'No report anexo você encontrará a situação atual dos itens listados abaixo:' TO lt_text.
+      APPEND ' ' TO lt_text.
+      APPEND 'SM50 - Quantidade de work process livres/consumidos e tempos de resposta' TO lt_text.
+      APPEND 'ST22 - Quantidade de dumps' TO lt_text.
+      APPEND 'SM37 - Jobs cancelados e jobs com atraso e/ou monitoring de jobs específicos' TO lt_text.
+      APPEND 'SP01 - Fila de spoll' TO lt_text.
+      APPEND 'SPAD - Output devices' TO lt_text.
+      APPEND 'SM13 - Fila de update' TO lt_text.
+      APPEND 'SMLG - Situação do logon group e tempos de resposta' TO lt_text.
+      APPEND 'SM66 - Top consumo de memória por usuário (PRIV)' TO lt_text.
+      APPEND 'SM12 - Quantidade de Table locks' TO lt_text.
+      APPEND 'SM12 - Duração de table locks' TO lt_text.
+      APPEND 'DB01 - Database locks' TO lt_text.
+      APPEND 'SM59 - Status de rfcs específicas' TO lt_text.
+      APPEND 'STMS - RC das requets importadas' TO lt_text.
+      APPEND 'SMMS - Status do message server' TO lt_text.
+      APPEND ' ' TO lt_text.
+      APPEND 'Dúvidas ou sugestões contate-nos!' TO lt_text.
+      APPEND ' ' TO lt_text.
+      APPEND 'Basis Monitoring Team' TO lt_text.
+      APPEND 'Brazil.IO.Accenture.SAP.Basis.Pool@accenture.com' TO lt_text.
+
+    gv_document = cl_document_bcs=>create_document(
+    i_text    = lt_text
+    i_type    = 'RAW'
+    i_hex     = gv_pdf_content
+    i_length  = gv_pdf_size
+    i_subject = lc_subject ).            "Subject for Email
+
+
+    CALL METHOD gv_document->add_attachment
+      EXPORTING
+        i_attachment_type    = lc_pdf
+        i_attachment_subject = lc_subject
+        i_att_content_hex    = gv_pdf_content.
+
+
+    gv_send_request->set_document( gv_document ).
+
+    LOOP AT i_comm WHERE partner EQ i_coll_data-partner
+    AND sid     EQ i_coll_data-sid.
+
+      lv_email = i_comm-email.
+      gv_recipient = cl_cam_address_bcs=>create_internet_address( lv_email ).
+      gv_send_request->add_recipient( gv_recipient ).
+    ENDLOOP.
+
+    gv_sent_to_all = gv_send_request->send( i_with_error_screen = lc_x ).
+    COMMIT WORK.
+    IF gv_sent_to_all IS INITIAL.
+      MESSAGE i500(sbcoms) WITH lv_email.
+    ELSE.
+      MESSAGE s022(so).
+    ENDIF.
+
+  CATCH cx_bcs INTO gv_bcs_exception.
+    MESSAGE i865(so) WITH gv_bcs_exception->error_type.
+ENDTRY.
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  ZF_THRESHOLDS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LS_THRESHOLDS  text
+*      -->P_I_COLL_DATA_VALUE  text
+*      <--P_COLLECTED_DATA  text
+*----------------------------------------------------------------------*
+FORM zf_thresholds  USING    p_ls_thresholds TYPE ybmon_thresholds
+      p_qtde "TYPE char70
+CHANGING p_collected_data TYPE ybmon_collected_data.
+
+  DATA:
+    l_wd         TYPE i,
+    l_green(10)  TYPE c,
+    l_yellow(10) TYPE c,
+    l_red(10)    TYPE c,
+    l_cont(3)    TYPE n.
+
+  IF p_ls_thresholds-comp_type EQ 'MS'. " Jobs específicos
+
+    l_cont = strlen( p_qtde ).
+    IF l_cont > 6.
+      l_cont = 6.
+    ENDIF.
+
+    IF p_qtde(l_cont) EQ 'Active'
+    OR p_qtde(l_cont) EQ 'Ativo'.
+
+      p_collected_data-status   = 'GREE'.
+
+    ELSE.
+      p_collected_data-status = 'RED'.
+
+    ENDIF.
+
+    p_collected_data-solution =  p_collected_data-value(10).
+    p_collected_data-value    = p_collected_data-value+10.
+
+    RETURN.
+
+  ELSEIF p_ls_thresholds-comp_type EQ 'MJ'.
+
+    CLEAR p_collected_data-status.
+    RETURN.
+
+  ELSEIF p_ls_thresholds-comp_type EQ 'OS' ."Espaço Livre
+
+    IF p_qtde(2) EQ 'ON'.
+      p_collected_data-status = 'GREE'.
+
+    ELSE.
+      p_collected_data-status = 'RED'.
+      p_collected_data-action   = p_ls_thresholds-action_red.
+      p_collected_data-solution = p_ls_thresholds-solution_red.
+    ENDIF.
+    RETURN.
+
+  ELSEIF p_ls_thresholds-comp_type EQ 'TI'. "Tempo de resposta
+
+    p_collected_data-status   = 'GREE'.
+    p_collected_data-solution = p_collected_data-value(10).
+    p_collected_data-value    = p_collected_data-value+10.
+
+    RETURN.
+
+  ELSE.
+
+    l_wd = p_qtde.
+
+  ENDIF.
+
+  IF p_ls_thresholds-comp_type EQ 'DM' "QUantidade de dumps
+  OR p_ls_thresholds-comp_type EQ 'JC' "Jobs cancelados
+  OR p_ls_thresholds-comp_type EQ 'UQ' "Fila de updates
+  OR p_ls_thresholds-comp_type EQ 'UM' "Fila de updates
+  OR p_ls_thresholds-comp_type EQ 'TW' "Workprocess Tempo de Espera
+  OR p_ls_thresholds-comp_type EQ 'LN' "Numero de locks no SAP
+  OR p_ls_thresholds-comp_type EQ 'R8' "Transporte de requests com RC8
+  OR p_ls_thresholds-comp_type EQ 'SP' "Fila de spool
+  OR p_ls_thresholds-comp_type EQ 'S0' "Fila de spool
+  OR p_ls_thresholds-comp_type EQ 'LD'. " DB01
+
+    IF l_wd LE p_ls_thresholds-threshold_green.
+      p_collected_data-status = 'GREE'.
+
+    ELSEIF l_wd LE p_ls_thresholds-threshold_yellow.
+
+      p_collected_data-status   = 'YELL'.
+      p_collected_data-action   = p_ls_thresholds-action_yellow.
+      p_collected_data-solution = p_ls_thresholds-solution_yellow.
+
+    ELSE.
+      p_collected_data-status = 'RED'.
+      p_collected_data-action   = p_ls_thresholds-action_red.
+      p_collected_data-solution = p_ls_thresholds-solution_red.
+
+    ENDIF.
+
+  ELSEIF p_ls_thresholds-comp_type EQ 'JD' "Jobs com delay
+    .
+
+    IF l_wd < p_ls_thresholds-threshold_green.
+      p_collected_data-status = 'GREE'.
+
+    ELSE.
+      p_collected_data-status = 'RED'.
+      p_collected_data-action   = p_ls_thresholds-action_red.
+      p_collected_data-solution = p_ls_thresholds-solution_red.
+
+    ENDIF.
+    MOVE p_ls_thresholds-threshold_green TO l_green.
+    CONDENSE l_green NO-GAPS.
+    MOVE p_ls_thresholds-threshold_red TO l_red.
+    CONDENSE l_red NO-GAPS.
+
+    CONCATENATE 'Green:' l_green ' - ' 'Red:' l_red INTO p_collected_data-threshold SEPARATED BY space.
+    RETURN.
+
+  ELSEIF p_ls_thresholds-comp_type EQ 'WD'. "Workprocess disponíveis
+
+    IF l_wd <= p_ls_thresholds-threshold_red.
+
+      p_collected_data-status = 'RED'.
+      p_collected_data-action   = p_ls_thresholds-action_red.
+      p_collected_data-solution = p_ls_thresholds-solution_red.
+
+    ELSEIF l_wd <= p_ls_thresholds-threshold_yellow.
+
+      p_collected_data-status   = 'YELL'.
+      p_collected_data-action   = p_ls_thresholds-action_yellow.
+      p_collected_data-solution = p_ls_thresholds-solution_yellow.
+
+    ELSE.
+
+      p_collected_data-status = 'GREE'.
+
+    ENDIF.
+
+  ELSEIF p_ls_thresholds-comp_type EQ 'FS' "Espaço Livre
+    .
+    IF l_wd GE p_ls_thresholds-threshold_green.
+      p_collected_data-status = 'GREE'.
+
+    ELSEIF l_wd GE p_ls_thresholds-threshold_red.
+
+      p_collected_data-status   = 'YELL'.
+      p_collected_data-action   = p_ls_thresholds-action_yellow.
+      p_collected_data-solution = p_ls_thresholds-solution_yellow.
+
+    ELSE.
+      p_collected_data-status = 'RED'.
+      p_collected_data-action   = p_ls_thresholds-action_red.
+      p_collected_data-solution = p_ls_thresholds-solution_red.
+
+    ENDIF.
+  ENDIF.
+
+  MOVE p_ls_thresholds-threshold_green TO l_green.
+  CONDENSE l_green NO-GAPS.
+  MOVE p_ls_thresholds-threshold_yellow TO l_yellow.
+  CONDENSE l_yellow NO-GAPS.
+  MOVE p_ls_thresholds-threshold_red TO l_red.
+  CONDENSE l_red NO-GAPS.
+
+  CONCATENATE 'Green:' l_green ' - '
+  'Yellow:' l_yellow ' - '
+  'Red:' l_red INTO p_collected_data-threshold SEPARATED BY space.
+
+ENDFORM.
