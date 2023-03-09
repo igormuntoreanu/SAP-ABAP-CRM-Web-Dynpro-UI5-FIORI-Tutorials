@@ -1,0 +1,229 @@
+FUNCTION z_ferpre_dispara_email.
+*"----------------------------------------------------------------------
+*"*"Interface local:
+*"  IMPORTING
+*"     VALUE(IV_RECNNR) TYPE  RECNNUMBER
+*"     VALUE(IV_BUKRS) TYPE  BUKRS
+*"----------------------------------------------------------------------
+
+***********************************************************************************
+* *&Get the Email id and User id Whom you want to Send  ******
+  DATA: it_receivers       TYPE STANDARD TABLE OF  somlreci1,
+        lt_return          TYPE TABLE OF bapiret2,
+        lt_smtp            TYPE TABLE OF bapiadsmtp,
+        lv_where           TYPE string,
+        lv_time            TYPE c LENGTH 8,
+        lv_date            TYPE c LENGTH 10,
+        lv_date2           TYPE c LENGTH 10,
+        wa_it_receivers    LIKE LINE OF it_receivers,
+        it_packing_list    TYPE STANDARD TABLE OF  sopcklsti1,
+        gd_doc_data        TYPE sodocchgi1,
+        wa_it_packing_list LIKE LINE OF  it_packing_list,
+        lv_subject(90)     TYPE c,
+        it_message         TYPE STANDARD TABLE OF solisti1,
+        wa_it_message      LIKE LINE OF it_message,
+        lv_recnnumber      TYPE recnnumber,
+        lv_lines           TYPE i,
+        lv_system          TYPE string,
+        lv_alteracoes      TYPE string.
+
+  lv_recnnumber = iv_recnnr.
+  SHIFT lv_recnnumber LEFT DELETING LEADING '0'. CONDENSE lv_recnnumber.
+
+  SELECT *
+    FROM s_poworkflowrecipientvh
+    INTO TABLE @DATA(lt_spoppwfl). "Aprovadores do Workflow Flexível
+  CHECK sy-subrc = 0.
+  LOOP AT lt_spoppwfl ASSIGNING FIELD-SYMBOL(<fs_spo>).
+    CALL FUNCTION 'BAPI_USER_GET_DETAIL'
+      EXPORTING
+        username = <fs_spo>-userid
+      TABLES
+        return   = lt_return
+        addsmtp  = lt_smtp.
+    LOOP AT lt_smtp ASSIGNING FIELD-SYMBOL(<fs_email>).
+      "&-- Assign the email id and User id to  whom you want to Send  -------------&
+      FREE wa_it_receivers.
+      wa_it_receivers-receiver   = <fs_email>-e_mail. "&---- Assign Email id
+      wa_it_receivers-rec_type   = 'U'.      "&---- Send to External Email id
+      wa_it_receivers-com_type   = 'INT'.
+      wa_it_receivers-notif_del  = 'X'.
+      wa_it_receivers-notif_ndel = 'X'.
+      APPEND wa_it_receivers TO it_receivers .
+      FREE wa_it_receivers.
+    ENDLOOP.
+    FREE: lt_smtp, lt_return.
+  ENDLOOP.
+*  wa_it_receivers-receiver   = iv_user.  "&----- Assign SAP User Id
+*  wa_it_receivers-rec_type   = 'B'.      "&-- Send to SAP Inbox
+*  wa_it_receivers-com_type   = 'INT'.
+*  wa_it_receivers-notif_del  = 'X'.
+*  wa_it_receivers-notif_ndel = 'X'.
+*  APPEND wa_it_receivers TO it_receivers .
+*& - END of  Assign the Email id and User id to  Whom you want to Send  --&
+  "&--- Read the Number of lines in the Internal Table
+  DESCRIBE TABLE it_receivers LINES lv_lines.
+  "&--- Check the Sender Email id or SAP User id is got or not.
+  IF lv_lines IS NOT INITIAL.
+    lv_where = |%{ lv_recnnumber }%|.
+    SELECT *
+      FROM zcds_refx_cdpos
+      INTO TABLE @DATA(lt_contract_changes)
+      WHERE objectid LIKE @lv_where
+      ORDER BY udate DESCENDING, utime DESCENDING.
+    CHECK lt_contract_changes IS NOT INITIAL.
+
+*    GET TIME.
+*    DELETE lt_contract_changes WHERE udate <> sy-datum.
+*    DELETE lt_contract_changes WHERE utime < sy-uzeit - 120. "Elimina alteracoes antigas e nao atuais.
+
+    CHECK lt_contract_changes IS NOT INITIAL.
+    READ TABLE lt_contract_changes ASSIGNING FIELD-SYMBOL(<fs_contr>) INDEX 1.
+
+*&---------------------------------------------------------------------
+* Add thetext to mail text table
+*&----------------------------------------------------------------------
+*&-- Subject of the mail -------------&*
+    DATA(lv_contrato) = lv_recnnumber.
+    SHIFT lv_contrato LEFT DELETING LEADING '0'.
+    lv_subject = |Solicitação de aprovação do contrato { lv_contrato }|.
+    "&--  body  of the mail ----------------&*
+    CLEAR wa_it_message.
+    wa_it_message-line = 'Caro aprovador,'.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+*** insert Blank Line *********************************************
+    wa_it_message-line = '                               '.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+******* Assign your Text  below *************************************
+    lv_time = <fs_contr>-utime(2) && ':' && <fs_contr>-utime+2(2) && ':' && <fs_contr>-utime+4(2).
+    lv_date = <fs_contr>-udate+6(2) && '.' && <fs_contr>-udate+4(2) && '.' && <fs_contr>-udate(4).
+    wa_it_message-line = |O contrato { lv_contrato }, empresa { iv_bukrs }, foi modificado pelo usuário { <fs_contr>-username } às { lv_time } do dia { lv_date } e necessita ser aprovado.|.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+*** insert Blank Line *********************************************
+    wa_it_message-line = '                               '.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+******* Clique aqui para ver alteracoes *************************************
+    FREE MEMORY ID 'RECNNR'.
+    SET PARAMETER ID 'RECNNR' FIELD lv_contrato.
+
+    CASE sy-sysid.
+      WHEN 'S4D'.
+        lv_alteracoes = ''.
+      WHEN 'S4Q'.
+        lv_alteracoes = ''.
+      WHEN 'S4P'.
+        lv_alteracoes = ''.
+      WHEN OTHERS.
+    ENDCASE.
+
+    CONCATENATE 'Clique' lv_alteracoes 'para verificar alterações.' INTO wa_it_message-line SEPARATED BY space.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+
+    wa_it_message-line = 'Fornecendo o contrato e a empresa e clique em executar.'.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+*** insert Blank Line *********************************************
+    wa_it_message-line = '                               '.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+******* Clique aqui para aprovar *************************************
+
+    CASE sy-sysid.
+      WHEN 'S4D'.
+        lv_system = ''.
+      WHEN 'S4Q'.
+        lv_system = ''.
+      WHEN 'S4P'.
+        lv_system = ''.
+      WHEN OTHERS.
+    ENDCASE.
+
+    CONCATENATE 'Clique' lv_system 'para Aprovar' INTO wa_it_message-line SEPARATED BY space.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+*** insert Blank Line *********************************************
+    wa_it_message-line = '                               '.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+
+******* Assign your Text  below *************************************
+*    IF lines( lt_contract_changes ) > 0.
+*      wa_it_message-line = |Lista de modificações no contrato:|.
+*      APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+**** insert Blank Line *********************************************
+*      wa_it_message-line = '                               '.
+*      APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+*      LOOP AT lt_contract_changes ASSIGNING FIELD-SYMBOL(<fs_contracat_changes>).
+*        IF <fs_contracat_changes>-fname CS 'DAT' OR <fs_contracat_changes>-fname CS 'DT'.
+*          lv_date  = <fs_contracat_changes>-value_old+6(2) && '.' && <fs_contracat_changes>-value_old+4(2) && '.' && <fs_contracat_changes>-value_old(4).
+*          lv_date2 = <fs_contracat_changes>-value_new+6(2) && '.' && <fs_contracat_changes>-value_new+4(2) && '.' && <fs_contracat_changes>-value_new(4).
+*          CONCATENATE <fs_contracat_changes>-description
+*                      'de'
+*                      lv_date
+*                      'para'
+*                      lv_date2
+*                      INTO wa_it_message-line SEPARATED BY space.
+*        ELSE.
+*          CONCATENATE <fs_contracat_changes>-description
+*                    'de'
+*                    <fs_contracat_changes>-value_old
+*                    'para'
+*                    <fs_contracat_changes>-value_new
+*                    INTO wa_it_message-line SEPARATED BY space.
+*        ENDIF.
+*
+*        APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+*      ENDLOOP.
+*    ENDIF.
+*** insert Blank Line{} *********************************************
+    wa_it_message-line = '                                        '.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+**********Assign your Text  below ********************************
+    wa_it_message-line = 'Este e-mail foi gerado automaticamente, favor não responder.'.
+    APPEND wa_it_message TO it_message. CLEAR wa_it_message.
+*********************************************************************
+**********& Send EMAIL MESSAGE  &*********************************
+    gd_doc_data-doc_size = 1.
+*Populate the subject/generic message attributes
+    gd_doc_data-obj_langu = sy-langu.
+    gd_doc_data-obj_name = 'SAPRPT'.
+    gd_doc_data-obj_descr = lv_subject.
+    gd_doc_data-sensitivty = 'F'.
+*Describe the body of the message
+    CLEAR wa_it_packing_list.
+    REFRESH it_packing_list.
+    wa_it_packing_list-transf_bin = space.
+    wa_it_packing_list-head_start = 1.
+    wa_it_packing_list-head_num = 0.
+    wa_it_packing_list-body_start = 1.
+    DESCRIBE TABLE it_message LINES wa_it_packing_list-body_num.
+    wa_it_packing_list-doc_type = 'RAW'.
+    APPEND wa_it_packing_list TO it_packing_list.
+*&------ Call the Function Module to send the message to External and SAP Inbox
+    CALL FUNCTION 'SO_NEW_DOCUMENT_ATT_SEND_API1'
+      EXPORTING
+        document_data              = gd_doc_data
+        put_in_outbox              = 'X'
+        commit_work                = 'X'
+      TABLES
+        packing_list               = it_packing_list
+        contents_txt               = it_message
+        receivers                  = it_receivers
+      EXCEPTIONS
+        too_many_receivers         = 1
+        document_not_sent          = 2
+        document_type_not_exist    = 3
+        operation_no_authorization = 4
+        parameter_error            = 5
+        x_error                    = 6
+        enqueue_error              = 7
+        OTHERS                     = 8.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ENDIF. "&---- END of Check the Sender Email id or SAP User id is got or not.
+
+ENDFUNCTION.
