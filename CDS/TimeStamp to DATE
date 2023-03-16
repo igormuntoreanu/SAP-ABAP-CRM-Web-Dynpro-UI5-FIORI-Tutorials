@@ -1,0 +1,11 @@
+cast(substring(cast(ZCDS_BUT100.ValidFrom as abap.char(32)),1,8) as abap.dats) as datateste,
+
+    tstmp_to_dats( ZCDS_BUT100.ValidFrom, //tstmp_current_utctimestamp(),
+                   abap_user_timezone( $session.user, $session.client,'NULL' ),
+                   $session.client,
+                   'NULL' )      as ValidoDe,
+                   
+    tstmp_to_dats( ZCDS_BUT100.ValidTo,
+                   abap_system_timezone( $session.client,'NULL' ),
+                   $session.client,
+                   'NULL' )      as ValidoAte, 
