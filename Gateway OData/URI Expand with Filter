@@ -1,0 +1,1 @@
+/sap/opu/odata/SAP/Z20PP_REPAIR_COCKPIT_SRV/VariantSet?$expand=ToKPI&$filter=Report eq 'Z20PP_REPAIR_COCKPIT' and VariantName eq 'TESTE'&$format=json
