@@ -1,7 +1,8 @@
 REPORT zifm_xd01_bdc.
 
-DATA: gt_bdc TYPE TABLE OF bdcdata,
-      gs_bdc TYPE bdcdata.
+DATA: gt_bdc  TYPE TABLE OF bdcdata,
+      gs_bdc  TYPE bdcdata,
+      lt_msgs TYPE TABLE OF BDCMSGCOLL.
 
 PARAMETERS: p_acc   TYPE rf02d-ktokd,
             p_name1 TYPE kna1-name1,
@@ -27,7 +28,7 @@ FORM p_monta_batch_input .
   PERFORM p_monta_campos USING 'KNA1-LAND1'  p_land.
   PERFORM p_monta_campos USING 'KNA1-SPRAS'  p_spras.
 
-  CALL TRANSACTION 'XD01' USING gt_bdc.
+  CALL TRANSACTION 'XD01' USING gt_bdc MODE 'N' MESSAGES INTO lt_msgs.
 
 ENDFORM.                    " P_MONTA_BATCH_INPUT
 *&---------------------------------------------------------------------*
