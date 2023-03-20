@@ -58,3 +58,157 @@ FORM p_monta_campos  USING p_campo
   CLEAR gs_bdc.
 
 ENDFORM.                    " P_MONTA_CAMPOS
+
+
+
+____________________________________________________________
+With MACROS
+
+FUNCTION zrs_variant_contents_create ##RFC_PERFORMANCE_OK.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(REPORT) TYPE  RSVAR-REPORT
+*"     VALUE(VARIANT) TYPE  RSVAR-VARIANT
+*"     VALUE(VALU_TAB) TYPE  FCCX_T_FLAT_SELECTION
+*"  EXPORTING
+*"     VALUE(RETURN) TYPE  BAPIRET2
+*"     VALUE(EV_REPORT) TYPE  RSVAR-REPORT
+*"     VALUE(EV_VARIANT) TYPE  RSVAR-VARIANT
+*"----------------------------------------------------------------------
+
+  DATA: gt_bdc  TYPE TABLE OF bdcdata,
+        gs_bdc  TYPE bdcdata,
+        lt_msgs TYPE TABLE OF bdcmsgcoll.
+
+  DEFINE assign_screen.
+    gs_bdc-program  = &1.
+    gs_bdc-dynpro   = &2.
+    gs_bdc-dynbegin = 'X'.
+
+    APPEND gs_bdc TO gt_bdc.
+    CLEAR gs_bdc.
+
+  END-OF-DEFINITION.
+
+
+  DEFINE assign_fields.
+    gs_bdc-fnam = &1.
+    gs_bdc-fval = &2.
+
+    APPEND gs_bdc TO gt_bdc.
+    CLEAR gs_bdc.
+
+  END-OF-DEFINITION.
+
+  DATA(lt_values) = valu_tab[].
+  DELETE lt_values WHERE low IS INITIAL.
+
+  READ TABLE lt_values WITH KEY selname = 'P_RBMLD' low = 'X' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    DELETE: lt_values WHERE selname eq 'S_VBELN'.
+    DELETE: lt_values WHERE selname eq 'S_SAGES'.
+    DELETE: lt_values WHERE selname eq 'S_SAABS'.
+    DELETE: lt_values WHERE selname eq 'S_SAKRE'.
+    DELETE: lt_values WHERE selname eq 'S_SAFAK'.
+    DELETE: lt_values WHERE selname eq 'S_SASPE'.
+
+    DELETE: lt_values WHERE selname eq 'S_AUART'.
+    DELETE: lt_values WHERE selname eq 'S_SOART'.
+    DELETE: lt_values WHERE selname eq 'S_SOVBN'.
+    DELETE: lt_values WHERE selname eq 'S_SOGES'.
+    DELETE: lt_values WHERE selname eq 'S_SOABS'.
+    DELETE: lt_values WHERE selname eq 'S_SOLIF'.
+    DELETE: lt_values WHERE selname eq 'S_SOKRE'.
+    DELETE: lt_values WHERE selname eq 'S_SOFAK'.
+    DELETE: lt_values WHERE selname eq 'S_SOSPE'.
+    DELETE: lt_values WHERE selname eq 'S_EDATU'.
+    DELETE: lt_values WHERE selname eq 'S_LPRIO'.
+  ENDIF.
+
+  READ TABLE lt_values WITH KEY selname = 'P_RBANG' low = 'X' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    DELETE: lt_values WHERE selname eq 'S_QMART'.
+    DELETE: lt_values WHERE selname eq 'P_XMMAB'.
+    DELETE: lt_values WHERE selname eq 'S_QMNUM'.
+    DELETE: lt_values WHERE selname eq 'S_EQUNR'.
+
+    DELETE: lt_values WHERE selname eq 'S_AUART'.
+    DELETE: lt_values WHERE selname eq 'S_SOART'.
+    DELETE: lt_values WHERE selname eq 'S_SOVBN'.
+    DELETE: lt_values WHERE selname eq 'S_SOGES'.
+    DELETE: lt_values WHERE selname eq 'S_SOABS'.
+    DELETE: lt_values WHERE selname eq 'S_SOLIF'.
+    DELETE: lt_values WHERE selname eq 'S_SOKRE'.
+    DELETE: lt_values WHERE selname eq 'S_SOFAK'.
+    DELETE: lt_values WHERE selname eq 'S_SOSPE'.
+    DELETE: lt_values WHERE selname eq 'S_EDATU'.
+    DELETE: lt_values WHERE selname eq 'S_LPRIO'.
+  ENDIF.
+
+  READ TABLE lt_values WITH KEY selname = 'P_RBKDA' low = 'X' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    DELETE: lt_values WHERE selname eq 'S_QMART'.
+    DELETE: lt_values WHERE selname eq 'P_XMMAB'.
+    DELETE: lt_values WHERE selname eq 'S_QMNUM'.
+    DELETE: lt_values WHERE selname eq 'S_EQUNR'.
+
+    DELETE: lt_values WHERE selname eq 'S_VBELN'.
+    DELETE: lt_values WHERE selname eq 'S_SAGES'.
+    DELETE: lt_values WHERE selname eq 'S_SAABS'.
+    DELETE: lt_values WHERE selname eq 'S_SAKRE'.
+    DELETE: lt_values WHERE selname eq 'S_SAFAK'.
+    DELETE: lt_values WHERE selname eq 'S_SASPE'.
+  ENDIF.
+
+  assign_screen: 'Z20PP_REPAIR_COCKPIT' '1000'.
+
+  assign_fields: 'BDC_OKCODE' '=SPOS'.
+  LOOP AT lt_values ASSIGNING FIELD-SYMBOL(<fs_value>).
+    IF <fs_value>-selname(2) EQ 'P_'.
+      assign_fields: <fs_value>-selname <fs_value>-low.
+    ELSEIF <fs_value>-selname(2) EQ 'S_'.
+      DATA(lv_low)  = <fs_value>-selname && '-LOW'.
+      DATA(lv_high) = <fs_value>-selname && '-HIGH'.
+
+      assign_fields: lv_low  <fs_value>-low.
+      IF <fs_value>-high IS NOT INITIAL.
+        assign_fields: lv_high <fs_value>-high.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+
+  assign_screen: 'SAPLSVAR' '0281'.
+  assign_fields: 'BDC_OKCODE' '=SAVE'.
+  assign_fields: 'RSVAR-VARIANT' variant.
+  assign_fields: 'RSVAR-VTEXT' variant.
+
+  IF gt_bdc IS NOT INITIAL.
+    CALL TRANSACTION 'Z200' WITH AUTHORITY-CHECK USING gt_bdc MODE 'N' UPDATE 'S' MESSAGES INTO lt_msgs.
+    DATA(lv_subrc) = sy-subrc.
+    READ TABLE lt_msgs INTO DATA(ls_msg) WITH KEY msgtyp = 'E'.
+    IF sy-subrc <> 0.
+      READ TABLE lt_msgs INTO ls_msg WITH KEY msgtyp = 'S'.
+    ENDIF.
+
+    READ TABLE lt_msgs WITH KEY msgid = 'DB' msgnr = '617' TRANSPORTING NO FIELDS.
+    IF sy-subrc = 0. "Success
+      CLEAR lv_subrc.
+    ENDIF.
+
+    return-id = ls_msg-msgid.
+    return-number = ls_msg-msgnr.
+    return-message_v1 = ls_msg-msgv1.
+    return-message_v2 = ls_msg-msgv2.
+    return-message_v3 = ls_msg-msgv3.
+    return-message_v4 = ls_msg-msgv4.
+    return-type = COND #( WHEN lv_subrc IS NOT INITIAL THEN 'E' ELSE ls_msg-msgtyp ).
+
+    MESSAGE ID return-id TYPE return-type  NUMBER return-number WITH return-message_v1 return-message_v2
+    return-message_v3 return-message_v4 INTO return-message.
+
+  ELSE.
+
+  ENDIF.
+
+ENDFUNCTION.
