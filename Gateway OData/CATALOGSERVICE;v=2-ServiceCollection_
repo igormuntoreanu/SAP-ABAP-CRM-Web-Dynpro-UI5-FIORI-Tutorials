@@ -1,0 +1,7 @@
+Error in /sap/opu/odata/IWFND/CATALOGSERVICE;v=2-ServiceCollection ?
+
+Check Stack:
+/IWFND/IF_SODATA_MAPPER~GET_ENTITY_PROV_BY_FEED_DATA (/IWFND/  93
+/IWCOR/IF_DS_EP_WRITER~WRITE_ENTITY_SET (/IWCOR/CL_DS_EP_WRIT 114
+
+Error in table /IWFND/I_MED_SRH  - check services here to see if timestamp is really fed
