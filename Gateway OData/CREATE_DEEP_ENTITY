@@ -1,0 +1,114 @@
+METHOD /iwbep/if_mgw_appl_srv_runtime~create_deep_entity.
+
+  DATA: BEGIN OF ls_variant.
+          INCLUDE TYPE zcl_z20pp_repair_cockp_mpc=>ts_variant.
+  DATA:   tokpi TYPE zcl_z20pp_repair_cockp_mpc=>tt_kpi,
+        END OF ls_variant.
+
+  DATA(lv_entityset) = io_tech_request_context->get_entity_set_name( ).
+
+  DATA: ls_data TYPE zcl_z20pp_repair_cockp_mpc=>ts_variant,
+        ls_msg  TYPE bapiret2.
+
+  CASE lv_entityset.
+    WHEN 'VariantSet'.
+
+      io_data_provider->read_entry_data(
+        IMPORTING
+          es_data = ls_variant ).
+
+
+      CALL FUNCTION 'ZRS_VARIANT_CONTENTS_CREATE' DESTINATION 'NONE'
+        EXPORTING
+          report      = ls_variant-report
+          variant     = ls_variant-variantname
+          valu_tab    = ls_variant-tokpi
+          description = ls_variant-variantdescription
+        IMPORTING
+          return     = ls_msg
+          ev_report  = ls_variant-report
+          ev_variant = ls_variant-variantname.
+
+      IF ls_msg-type = 'E'.
+        DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+        lo_message_container->add_message(
+          EXPORTING
+            iv_msg_type               = ls_msg-type
+            iv_msg_id                 = ls_msg-id
+            iv_msg_number             = ls_msg-number
+            iv_msg_v1                 = ls_msg-message_v1
+            iv_msg_v2                 = ls_msg-message_v2
+            iv_msg_v3                 = ls_msg-message_v3
+            iv_msg_v4                 = ls_msg-message_v4  ).
+
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+          EXPORTING
+            message_container = lo_message_container.
+
+      ELSE.
+        copy_data_to_ref(
+          EXPORTING
+            is_data = ls_variant
+          CHANGING
+            cr_data = er_deep_entity  ).
+      ENDIF.
+
+    WHEN OTHERS.
+  ENDCASE.
+
+ENDMETHOD.
+
+
+FUNCTION zrs_variant_contents_create ##RFC_PERFORMANCE_OK.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(REPORT) TYPE  RSVAR-REPORT
+*"     VALUE(VARIANT) TYPE  RSVAR-VARIANT
+*"     VALUE(VALU_TAB) TYPE  CKML_T_RSPARAMS
+*"     VALUE(DESCRIPTION) TYPE  RVART_VTXT
+*"  EXPORTING
+*"     VALUE(RETURN) TYPE  BAPIRET2
+*"     VALUE(EV_REPORT) TYPE  RSVAR-REPORT
+*"     VALUE(EV_VARIANT) TYPE  RSVAR-VARIANT
+*"----------------------------------------------------------------------
+
+  DATA: lt_varit TYPE TABLE OF varit.
+
+  lt_varit = VALUE #( ( mandt = sy-mandt langu = sy-langu report = report variant = variant vtext = description ) ).
+
+  CALL FUNCTION 'RS_CREATE_VARIANT'
+    EXPORTING
+      curr_report               = report
+      curr_variant              = variant
+      vari_desc                 = VALUE varid( report = report variant = variant transport = 'F' environmnt = 'A' version = '1' )
+    TABLES
+      vari_contents             = valu_tab[]
+      vari_text                 = lt_varit[]
+    EXCEPTIONS
+      illegal_report_or_variant = 1
+      illegal_variantname       = 2
+      not_authorized            = 3
+      not_executed              = 4
+      report_not_existent       = 5
+      report_not_supplied       = 6
+      variant_exists            = 7
+      variant_locked            = 8
+      OTHERS                    = 9.
+  IF sy-subrc <> 0.
+    return-id           = sy-msgid.
+    return-type         = sy-msgty.
+    return-number       = sy-msgno.
+    return-message_v1   = sy-msgv1.
+    return-message_v2   = sy-msgv2.
+    return-message_v3   = sy-msgv3.
+    return-message_v4   = sy-msgv4.
+  ELSE.
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+      EXPORTING
+        wait   = abap_true
+      IMPORTING
+        return = return.
+  ENDIF.
+
+ENDFUNCTION.
