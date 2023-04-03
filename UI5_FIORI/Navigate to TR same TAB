@@ -1,0 +1,7 @@
+Use transaction /UI2/FLP_CUS_CONF to change FLP Configuration parameters in current client only
+Use transaction /UI2/FLP_SYS_CONF to change the FLP Configuration parameters system-wide
+
+Add/Set NAVIGATION_GUI_INPLACE to true
+
+For more possible parameters check
+https://help.sap.com/docs/ABAP_PLATFORM/a7b390faab1140c087b8926571e942b7/6107ee41f89a43c9af0aa279fe039cca.html
