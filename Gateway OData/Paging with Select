@@ -1,0 +1,18 @@
+ METHOD orderrheaderset_get_entityset.
+    IF is_paging IS NOT INITIAL.   "importing param only filled when $top $skip are used
+      SELECT  vbeln,
+              erdat,
+              erzet,
+              ernam,
+              audat,
+              netwr,
+              waerk,
+              vkorg,
+              vtweg FROM vbak
+              ORDER BY vbeln
+      INTO CORRESPONDING FIELDS OF TABLE @et_entityset
+      OFFSET @is_paging-skip UP TO @is_paging-top ROWS.
+    ELSE.
+      "Logic goes here for without paging i.e selecting ALL
+    ENDIF.
+  ENDMETHOD.
