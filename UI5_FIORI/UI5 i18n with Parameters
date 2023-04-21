@@ -1,0 +1,5 @@
+File:
+pickingNumber=Picking number {0}:
+
+JS:
+that.getOwnerComponent().getModel("i18n").getResourceBundle().getText("pickingNumber", [iCounter])
