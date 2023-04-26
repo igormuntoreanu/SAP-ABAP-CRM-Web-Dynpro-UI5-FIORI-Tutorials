@@ -129,3 +129,346 @@ METHOD equirefset_get_entityset.
       ct_data   = et_entityset.
 
 ENDMETHOD.
+__________________________________________________________________-
+
+FUNCTION z_20plm_ibase_visu_equi_ref ##RFC_PERFORMANCE_OK.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_KLART) TYPE  KLASSENART OPTIONAL
+*"     VALUE(IV_CLASS) TYPE  KLASSE_D OPTIONAL
+*"     VALUE(IV_EQUNR) TYPE  EQUNR OPTIONAL
+*"     VALUE(IV_LANGUAGE) TYPE  SY-LANGU OPTIONAL
+*"     VALUE(IT_RG_ATNAM) TYPE  Z20PLMTY_RG_ATNAM OPTIONAL
+*"     VALUE(IT_RG_ATWRT) TYPE  Z20PLMTY_RG_ATWRT OPTIONAL
+*"  EXPORTING
+*"     VALUE(ET_EQUI_LIST) TYPE  RIHEQUI_LIST_T
+*"     VALUE(EV_KLART) TYPE  KLASSENART
+*"     VALUE(EV_CLASS) TYPE  KLASSE_D
+*"----------------------------------------------------------------------
+
+  DATA: lt_comw   TYPE tt_comw,
+*        lt_objs   TYPE tt_clsel_objects,
+        ls_output TYPE rihequi_list,
+        lr_dec    TYPE RANGE OF auspext_dec_from,
+        ls_dec    LIKE LINE OF lr_dec,
+        lv_equi   TYPE equi-equnr.
+
+  CHECK iv_klart IS NOT INITIAL OR
+        iv_class IS NOT INITIAL OR
+        iv_equnr IS NOT INITIAL OR
+        iv_language IS NOT INITIAL OR
+        it_rg_atnam IS NOT INITIAL OR
+        it_rg_atwrt IS NOT INITIAL.
+
+  ev_klart = iv_klart.
+  ev_class = iv_class.
+
+  IF iv_equnr IS NOT INITIAL.
+    lv_equi = |{ iv_equnr ALPHA = IN }|.
+  ENDIF.
+
+  IF iv_language IS NOT INITIAL.
+    DATA(lv_language) = iv_language.
+  ELSE.
+    lv_language = sy-langu.
+  ENDIF.
+
+  IF it_rg_atwrt IS NOT INITIAL OR it_rg_atnam IS NOT INITIAL.
+
+    "Transform GE and LE to BT
+    DATA(lt_rg_atwrt_aux) = it_rg_atwrt[].
+
+    LOOP AT lt_rg_atwrt_aux ASSIGNING FIELD-SYMBOL(<fs_atwrt_aux>).
+      DATA(lv_tabix) = sy-tabix.
+      IF <fs_atwrt_aux>-option = 'GE'.
+        DATA(ls_atwrt_aux_ge) = <fs_atwrt_aux>.
+        IF sy-tabix + 1 <= lines( lt_rg_atwrt_aux ). "Check if next line exists and if it is LE
+          DATA(ls_atwrt_aux_le) = VALUE #( lt_rg_atwrt_aux[ sy-tabix + 1 ] OPTIONAL ).
+          IF ls_atwrt_aux_le-option = 'LE'.
+            <fs_atwrt_aux>-option = 'BT'. "Update GE line
+            <fs_atwrt_aux>-high   = ls_atwrt_aux_le-low.
+            DELETE lt_rg_atwrt_aux INDEX lv_tabix + 1. "Delete LE line
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    "Filter by Characteristics Values
+    SELECT DISTINCT a~objek, b~objek AS equnr
+      FROM ausp AS a
+      INNER JOIN inob AS b ON ( b~cuobj = a~objek )
+      INNER JOIN cabn AS c ON ( c~atinn = a~atinn )
+      INTO TABLE @DATA(lt_ausp)
+      WHERE a~atwrt IN @lt_rg_atwrt_aux ##SELECT_NULL_VALUES[ATWRT]
+        AND c~atnam IN @it_rg_atnam.
+    IF sy-subrc <> 0.
+      "Sometimes the values are in the field DEC_VALUE_FROM
+      SELECT DISTINCT a~objek, b~objek AS equnr
+      FROM ausp AS a
+      INNER JOIN inob AS b ON ( b~cuobj = a~objek )
+      INNER JOIN cabn AS c ON ( c~atinn = a~atinn )
+      INTO TABLE @lt_ausp
+      WHERE ( a~dec_value_from IN @lt_rg_atwrt_aux OR a~atflv IN @lt_rg_atwrt_aux ) ##SELECT_NULL_VALUES[ATFLV]
+        AND c~atnam IN @it_rg_atnam.
+    ENDIF.
+    IF sy-subrc = 0.
+      SORT lt_ausp BY equnr.
+      DELETE ADJACENT DUPLICATES FROM lt_ausp COMPARING equnr.
+      SELECT equnr
+        FROM equi
+        INTO TABLE @DATA(lt_equipments_help)
+        FOR ALL ENTRIES IN @lt_ausp
+        WHERE equnr = @lt_ausp-equnr(18).
+      IF sy-subrc = 0.
+        SORT lt_equipments_help BY equnr.
+      ENDIF.
+    ENDIF.
+
+    IF lv_equi IS NOT INITIAL.
+      DELETE lt_equipments_help WHERE equnr <> lv_equi.
+    ENDIF.
+
+    IF lt_equipments_help IS INITIAL.
+      EXIT. "No Equipments found for given Characteristic and value
+    ENDIF.
+  ENDIF.
+
+************ Performance Issue - 20.04.2023 - Begin
+*  CALL FUNCTION 'IHCLSD_PROCESS_SEARCH'
+*    EXPORTING
+*      i_klart                 = iv_klart
+*      i_class                 = iv_class
+*      it_comw                 = lt_comw
+*      i_objecttype            = 'EQUI'
+*    CHANGING
+*      ct_objects              = lt_objs
+*    EXCEPTIONS
+*      no_objects_found        = 1
+*      inconsistent_parameters = 2
+*      no_authority_classtype  = 3
+*      no_valid_classes        = 4
+*      OTHERS                  = 5.
+*  IF sy-subrc = 0.
+************* Performance Issue - 09.02.2023 - Begin
+*    IF lt_equipments_help IS NOT INITIAL.
+*      LOOP AT lt_objs ASSIGNING FIELD-SYMBOL(<fs_objs>).
+*        DATA(lv_tabix) = sy-tabix.
+*        READ TABLE lt_equipments_help WITH KEY equnr = <fs_objs>-object(18) TRANSPORTING NO FIELDS BINARY SEARCH.
+*        IF sy-subrc <> 0.
+*          DELETE lt_objs INDEX lv_tabix.
+*        ENDIF.
+*      ENDLOOP.
+*    ENDIF.
+************* Performance Issue - 09.02.2023 - End
+** check if all returned objects are really related to classification
+*    LOOP AT lt_objs INTO DATA(ls_object) WHERE obtab = 'EQUI'. "v n2061987
+*      IF ls_object-cuobj IS NOT INITIAL.                    "n2120296
+*        CALL FUNCTION 'CUCB_GET_OWNER_OF_CFG'
+*          EXPORTING
+*            i_instance                   = ls_object-cuobj
+*          EXCEPTIONS
+*            invalid_instance             = 1
+*            instance_is_a_classification = 2
+*            unknown_owner                = 3
+*            OTHERS                       = 4.
+*        IF sy-subrc <> 2.
+**       instance is not a classification and should be removed
+*          DELETE lt_objs WHERE cuobj = ls_object-cuobj.
+*        ENDIF.
+*      ENDIF.                                                "n2120296
+*    ENDLOOP.
+*
+*    IF iv_equnr IS NOT INITIAL.
+*      DELETE lt_objs WHERE object(18) NE iv_equnr.
+*    ENDIF.
+*
+*    CHECK lt_objs IS NOT INITIAL.
+************ Performance Issue - 20.04.2023 - End
+  SELECT *
+    FROM z20pmv_equi
+    INTO TABLE @DATA(lt_z20pmv_equi)
+    FOR ALL ENTRIES IN @lt_equipments_help
+    WHERE equnr EQ @lt_equipments_help-equnr
+      AND datbi GE @sy-datum
+      AND spras EQ @lv_language. "Performance Issue - 09.02.2023
+  IF sy-subrc = 0.
+    "Performance Issue - 09.02.2023 - Begin
+    DATA(lt_z20pmv_equi_aux) = lt_z20pmv_equi[].
+    SORT lt_z20pmv_equi_aux BY objnr.
+    DELETE ADJACENT DUPLICATES FROM lt_z20pmv_equi_aux COMPARING objnr.
+
+    SELECT * FROM ihpa
+     INTO TABLE @DATA(it_ihpa)
+     FOR ALL ENTRIES IN @lt_z20pmv_equi_aux
+     WHERE objnr    =  @lt_z20pmv_equi_aux-objnr AND
+           kzloesch =  ' '  AND
+           ( parvw    = 'EN' OR
+             parvw    = 'Z0' ).
+    IF sy-subrc = 0.
+      SORT it_ihpa BY objnr.
+      SELECT kunnr, name1
+             FROM kna1
+             INTO TABLE @DATA(lt_kna1)
+             FOR ALL ENTRIES IN @it_ihpa
+             WHERE kunnr EQ @it_ihpa-parnr(10).
+      IF sy-subrc = 0.
+        SORT lt_kna1 BY kunnr.
+      ENDIF.
+
+      SELECT id, codeword, kdgrp
+        FROM z20sdt_codeword
+        INTO TABLE @DATA(lt_z20sdt_codeword)
+        FOR ALL ENTRIES IN @it_ihpa
+             WHERE id EQ @it_ihpa-parnr(10).
+      IF sy-subrc = 0.
+        SORT lt_z20sdt_codeword BY id.
+
+        SELECT kdgrp, ktext
+           FROM t151t
+           INTO TABLE @DATA(lt_t151t)
+          FOR ALL ENTRIES IN @lt_z20sdt_codeword
+           WHERE spras = @lv_language AND
+                 kdgrp = @lt_z20sdt_codeword-kdgrp.
+        IF sy-subrc = 0.
+          SORT lt_t151t BY kdgrp.
+        ENDIF.
+      ENDIF.
+
+************ Performance Issue - 09.02.2023 - End
+      "Begin of Z20PM_RIEQUI20 - ENDKUNDE_KENNWORT
+      LOOP AT lt_z20pmv_equi INTO DATA(ls_z20pmv_equi).
+        MOVE-CORRESPONDING ls_z20pmv_equi TO ls_output.
+************ Performance Issue - 09.02.2023 - Begin
+*        SELECT * FROM ihpa  " Remove Select from inside the LOOP
+*               INTO TABLE @DATA(it_ihpa)
+*               WHERE objnr    =  @ls_z20pmv_equi-objnr AND
+*                     kzloesch =  ' '  AND
+*                     ( parvw    = 'EN' OR
+*                       parvw    = 'Z0' ).
+*        IF sy-subrc EQ 0.
+        READ TABLE it_ihpa WITH KEY objnr = ls_z20pmv_equi-objnr BINARY SEARCH TRANSPORTING NO FIELDS.
+        IF sy-subrc = 0.
+          LOOP AT it_ihpa INTO DATA(ls_ihpa) FROM sy-tabix. "Perform BINARY LOOP
+            IF ls_ihpa-objnr <> ls_z20pmv_equi-objnr.
+              EXIT.
+            ENDIF.
+************ Performance Issue - 09.02.2023 - End
+            CASE ls_ihpa-parvw.
+* Endkunde
+              WHEN 'EN'.
+                ls_output-kund2 = ls_ihpa-parnr.
+                ls_output-zzendcustomer = ls_ihpa-parnr.                 "008
+************ Performance Issue - 09.02.2023 - Begin
+*                SELECT SINGLE name1                                       "008
+*                       FROM kna1                                          "008
+*                       INTO ls_output-zzendcustomer_name                 "008
+*                       WHERE kunnr EQ ls_ihpa-parnr.                      "008
+                READ TABLE lt_kna1 INTO DATA(ls_kna1) WITH KEY kunnr = ls_ihpa-parnr BINARY SEARCH.
+                IF sy-subrc = 0.
+                  ls_output-zzendcustomer_name = ls_kna1-name1.
+                ENDIF.
+************ Performance Issue - 09.02.2023 - End
+* Kennwort
+              WHEN 'Z0'.
+                ls_output-zzkunnr_z0 = ls_ihpa-parnr.
+************ Performance Issue - 09.02.2023 - Begin
+*begin 004 zusätzlich Paper Category ausgeben
+*                SELECT SINGLE codeword, kdgrp FROM z20sdt_codeword
+*                       INTO (@ls_output-zzkunnr_z0_name, @DATA(lv_kdgrp) )
+*                       WHERE id = @ls_ihpa-parnr.
+*
+*                SELECT SINGLE ktext
+*                       FROM t151t
+*                       INTO ls_output-zzkdgrp
+*                       WHERE spras = lv_language AND
+*                             kdgrp = lv_kdgrp.
+*                IF sy-subrc <> 0.
+                READ TABLE lt_z20sdt_codeword INTO DATA(ls_z20sdt_codeword) WITH KEY id = ls_ihpa-parnr BINARY SEARCH.
+                IF sy-subrc = 0.
+                  ls_output-zzkunnr_z0_name = ls_z20sdt_codeword-codeword.
+
+                  READ TABLE lt_t151t INTO DATA(ls_t151t) WITH KEY kdgrp = ls_z20sdt_codeword-kdgrp BINARY SEARCH.
+                  IF sy-subrc = 0.
+                    ls_output-zzkdgrp = ls_t151t-ktext.
+                  ENDIF.
+                ELSE.
+************ Performance Issue - 09.02.2023 - End
+*end 004
+************ Performance Issue - 09.02.2023 - Begin
+*                  SELECT SINGLE name1
+*                                   FROM kna1
+*                                   INTO ls_output-zzkunnr_z0_name
+*                                   WHERE kunnr = ls_ihpa-parnr.
+                  READ TABLE lt_kna1 INTO ls_kna1 WITH KEY kunnr = ls_ihpa-parnr BINARY SEARCH.
+                  IF sy-subrc = 0.
+                    ls_output-zzkunnr_z0_name = ls_kna1-name1.
+                  ENDIF.
+                ENDIF.
+************ Performance Issue - 09.02.2023 - End
+************ Performance Issue - 09.02.2023 - End
+            ENDCASE.
+          ENDLOOP.
+        ENDIF.
+
+        SHIFT ls_output-equnr LEFT DELETING LEADING '0'.
+        SHIFT ls_output-heqnr LEFT DELETING LEADING '0'.
+        SHIFT ls_output-hequi LEFT DELETING LEADING '0'.
+        SHIFT ls_output-sernr LEFT DELETING LEADING '0'.
+        SHIFT ls_output-kund1 LEFT DELETING LEADING '0'.
+        SHIFT ls_output-kund2 LEFT DELETING LEADING '0'.
+        SHIFT ls_output-kund3 LEFT DELETING LEADING '0'.
+        SHIFT ls_output-iloan LEFT DELETING LEADING '0'.
+        SHIFT ls_output-zzvbeln_orig LEFT DELETING LEADING '0'.
+        SHIFT ls_output-zzvbpos_orig LEFT DELETING LEADING '0'.
+        SHIFT ls_output-zzvbeln_latest LEFT DELETING LEADING '0'.
+        SHIFT ls_output-zzvbpos_latest LEFT DELETING LEADING '0'.
+        SHIFT ls_output-zzkunnr_z0 LEFT DELETING LEADING '0'.
+        SHIFT ls_output-zzendcustomer LEFT DELETING LEADING '0'.
+
+        APPEND ls_output TO et_equi_list.
+        CLEAR ls_output.
+      ENDLOOP.
+
+      " End of Z20PM_RIEQUI20 - ENDKUNDE_KENNWORT
+
+************ Performance Issue - 09.02.2023 - Begin
+      " Logic below is not necessary
+*        " Begin of DELETE_WRONG_LANG_F30
+*        SORT et_equi_list BY equnr datbi eqlfn.
+*        LOOP AT et_equi_list ASSIGNING FIELD-SYMBOL(<object_tab_l>) WHERE spras <> lv_language.
+*          DATA(lv_tabix_original) = sy-tabix.
+*          DATA(l_tabix) = sy-tabix + 1.
+*          READ TABLE et_equi_list INDEX l_tabix ASSIGNING FIELD-SYMBOL(<object_tab_r>).
+*          IF sy-subrc = 0.
+*            IF <object_tab_l>-equnr = <object_tab_r>-equnr AND
+*               <object_tab_l>-datbi = <object_tab_r>-datbi AND
+*               <object_tab_l>-eqlfn = <object_tab_r>-eqlfn.
+**--- nur gleiche Zeitsegmente löschen -------------------------------*
+*              DELETE et_equi_list INDEX lv_tabix_original.
+*              CONTINUE.
+*            ENDIF.
+*          ENDIF.
+*          l_tabix = l_tabix - 2.
+*          IF l_tabix > 0.
+*            READ TABLE et_equi_list INDEX l_tabix ASSIGNING <object_tab_r>.
+*            IF sy-subrc = 0.
+*              IF <object_tab_l>-equnr = <object_tab_r>-equnr AND
+*                 <object_tab_l>-datbi = <object_tab_r>-datbi AND
+*                 <object_tab_l>-eqlfn = <object_tab_r>-eqlfn.
+*                DELETE et_equi_list INDEX lv_tabix_original.
+*              ENDIF.
+*            ENDIF.
+*          ENDIF.
+*        ENDLOOP.
+*        "End of DELETE_WRONG_LANG_F30
+************ Performance Issue - 09.02.2023 - End
+    ENDIF.
+  ENDIF.
+
+  SORT et_equi_list BY equnr.
+  DELETE ADJACENT DUPLICATES FROM et_equi_list COMPARING equnr.
+
+*  ENDIF.
+
+ENDFUNCTION.
