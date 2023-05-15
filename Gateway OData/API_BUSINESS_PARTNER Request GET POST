@@ -7,8 +7,8 @@ _________________
 {
   "d" : {
     "__metadata" : {
-      "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')",
-      "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')",
+      "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')",
+      "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')",
       "type" : "API_BUSINESS_PARTNER.A_BusinessPartnerType"
     },
     "BusinessPartner" : "",
@@ -67,20 +67,20 @@ _________________
     "ZZ1_SearchTerm2_bus" : "346.861.418-77",
     "to_BuPaIdentification" : {
       "__deferred" : {
-        "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_BuPaIdentification"
+        "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_BuPaIdentification"
       }
     },
     "to_BuPaIndustry" : {
       "__deferred" : {
-        "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_BuPaIndustry"
+        "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_BuPaIndustry"
       }
     },
     "to_BusinessPartnerAddress" : {
       "results" : [
         {
           "__metadata" : {
-            "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')",
-            "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')",
+            "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')",
+            "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')",
             "type" : "API_BUSINESS_PARTNER.A_BusinessPartnerAddressType"
           },
           "BusinessPartner" : "",
@@ -128,8 +128,8 @@ _________________
             "results" : [
               {
                 "__metadata" : {
-                  "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BuPaAddressUsage(BusinessPartner='',ValidityEndDate=datetimeoffset'9999-12-31T23%3A59%3A59Z',AddressUsage='XXDEFAULT',AddressID='194085')",
-                  "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BuPaAddressUsage(BusinessPartner='',ValidityEndDate=datetimeoffset'9999-12-31T23%3A59%3A59Z',AddressUsage='XXDEFAULT',AddressID='194085')",
+                  "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BuPaAddressUsage(BusinessPartner='',ValidityEndDate=datetimeoffset'9999-12-31T23%3A59%3A59Z',AddressUsage='XXDEFAULT',AddressID='194085')",
+                  "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BuPaAddressUsage(BusinessPartner='',ValidityEndDate=datetimeoffset'9999-12-31T23%3A59%3A59Z',AddressUsage='XXDEFAULT',AddressID='194085')",
                   "type" : "API_BUSINESS_PARTNER.A_BuPaAddressUsageType"
                 },
                 "BusinessPartner" : "",
@@ -144,27 +144,27 @@ _________________
           },
           "to_EmailAddress" : {
             "__deferred" : {
-              "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_EmailAddress"
+              "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_EmailAddress"
             }
           },
           "to_FaxNumber" : {
             "__deferred" : {
-              "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_FaxNumber"
+              "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_FaxNumber"
             }
           },
           "to_MobilePhoneNumber" : {
             "__deferred" : {
-              "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_MobilePhoneNumber"
+              "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_MobilePhoneNumber"
             }
           },
           "to_PhoneNumber" : {
             "__deferred" : {
-              "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_PhoneNumber"
+              "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_PhoneNumber"
             }
           },
           "to_URLAddress" : {
             "__deferred" : {
-              "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_URLAddress"
+              "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerAddress(BusinessPartner='',AddressID='194085')/to_URLAddress"
             }
           }
         }
@@ -172,7 +172,7 @@ _________________
     },
     "to_BusinessPartnerBank" : {
       "__deferred" : {
-        "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_BusinessPartnerBank"
+        "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_BusinessPartnerBank"
       }
     },
     "to_BusinessPartnerContact" : {
@@ -184,8 +184,8 @@ _________________
       "results" : [
         {
           "__metadata" : {
-            "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU00')",
-            "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU00')",
+            "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU00')",
+            "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU00')",
             "type" : "API_BUSINESS_PARTNER.A_BusinessPartnerRoleType"
           },
           "BusinessPartner" : "",
@@ -196,8 +196,8 @@ _________________
         },
         {
           "__metadata" : {
-            "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU01')",
-            "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU01')",
+            "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU01')",
+            "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='FLCU01')",
             "type" : "API_BUSINESS_PARTNER.A_BusinessPartnerRoleType"
           },
           "BusinessPartner" : "",
@@ -208,8 +208,8 @@ _________________
         },
         {
           "__metadata" : {
-            "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='MKK')",
-            "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='MKK')",
+            "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='MKK')",
+            "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerRole(BusinessPartner='',BusinessPartnerRole='MKK')",
             "type" : "API_BUSINESS_PARTNER.A_BusinessPartnerRoleType"
           },
           "BusinessPartner" : "",
@@ -224,8 +224,8 @@ _________________
       "results" : [
         {
           "__metadata" : {
-            "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerTaxNumber(BusinessPartner='',BPTaxType='BR2')",
-            "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerTaxNumber(BusinessPartner='',BPTaxType='BR2')",
+            "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerTaxNumber(BusinessPartner='',BPTaxType='BR2')",
+            "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartnerTaxNumber(BusinessPartner='',BPTaxType='BR2')",
             "type" : "API_BUSINESS_PARTNER.A_BusinessPartnerTaxNumberType"
           },
           "BusinessPartner" : "",
@@ -238,8 +238,8 @@ _________________
     },
     "to_Customer" : {
       "__metadata" : {
-        "id" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')",
-        "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')",
+        "id" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')",
+        "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')",
         "type" : "API_BUSINESS_PARTNER.A_CustomerType"
       },
       "Customer" : "",
@@ -299,18 +299,18 @@ _________________
       "ZZ1_PJ_CNAE_cus" : "",
       "to_CustomerCompany" : {
         "__deferred" : {
-          "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')/to_CustomerCompany"
+          "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')/to_CustomerCompany"
         }
       },
       "to_CustomerSalesArea" : {
         "__deferred" : {
-          "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')/to_CustomerSalesArea"
+          "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_Customer('')/to_CustomerSalesArea"
         }
       }
     },
     "to_Supplier" : {
       "__deferred" : {
-        "uri" : "https://vhedis4dci.cogna.com.br:44300/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_Supplier"
+        "uri" : "/sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner('')/to_Supplier"
       }
     }
   }
