@@ -11,7 +11,23 @@ METHOD equirefset_get_entityset.
         ls_rfilterchar      LIKE LINE OF lr_filterchar,
         lr_filtercharvalues TYPE RANGE OF zcl70plm_ibase_visu_mpc=>ts_equiref-filtercharvalue.
 
-  DATA: lt_entityset TYPE zcl70plm_ibase_visu_mpc=>tt_equiref.
+  DATA: lt_entityset TYPE zcl70plm_ibase_visu_mpc=>tt_equiref,
+        ls_entityset TYPE LINE OF zcl70plm_ibase_visu_mpc=>tt_equiref.
+
+  TYPES: BEGIN OF ty_complex_condition,
+           type      TYPE string,
+           value     TYPE string,
+           attribute TYPE string,
+           guid      TYPE sysuuid_x16,
+         END OF ty_complex_condition.
+
+  DATA: lt_condition_del TYPE TABLE OF ty_complex_condition.
+  DATA: lt_condition_aux TYPE TABLE OF ty_complex_condition.
+  DATA: ls_condition_aux TYPE ty_complex_condition.
+  DATA: lv_tabix TYPE sy-tabix.
+  DATA: lv_index TYPE sy-index.
+  DATA: lt_ranges TYPE sabp_t_name_range_pairs.
+  DATA: lv_has_filter TYPE c.
   "Due to high complexity of filter the logic needed to be transformed as below
   DATA(lo_filter_tree) = io_tech_request_context->get_filter_expression_tree( ).
 
@@ -27,35 +43,156 @@ METHOD equirefset_get_entityset.
       EXPORTING
         it_sadl_conditions = lt_condition
       IMPORTING
-        et_ranges          = DATA(lt_ranges) ).
+        et_ranges          = lt_ranges ).
   ENDIF.
+
+  "The Filter Char should be done one by one.
+  LOOP AT lt_condition ASSIGNING FIELD-SYMBOL(<fs_condition>).
+    TRY.
+        DATA(lv_new_16) = cl_system_uuid=>create_uuid_x16_static( ).
+      CATCH cx_uuid_error.
+    ENDTRY.
+    MOVE-CORRESPONDING <fs_condition> TO ls_condition_aux.
+    ls_condition_aux-guid = lv_new_16.
+    APPEND ls_condition_aux TO lt_condition_aux.
+    CLEAR ls_condition_aux.
+  ENDLOOP.
+  "Create auxiliar table of condition
+  DATA(lt_condition_main) = lt_condition_aux[].
 
 * Get RFC destination
   DATA(lo_dp_facade) = /iwbep/if_mgw_conv_srv_runtime~get_dp_facade( ).
   DATA(lv_destination) = /iwbep/cl_sb_gen_dpc_rt_util=>get_rfc_destination( io_dp_facade = lo_dp_facade ).
 
-  READ TABLE lt_ranges INTO DATA(ls_filter) WITH KEY name = 'FILTERCHAR'.
+  READ TABLE lt_condition_main WITH KEY attribute = 'FILTERCHAR' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    lv_has_filter = abap_true.
+  ENDIF.
 
-  LOOP AT ls_filter-range INTO DATA(ls_filterchar).
-    DATA(lv_tabix) = sy-tabix.
-    READ TABLE lt_ranges INTO DATA(ls_language) WITH KEY name = 'FILTERLANGUAGE'.
-    READ TABLE lt_ranges INTO DATA(ls_class)    WITH KEY name = 'IV_CLASS'.
-    READ TABLE lt_ranges INTO DATA(ls_klart)    WITH KEY name = 'IV_KLART'.
-    READ TABLE lt_ranges INTO DATA(ls_equi)     WITH KEY name = 'EQUNR'.
-    READ TABLE lt_ranges INTO DATA(ls_atwrt)    WITH KEY name = 'FILTERCHARVALUE'.
+  IF lv_has_filter IS NOT INITIAL.
+    DO.
+      lv_index = sy-index.
+      lt_condition_aux[] = lt_condition_main[].
+      IF lt_condition_del IS NOT INITIAL.
+        LOOP AT lt_condition_aux INTO ls_condition_aux.
+          lv_tabix = sy-tabix.
+          READ TABLE lt_condition_del WITH KEY guid = ls_condition_aux-guid TRANSPORTING NO FIELDS.
+          IF sy-subrc = 0.
+            DELETE lt_condition_aux INDEX lv_tabix.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+
+      READ TABLE lt_condition_aux INTO ls_condition_aux WITH KEY attribute = 'FILTERCHAR'.
+      IF sy-subrc = 0.
+
+        DELETE lt_condition_aux FROM sy-tabix + 3. "Keep equals and "and" then delete the rest
+        APPEND LINES OF lt_condition_aux[] TO lt_condition_del[].
+
+        NEW cl_sadl_cond_to_ranges( )->convert_sadl_cond_to_ranges(
+            EXPORTING
+              it_sadl_conditions = CORRESPONDING #( lt_condition_aux[] )
+            IMPORTING
+              et_ranges          = DATA(lt_ranges_char) ).
+
+        READ TABLE lt_ranges_char INTO DATA(ls_filter) WITH KEY name = 'FILTERCHAR'.
+        IF sy-subrc = 0.
+          LOOP AT ls_filter-range INTO DATA(ls_filterchar).
+            lv_tabix = sy-tabix.
+            READ TABLE lt_ranges      INTO DATA(ls_language) WITH KEY name = 'FILTERLANGUAGE'.
+            READ TABLE lt_ranges      INTO DATA(ls_class)    WITH KEY name = 'IV_CLASS'.
+            READ TABLE lt_ranges      INTO DATA(ls_klart)    WITH KEY name = 'IV_KLART'.
+            READ TABLE lt_ranges      INTO DATA(ls_equi)     WITH KEY name = 'EQUNR'.
+            READ TABLE lt_ranges_char INTO DATA(ls_atwrt)    WITH KEY name = 'FILTERCHARVALUE'.
+
+            lv_language          = VALUE #( ls_language-range[ 1 ]-low OPTIONAL ).
+            lv_class             = VALUE #( ls_class-range[ 1 ]-low OPTIONAL ).
+            lv_klart             = VALUE #( ls_klart-range[ 1 ]-low OPTIONAL ).
+            lv_equnr             = VALUE #( ls_equi-range[ 1 ]-low OPTIONAL ).
+            CLEAR lr_filterchar.
+            MOVE-CORRESPONDING ls_filterchar TO ls_rfilterchar.
+            APPEND ls_rfilterchar TO lr_filterchar.
+
+            CLEAR lr_filtercharvalues.
+            MOVE-CORRESPONDING ls_atwrt-range[] TO lr_filtercharvalues[].
+
+            DATA(lv_rfc_name) = 'Z_20PLM_IBASE_VISU_EQUI_REF'.
+
+            IF lv_destination IS INITIAL OR lv_destination EQ 'NONE'.
+
+              TRY.
+                  CALL FUNCTION lv_rfc_name
+                    EXPORTING
+                      iv_klart       = lv_klart
+                      iv_class       = lv_class
+                      iv_equnr       = lv_equnr
+                      iv_language    = lv_language
+                      it_rg_atnam    = lr_filterchar
+                      it_rg_atwrt    = lr_filtercharvalues
+                    IMPORTING
+                      et_equi_list   = lt_entityset
+                    EXCEPTIONS
+                      system_failure = 1000 message lv_exc_msg
+                      OTHERS         = 1002.
+
+                  DATA(lv_subrc) = sy-subrc.
+*in case of co-deployment the exception is raised and needs to be caught
+                CATCH cx_root INTO DATA(lx_root).
+                  lv_subrc = 1001.
+                  DATA(lv_exc_msg) = lx_root->if_message~get_text( ).
+              ENDTRY.
+
+            ELSE.
+
+              CALL FUNCTION lv_rfc_name DESTINATION lv_destination
+                EXPORTING
+                  iv_klart       = lv_klart
+                  iv_class       = lv_class
+                  iv_equnr       = lv_equnr
+                  iv_language    = lv_language
+                  it_rg_atnam    = lr_filterchar
+                  it_rg_atwrt    = lr_filtercharvalues
+                IMPORTING
+                  et_equi_list   = lt_entityset
+                EXCEPTIONS
+                  system_failure = 1000
+                  OTHERS         = 1002.
+
+            ENDIF.
+
+            IF lv_index = 1. "First
+              DATA(lt_entityset_main) = lt_entityset.
+            ELSE.
+              LOOP AT lt_entityset_main INTO DATA(ls_entityset_main).
+                DATA(lv_tabix_main) = sy-tabix.
+                READ TABLE lt_entityset WITH KEY equnr = ls_entityset_main-equnr TRANSPORTING NO FIELDS.
+                IF sy-subrc NE 0.
+                  DELETE lt_entityset_main INDEX lv_tabix_main.
+                ENDIF.
+              ENDLOOP.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+
+      ELSE. " All filters have been processed
+        EXIT.
+      ENDIF.
+
+    ENDDO.
+
+  ELSE.
+    READ TABLE lt_ranges INTO ls_language WITH KEY name = 'FILTERLANGUAGE'.
+    READ TABLE lt_ranges INTO ls_class    WITH KEY name = 'IV_CLASS'.
+    READ TABLE lt_ranges INTO ls_klart    WITH KEY name = 'IV_KLART'.
+    READ TABLE lt_ranges INTO ls_equi     WITH KEY name = 'EQUNR'.
+    READ TABLE lt_ranges INTO ls_atwrt    WITH KEY name = 'FILTERCHARVALUE'.
 
     lv_language          = VALUE #( ls_language-range[ 1 ]-low OPTIONAL ).
     lv_class             = VALUE #( ls_class-range[ 1 ]-low OPTIONAL ).
     lv_klart             = VALUE #( ls_klart-range[ 1 ]-low OPTIONAL ).
     lv_equnr             = VALUE #( ls_equi-range[ 1 ]-low OPTIONAL ).
-    CLEAR lr_filterchar.
-    MOVE-CORRESPONDING ls_filterchar TO ls_rfilterchar.
-    APPEND ls_rfilterchar TO lr_filterchar.
 
-    CLEAR lr_filtercharvalues.
-    MOVE-CORRESPONDING ls_atwrt-range[] TO lr_filtercharvalues[].
-
-    DATA(lv_rfc_name) = 'Z_20PLM_IBASE_VISU_EQUI_REF'.
+    lv_rfc_name = 'Z_20PLM_IBASE_VISU_EQUI_REF'.
 
     IF lv_destination IS INITIAL OR lv_destination EQ 'NONE'.
 
@@ -69,16 +206,16 @@ METHOD equirefset_get_entityset.
               it_rg_atnam    = lr_filterchar
               it_rg_atwrt    = lr_filtercharvalues
             IMPORTING
-              et_equi_list   = lt_entityset
+              et_equi_list   = lt_entityset_main
             EXCEPTIONS
               system_failure = 1000 message lv_exc_msg
               OTHERS         = 1002.
 
-          DATA(lv_subrc) = sy-subrc.
+          lv_subrc = sy-subrc.
 *in case of co-deployment the exception is raised and needs to be caught
-        CATCH cx_root INTO DATA(lx_root).
+        CATCH cx_root INTO lx_root.
           lv_subrc = 1001.
-          DATA(lv_exc_msg) = lx_root->if_message~get_text( ).
+          lv_exc_msg = lx_root->if_message~get_text( ).
       ENDTRY.
 
     ELSE.
@@ -92,27 +229,22 @@ METHOD equirefset_get_entityset.
           it_rg_atnam    = lr_filterchar
           it_rg_atwrt    = lr_filtercharvalues
         IMPORTING
-          et_equi_list   = lt_entityset
+          et_equi_list   = lt_entityset_main
         EXCEPTIONS
           system_failure = 1000
           OTHERS         = 1002.
 
     ENDIF.
+  ENDIF.
 
-    IF lv_tabix = 1.
-      DATA(lt_entityset_main) = lt_entityset.
-    ELSE.
-      LOOP AT lt_entityset_main INTO DATA(ls_entityset_main).
-        DATA(lv_tabix_main) = sy-tabix.
-        READ TABLE lt_entityset WITH KEY equnr = ls_entityset_main-equnr TRANSPORTING NO FIELDS.
-        IF sy-subrc NE 0.
-          DELETE lt_entityset_main INDEX lv_tabix_main.
-        ENDIF.
-      ENDLOOP.
-    ENDIF.
+
+  LOOP AT lt_entityset_main ASSIGNING FIELD-SYMBOL(<fs_entityset_main>).
+    MOVE-CORRESPONDING <fs_entityset_main> TO ls_entityset.
+    ls_entityset-iv_class = lv_class.
+    ls_entityset-iv_klart = lv_klart.
+    APPEND ls_entityset TO et_entityset.
+    CLEAR ls_entityset.
   ENDLOOP.
-
-  APPEND LINES OF lt_entityset_main TO et_entityset.
 
   map_and_sort(
         EXPORTING
@@ -470,5 +602,208 @@ FUNCTION z_20plm_ibase_visu_equi_ref ##RFC_PERFORMANCE_OK.
   DELETE ADJACENT DUPLICATES FROM et_equi_list COMPARING equnr.
 
 *  ENDIF.
+
+ENDFUNCTION.
+
+______________________________________________________________________________________________________
+
+FUNCTION z_20plm_ibase_visu_class_value.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_EQUNR) TYPE  EQUNR OPTIONAL
+*"     VALUE(IV_CLASS) TYPE  KLASSE_D
+*"     VALUE(IV_CLASSTYPE) TYPE  KLASSENART
+*"     VALUE(IV_LANGUAGE) TYPE  LANGU OPTIONAL
+*"     VALUE(IV_CHARACT) TYPE  ATNAM OPTIONAL
+*"     VALUE(IV_VALUE_CHAR) TYPE  ATWRT OPTIONAL
+*"  EXPORTING
+*"     VALUE(EV_EQUNR) TYPE  EQUNR
+*"     VALUE(EV_CLASS) TYPE  KLASSE_D
+*"     VALUE(EV_CLASSTYPE) TYPE  KLASSENART
+*"     VALUE(EV_LANGUAGE) TYPE  LANGU
+*"     VALUE(EV_CHARACT) TYPE  ATNAM
+*"  TABLES
+*"      ET_CLASSVALUES STRUCTURE  Z20PLMS_ALM_ME_CLASSVALUES OPTIONAL
+*"----------------------------------------------------------------------
+*---------------------------------------------------------------------
+*  Function module:   Z_20PLM_IBASE_VISU_CLASS_VALUE
+*  Title:             Get equipment classification values
+*  Autor:             Sybille Eisermann DSG
+*  Customer:          Oliver Baunholzer DSG
+*  Created:           2022-03
+*
+*  Short description:  gets equipment classification values
+*                      (including empty values)
+*---------------------------------------------------------------------
+*  Changes:        Description (newest on top)
+*---------------------------------------------------------------------
+*  LNr / JJJJ-MM-TT / Name    / Project-Nr
+*---------------------------------------------------------------------
+
+  TYPES BEGIN OF lty_ksml_key.
+  TYPES clint TYPE clint.
+  TYPES posnr TYPE kposnr.
+  TYPES adzhl TYPE adzhl.
+  TYPES lkenz TYPE lkenz.
+  TYPES imerk TYPE atinn.
+  TYPES END OF lty_ksml_key.
+
+  DATA: ls_classvalues         LIKE LINE OF et_classvalues,
+        lt_classvalues         TYPE TABLE OF z20plms_alm_me_classvalues,
+        lt_classvalues_final   TYPE TABLE OF z20plms_alm_me_classvalues,
+        lv_object              TYPE cuobn,
+        lt_funcloc_classvalues TYPE TABLE OF alm_me_classvalues,
+        lt_return              TYPE TABLE OF bapiret2,
+        lv_language            TYPE langu,
+        lv_atinn               TYPE atinn,
+        ls_ksml                TYPE lty_ksml_key,
+        lt_ksml                LIKE TABLE OF ls_ksml,
+        lt_rg_imerk            TYPE RANGE OF atinn,
+        ls_rg_imerk            LIKE LINE OF lt_rg_imerk.
+
+
+  FIELD-SYMBOLS: <fs_funcloc_classvalue> LIKE LINE OF lt_funcloc_classvalues,
+                 <fs_classvalue>         LIKE ls_classvalues.
+
+  CONSTANTS  c_class_equi    TYPE tabelle VALUE 'EQUI'.
+
+  IF iv_equnr IS INITIAL AND
+     iv_class IS INITIAL AND
+     iv_classtype IS INITIAL AND
+     iv_language IS INITIAL AND
+     iv_charact IS INITIAL AND
+     iv_value_char IS INITIAL.
+    EXIT.
+  ENDIF.
+
+  "take sy-langu if no language is given
+  IF iv_language IS INITIAL.
+    lv_language = sy-langu.
+  ELSE.
+    lv_language = iv_language.
+  ENDIF.
+
+  " all classvalues of classification
+  SELECT b~clint b~posnr b~adzhl b~lkenz b~imerk
+    FROM klah AS a
+    INNER JOIN ksml AS b
+      ON a~clint EQ b~clint
+    INTO TABLE lt_ksml
+    WHERE a~class = iv_class
+      AND a~klart = iv_classtype.
+  " only actual version of each position
+  LOOP AT lt_ksml INTO ls_ksml WHERE adzhl NE 0.
+    DELETE lt_ksml
+     WHERE posnr = ls_ksml-posnr
+       AND adzhl < ls_ksml-adzhl.
+  ENDLOOP.
+  " errase deleted class values
+  DELETE lt_ksml WHERE lkenz = abap_true.
+  " sort by posnr
+  SORT lt_ksml BY posnr ASCENDING.
+  " create range table
+  ls_rg_imerk-sign = 'I'.
+  ls_rg_imerk-option = 'EQ'.
+  LOOP AT lt_ksml INTO ls_ksml.
+    ls_rg_imerk-low = ls_ksml-imerk.
+    APPEND ls_rg_imerk TO lt_rg_imerk.
+  ENDLOOP.
+  " select values
+  DATA: lv_anzst TYPE cabn-anzst.
+
+  SELECT c~atinn c~atnam t~atbez c~atfor AS datatype c~anzst AS datalength
+         c~anzst "Decimalplaces
+    FROM cabn AS c
+    JOIN cabnt AS t
+      ON ( t~atinn EQ c~atinn )
+    INTO ( ls_classvalues-internalchar, ls_classvalues-charact, ls_classvalues-charact_descr, ls_classvalues-datatype, ls_classvalues-datalength, lv_anzst )
+    WHERE c~atinn IN lt_rg_imerk
+      AND c~lkenz = abap_false
+      AND c~datub >= sy-datum
+      AND t~datub >= sy-datum
+      AND t~spras = lv_language
+      AND c~atmst = '7'.  "Released
+    APPEND ls_classvalues TO lt_classvalues.
+  ENDSELECT.
+
+  IF iv_equnr IS NOT INITIAL.
+
+    " classvalues of equipment
+    " Type conversion
+    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+      EXPORTING
+        input  = iv_equnr
+      IMPORTING
+        output = iv_equnr.
+    MOVE iv_equnr TO lv_object.
+    CALL FUNCTION 'ALM_ME_TOB_CLASSES'
+      EXPORTING
+        object      = lv_object
+        objecttable = c_class_equi
+        language    = lv_language
+      TABLES
+        classvalues = lt_funcloc_classvalues
+        return      = lt_return.
+
+    IF lt_funcloc_classvalues IS INITIAL.
+      CALL FUNCTION 'ZALM_ME_TOB_CLASSES'
+        EXPORTING
+          object      = lv_object
+          objecttable = c_class_equi
+          language    = lv_language
+        TABLES
+          classvalues = lt_funcloc_classvalues
+          return      = lt_return.
+    ENDIF.
+
+    LOOP AT lt_classvalues ASSIGNING <fs_classvalue>.
+
+      READ TABLE lt_funcloc_classvalues ASSIGNING <fs_funcloc_classvalue> WITH KEY charact = <fs_classvalue>-charact.
+
+      READ TABLE lt_ksml ASSIGNING FIELD-SYMBOL(<fs_ksml>) WITH KEY imerk = <fs_classvalue>-internalchar.
+      IF sy-subrc = 0.
+        IF <fs_funcloc_classvalue> IS ASSIGNED.
+          MOVE-CORRESPONDING <fs_funcloc_classvalue> TO <fs_classvalue>.
+        ENDIF.
+        <fs_classvalue>-datalength = <fs_classvalue>-datalength + lv_anzst + 6. "6 = max length of (EINHE)
+        <fs_classvalue>-posnr = <fs_ksml>-posnr.
+        SHIFT <fs_classvalue>-charact_descr LEFT DELETING LEADING space.
+        SHIFT <fs_classvalue>-value_char LEFT DELETING LEADING space.
+        APPEND <fs_classvalue> TO et_classvalues.
+      ENDIF.
+      UNASSIGN <fs_funcloc_classvalue>.
+    ENDLOOP.
+
+  ELSE.
+
+    LOOP AT lt_classvalues ASSIGNING <fs_classvalue>.
+      READ TABLE lt_ksml ASSIGNING <fs_ksml> WITH KEY imerk = <fs_classvalue>-internalchar.
+      IF sy-subrc = 0.
+        <fs_classvalue>-datalength = <fs_classvalue>-datalength + lv_anzst + 6. "6 = max length of (EINHE)
+        <fs_classvalue>-posnr = <fs_ksml>-posnr.
+        SHIFT <fs_classvalue>-charact_descr LEFT DELETING LEADING space.
+        APPEND <fs_classvalue> TO et_classvalues.
+      ENDIF.
+    ENDLOOP.
+
+  ENDIF.
+
+  " sort classvalues alphabetically
+*  SORT et_classvalues BY charact_descr ASCENDING.
+  SORT et_classvalues BY posnr ASCENDING.
+
+  ev_equnr = iv_equnr.
+  ev_class = iv_class.
+  ev_classtype = iv_classtype.
+  ev_language = iv_language.
+
+  IF iv_charact IS NOT INITIAL.
+    DELETE et_classvalues WHERE charact NE iv_charact.
+  ENDIF.
+
+  IF iv_value_char IS NOT INITIAL.
+    DELETE et_classvalues WHERE value_char NE iv_value_char.
+  ENDIF.
 
 ENDFUNCTION.
