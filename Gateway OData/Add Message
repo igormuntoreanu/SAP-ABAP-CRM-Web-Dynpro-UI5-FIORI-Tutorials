@@ -1,1 +1,9 @@
           mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = 'MESSAGE' ).
+
+
+          mo_context->get_message_container( )->add_message(
+            EXPORTING
+              iv_msg_type               = 'E'
+              iv_msg_id                 = 'V1'
+              iv_msg_number             = 302
+              iv_msg_v1                 = CONV #( lv_so ) ).
