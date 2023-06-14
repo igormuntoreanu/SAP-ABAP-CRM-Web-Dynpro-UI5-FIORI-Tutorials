@@ -1,0 +1,16 @@
+Not possible.
+Create a report and transaction and simply call the report
+
+At the Target Mapping, add the parameter P_VARI and the name of the created transaction.
+
+*&---------------------------------------------------------------------*
+*& Report Z20PP_REPAIR_COCKPIT_FIORI
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z20pp_repair_cockpit_fiori.
+
+PARAMETERS: p_vari TYPE varid-variant.
+
+SUBMIT z20pp_repair_cockpit USING SELECTION-SET p_vari.
+
