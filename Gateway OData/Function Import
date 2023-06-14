@@ -49,3 +49,5 @@ ENDMETHOD.
 
 3) URI Example: /ZODATA_TEST_SRV/DesativaAluno?Alunoid='1'
 Here Alunoid is the paramenter defined.
+
+/sap/opu/odata/SAP/Z20PP_GRT_SRV/CrossCheck?SalesOrderId='AAA'&ProjectIdExt='BB'&WbsElementIdExt='CC'
