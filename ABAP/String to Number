@@ -1,0 +1,10 @@
+        TRANSLATE <fs_atwrt_aux>-low  USING '. '.
+        TRANSLATE <fs_atwrt_aux>-low  USING ', '.
+        TRANSLATE <fs_atwrt_aux>-high USING ', '.
+        TRANSLATE <fs_atwrt_aux>-high USING ', '.
+
+        CONDENSE <fs_atwrt_aux>-low NO-GAPS.
+        CONDENSE <fs_atwrt_aux>-high NO-GAPS.
+
+        FIND REGEX '(\d+)' IN <fs_atwrt_aux>-low  SUBMATCHES <fs_atwrt_aux>-low.
+        FIND REGEX '(\d+)' IN <fs_atwrt_aux>-high SUBMATCHES <fs_atwrt_aux>-high.
