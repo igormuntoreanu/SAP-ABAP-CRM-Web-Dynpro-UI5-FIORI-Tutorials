@@ -1,3 +1,19 @@
 Se38: /UI5/APP_INDEX_CALCULATE
 Transaction: sui_support
 Transaction: smicm -> server cache invalidate globally
+
+Report /UI2/INVALIDATE_GLOBAL_CACHES. This cache clearing is mandatory especially to verify the translations integrated for ex tiles,groups,catalogs in Launchpad admin
+
+Clear metadata cache
+Transaction: /IWFND/CACHE_CLEANUP on Gateway (oData cache clearing)
+
+Transaction: /IWBEP/CACHE_CLEANUP on Backend and Gateway (oData cache clearing)
+Synchronize chip cache
+Run the report /UI2/CHIP_SYNCHRONIZE_CACHE. Make sure there is no error in the table /UI2/CHIP_CHDR
+
+Run the report /UI2/DELETE_CACHE_AFTER_IMP. /UI2/DELETE_CACHE
+
+Run cache buster
+Run the report /UI5/UPDATE_CACHEBUSTER.
+
+5. Clear local browser cache – to avoid views and resources being displayed from local browser cache or else implement cache buster
