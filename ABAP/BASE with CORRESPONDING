@@ -1,0 +1,13 @@
+  TYPES: BEGIN OF ty_counter,
+          counter TYPE catsdb-counter,
+         END OF ty_counter.
+         
+  DATA: lt_counter TYPE TABLE OF ty_counter,
+        ls_counter TYPE counter.
+
+  DATA(lt_entityset_aux) = it_entityset.
+
+  DELETE lt_entityset_aux WHERE field_name NE 'COUNTER'.
+  CHECK lt_entityset_aux IS NOT INITIAL.
+  
+  lt_counter = CORRESPONDING #( BASE ( lt_counter ) lt_entityset_aux MAPPING counter = field_value )
