@@ -17,3 +17,7 @@ Run cache buster
 Run the report /UI5/UPDATE_CACHEBUSTER.
 
 5. Clear local browser cache – to avoid views and resources being displayed from local browser cache or else implement cache buster
+
+__________________-
+
+/UI5/UPD_ODATA_METADATA_CACHE - falls nichts funktioniert
