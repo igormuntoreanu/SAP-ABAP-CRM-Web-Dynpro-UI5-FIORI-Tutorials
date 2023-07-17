@@ -9,3 +9,8 @@
                                                                   type      = <fs_variants>-type
                                                                   langu     = lv_language
                                                                   ]-text OPTIONAL ).
+
+  ls_object-instid = VALUE #( it_key_tab[ name = 'ObjectKey' ]-value OPTIONAL ).
+
+  DATA(ls_so) = COND /iwbep/t_cod_select_options( WHEN ls_object-instid  IS INITIAL THEN VALUE #( it_filter_select_options[ property = 'ObjectKey' ]-select_options OPTIONAL ) ).
+  ls_object-instid = COND #( WHEN ls_object-instid IS INITIAL THEN VALUE #( ls_so[ 1 ]-low OPTIONAL ) ELSE ls_object-instid ).
