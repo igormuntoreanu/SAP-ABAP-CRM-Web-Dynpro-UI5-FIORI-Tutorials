@@ -1,0 +1,3 @@
+this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+          var abc = oEvent.context.oModel.getProperty( oEvent.context.sDeepPath + "/Status")
+}.bind(this));
