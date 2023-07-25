@@ -1,0 +1,12 @@
+this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+          var statusProfile = oEvent.context.oModel.getProperty( oEvent.context.sDeepPath + "/StatusProfile")
+          var status = oEvent.context.oModel.getProperty( oEvent.context.sDeepPath + "/Status")
+          var oSelect = sap.ui.getCore().byId("globalshuttlingloading::sap.suite.ui.generic.template.ObjectPage.view.Details::ShuttlingLoadingSet--idSelect");
+          if (oSelect) {
+            var oBinding = oSelect.getBinding("items");
+            var aFilters = [];
+            aFilters.push( new Filter("StatusProfile", FilterOperator.EQ, statusProfile) );
+            oBinding.filter(aFilters, FilterType);
+            oSelect.setSelectedKey(status);
+          }
+        }.bind(this));
