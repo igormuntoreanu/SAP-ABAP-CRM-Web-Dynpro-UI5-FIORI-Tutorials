@@ -117,3 +117,116 @@ Call a Service Entity Set from another Service:
     ENDLOOP.
 
   ENDMETHOD.
+
+_________________________________________________________________________________________
+
+METHOD dynamictileset_get_entity.
+
+  TYPES:
+    BEGIN OF ty_shuttlingloading,
+      headerguid             TYPE /deereag/shut_header_guid,
+      ivonlyerrors           TYPE flag,
+      shuttlelisttext        TYPE /deereag/coding_text,
+      shuttlelist            TYPE /deereag/shut_shuttlelist,
+      trailerid              TYPE /deereag/shut_trailerid,
+      statusprofile          TYPE /deereag/shut_statusprofile,
+      status                 TYPE /deereag/shut_status,
+      refdoctype             TYPE /deereag/shut_refdoctype,
+      refdocnumber           TYPE /deereag/shut_refdocnumber,
+      doorloading            TYPE /deereag/shut_doorloading,
+      serviceagent           TYPE lifnr,
+      creationtstamp         TYPE /deereag/shut_creation_tstamp,
+      creationuser           TYPE /deereag/shut_creation_user,
+      creationtcode          TYPE /deereag/shut_creation_tcode,
+      changetstamp           TYPE /deereag/shut_change_tstamp,
+      changeuser             TYPE /deereag/shut_change_user,
+      changetcode            TYPE /deereag/shut_change_tcode,
+      fastatus               TYPE /deereag/shut_fa_statusicon,
+      message                TYPE bapi_msg,
+      deststatus             TYPE /deereag/shut_deststatus,
+      creationtstampdate     TYPE datum,
+      creationtstamptime     TYPE uzeit,
+      changetstampdate       TYPE datum,
+      changetstamptime       TYPE uzeit,
+      headerparaprofile      TYPE /deereag/shut_paraprofile,
+      defaultitemparaprofile TYPE /deereag/shut_paraprofile,
+      unitgw                 TYPE gewei,
+      gsgew                  TYPE gsgew,
+      items                  TYPE /deereag/count,
+      material               TYPE matnr,
+      plant                  TYPE werks_d,
+      message_crit           TYPE inten,
+    END OF ty_shuttlingloading .
+
+  DATA: lt_header_entityset TYPE TABLE OF ty_shuttlingloading.
+
+  DATA(lv_key) = VALUE #( it_key_tab[ 1 ]-value OPTIONAL ).
+
+*  ASSIGN me->mr_request_details->* TO FIELD-SYMBOL(<fs_request_details>).
+
+  CASE lv_key.
+    WHEN '1'. "Loading
+      "/sap/opu/odata/DEEREAG/GLOBAL_SHUTTLING_MONI_SRV/ShuttlingLoadingSet/$count?$filter=Status eq 'LOADING' or Status eq 'CREATED'
+      DATA(lv_uri) = |/sap/opu/odata/DEEREAG/GLOBAL_SHUTTLING_MONI_SRV/ShuttlingLoadingSet?$filter=Status eq 'LOADING' or Status eq 'CREATED'|.
+
+      er_entity-key = '1'.
+      er_entity-icon = 'sap-icon://BusinessSuiteInAppSymbols/icon-truck-load'.
+      er_entity-title = 'Loading'.
+      er_entity-subtitle = 'Truck/Trailer'.
+      er_entity-numberstate = 'Success'.
+      er_entity-infostate = 'Error'.
+      er_entity-numberunit = ''.
+      er_entity-numberfactor = ''.
+      er_entity-statearrow = ''.
+    WHEN '2'. "In Transit
+      "/sap/opu/odata/DEEREAG/GLOBAL_SHUTTLING_MONI_SRV/ShuttlingLoadingSet/$count?$filter=Status eq 'TRANSIT'
+      lv_uri = |/sap/opu/odata/DEEREAG/GLOBAL_SHUTTLING_MONI_SRV/ShuttlingLoadingSet?$filter=Status eq 'TRANSIT'|.
+
+      er_entity-key = '2'.
+      er_entity-icon = 'sap-icon://BusinessSuiteInAppSymbols/icon-outbound-delivery'.
+      er_entity-title = 'In Transit'.
+      er_entity-subtitle = 'Truck/Trailer'.
+      er_entity-numberstate = 'Success'.
+      er_entity-infostate = 'Error'.
+      er_entity-numberunit = ''.
+      er_entity-numberfactor = ''.
+      er_entity-statearrow = ''.
+
+    WHEN '3'. "Unloading
+      "/sap/opu/odata/DEEREAG/GLOBAL_SHUTTLING_MONI_SRV/ShuttlingLoadingSet/$count?$filter=Status eq 'UNLOADING'
+      lv_uri = |/sap/opu/odata/DEEREAG/GLOBAL_SHUTTLING_MONI_SRV/ShuttlingLoadingSet?$filter=Status eq 'UNLOADING'|.
+
+      er_entity-key = '3'.
+      er_entity-icon = 'sap-icon://BusinessSuiteInAppSymbols/icon-truck-unload'.
+      er_entity-title = 'Unloading'.
+      er_entity-subtitle = 'Truck/Trailer'.
+      er_entity-numberstate = 'Success'.
+      er_entity-infostate = 'Error'.
+      er_entity-numberunit = ''.
+      er_entity-numberfactor = ''.
+      er_entity-statearrow = ''.
+    WHEN OTHERS.
+  ENDCASE.
+
+  /iwfnd/cl_sutil_client_proxy=>get_instance( )->web_request( EXPORTING
+                                                                it_request_header = VALUE /iwfnd/sutil_property_t( ( name  = if_http_header_fields_sap=>request_method
+                                                                value = if_http_entity=>co_request_method_get ) (
+                                                                name  = if_http_header_fields_sap=>request_uri
+                                                                value = lv_uri ) )
+                                                              IMPORTING
+                                                                ev_status_code        = DATA(lv_status_code)
+                                                                ev_response_body      = DATA(lv_response_body)
+                                                                ev_error_text         = DATA(lv_error_text) ).
+
+  /iwfnd/cl_sutil_odata_mapper=>get_instance( )->convert_to_abap( EXPORTING
+                                                                    iv_xdoc       = lv_response_body
+                                                                  IMPORTING
+                                                                    ed_data       = lt_header_entityset
+                                                                    ev_error_text = lv_error_text ).
+  DATA(lt_header_entityset_errors) = lt_header_entityset[].
+  DELETE lt_header_entityset_errors WHERE message_crit NE '1'.
+
+  er_entity-number = lines( lt_header_entityset ).
+  er_entity-info = | { lines( lt_header_entityset_errors ) } Errors|.
+
+ENDMETHOD.
