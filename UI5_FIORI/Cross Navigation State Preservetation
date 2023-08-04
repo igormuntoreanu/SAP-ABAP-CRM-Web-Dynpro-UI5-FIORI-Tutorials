@@ -1,0 +1,40 @@
+sap.ui.define([
+    "sap/ui/generic/app/navigation/service/NavigationHandler",
+    "sap/ui/generic/app/navigation/service/NavType"
+], function (NavigationHandler, NavType) {
+    'use strict';
+
+    return {
+        onInit: function (oEvent) {
+            // create an instance of the navigation handler
+            this.oNavigationHandler = new NavigationHandler(this.getOwnerComponent());
+
+            // on back navigation, the previous app state is returned in a Promise
+            this.oNavigationHandler
+                .parseNavigation()
+                .done(this.onNavigationDone.bind(this));
+        },
+
+        onInitSmartFilterBarExtension: function (oEvent) {
+        },
+        // Action when table line is selected and button is pressed
+        MoveIntoDoor: function (oEvent) {
+            this.selectedItem = oEvent.getSource().getParent().getParent().getSelectedItem().getBindingContext().getObject();
+            var vNavigationParameters = {
+                "YardTaskActivityType": "MV01",
+                "YardNo": this.selectedItem.YardNo,
+                "TuNumExt": this.selectedItem.TuNumExt
+            };
+            this.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+        },
+        // Extra Logic can be done here
+        onNavigationDone: function (oAppData, oURLParameters, sNavType) {
+            switch (sNavType) {
+                case NavType.initial:
+                    break;
+                case NavType.iAppState:
+                    break;
+            }
+        }
+    };
+});
