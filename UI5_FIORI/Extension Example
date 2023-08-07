@@ -1,0 +1,85 @@
+manifest.json:
+
+	"sap.ui5": {
+		"_version": "1.1.0",
+		"dependencies": {
+			"minUI5Version": "1.65.6"
+		},
+		"extends": {
+			"component": "com.sap.cd.yl.ui.adhoc.tasks",
+			"extensions": {
+				"sap.ui.controllerExtensions": {
+					"com.sap.cd.yl.ui.adhoc.tasks.controller.TaskCreation": {
+						"controllerName": "com.sap.cd.yl.ui.adhoc.tasks.SAPYLUIADHOCExtension.controller.TaskCreationCustom"
+					}
+				}
+			}
+		},
+
+_________________________--
+Controller:
+
+sap.ui.define([
+	"com/sap/cd/yl/ui/adhoc/tasks/controller/BaseController",
+	"sap/m/MessageBox",
+	"sap/ui/model/Filter",
+	"sap/ui/core/ValueState"
+], function (BaseController, MessageBox, Filter, ValueState) {
+	"use strict";
+	return sap.ui.controller("com.sap.cd.yl.ui.adhoc.tasks.SAPYLUIADHOCExtension.controller.TaskCreationCustom", {
+
+		onInit: function () {},
+
+		onBeforeRendering: function (oEvent) {},
+
+		onAfterRendering: function (oEvent) {},
+
+		_initYardTask: function () {
+			var oModel = this.getModel("main");
+			var sCurrentYard = oModel.getProperty("/currentYard");
+			oModel.setProperty("/yardTask", {});
+			oModel.setProperty("/editableTargetData", true);
+			oModel.setProperty("/inputOptionWithLicensePlate", false);
+			oModel.setProperty("/tuNoExtBlocked", true);
+			this.getModel().resetChanges();
+			var oYardTaskCtx = this.getModel().createEntry("/YardTaskSet", {
+				properties: {
+					YardNo: sCurrentYard
+				},
+				success: this._successTaskCreated.bind(this),
+				error: function (oError) {
+					this._hideBusyDialog();
+					jQuery.sap.log.error("Error posting data");
+				}.bind(this)
+			});
+			this.getView().setBindingContext(oYardTaskCtx);
+
+			this._setDataFromUrl();
+		},
+
+		_setDataFromUrl: function () {
+			this.queryString = window.location.hash;
+			this.urlParams = new URLSearchParams(this.queryString);
+			this.TuNumExt = this.urlParams.get('#YardTask-adhocext?TuNumExt');
+			this.YardNo = this.urlParams.get('YardNo');
+			this.YardTaskActivityType = this.urlParams.get('YardTaskActivityType');
+			var viewYardTaskActivityType = this.getView().byId("YardTaskActivityType");
+			var viewNoExtId = this.getView().byId("tuNoExtId");
+			var viewYardId = this.getView().byId("selectYardId");
+
+			if (this.YardTaskActivityType && viewYardTaskActivityType) {
+				viewYardTaskActivityType.setSelectedKey(this.YardTaskActivityType);
+			}
+
+			if (this.TuNumExt && viewNoExtId) {
+				viewNoExtId.setValue(this.TuNumExt);
+			}
+
+			if (this.YardNo && this.getModel("main")) {
+				this.getModel("main").setProperty("/currentYard", this.YardNo);
+
+			}
+		},
+
+	});
+});
