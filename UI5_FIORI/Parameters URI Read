@@ -1,0 +1,5 @@
+this.queryString = window.location.hash;
+			this.urlParams = new URLSearchParams(this.queryString);
+			this.TuNumExt = this.urlParams.get('#YardTask-adhocext?TuNumExt');
+			this.YardNo = this.urlParams.get('YardNo');
+			this.YardTaskActivityType = this.urlParams.get('YardTaskActivityType');
