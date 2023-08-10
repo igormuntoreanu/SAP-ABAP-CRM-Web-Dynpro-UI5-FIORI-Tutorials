@@ -1,0 +1,145 @@
+CLASS zcl_rtts_itab DEFINITION.
+  PUBLIC SECTION.
+    METHODS:
+      create_from_field_catalog
+        IMPORTING
+          it_fcat TYPE lvc_t_fcat
+        RETURNING VALUE(ro_data) TYPE REF TO DATA.
+ENDCLASS.                    "zcl_RTTS_ITAB DEFINITION
+*
+CLASS zcl_rtts_itab IMPLEMENTATION.
+  METHOD create_from_field_catalog.
+*&---------------------------------------------------------------------*
+*& Purpose - Utility to convert dynamic table using RTTS from
+*&           create_dynamic_table
+*&           to RTTS cl_abap_tabledescr=>create
+*& Author  - Naimesh Patel
+*& URL     - http://zevolving.com/?p=2189
+*&---------------------------------------------------------------------*
+ 
+* DD_ROLL = Data Element
+* FIELDNAME = Field name
+ 
+* Dynamic Table creation
+    DATA: lo_struct   TYPE REF TO cl_abap_structdescr,
+          lo_element  TYPE REF TO cl_abap_elemdescr,
+          lo_new_type TYPE REF TO cl_abap_structdescr,
+          lo_new_tab  TYPE REF TO cl_abap_tabledescr,
+          lt_comp     TYPE cl_abap_structdescr=>component_table,
+          lt_tot_comp TYPE cl_abap_structdescr=>component_table,
+          la_comp     LIKE LINE OF lt_comp.
+ 
+*=========== using RTTS ==============================
+* Get Field info from Field-Catalog
+    LOOP AT lt_fieldcat INTO la_fieldcat.
+*   Element Description
+      lo_element ?= cl_abap_elemdescr=>describe_by_name( la_fieldcat-dd_roll ).
+      la_comp-TYPE = lo_element.
+*   Field name
+      la_comp-NAME = la_fieldcat-fieldname.
+*
+*   Filling the component table
+      APPEND la_comp TO lt_tot_comp.
+      CLEAR: la_comp.
+    ENDLOOP.
+ 
+* 3. Create a New Type
+    lo_new_type = cl_abap_structdescr=>create( lt_tot_comp ).
+*
+* 4. New Table type
+    lo_new_tab = cl_abap_tabledescr=>create(
+                    p_line_type  = lo_new_type
+                    p_table_kind = cl_abap_tabledescr=>tablekind_std
+                    p_unique     = abap_false ).
+*
+* 5. data to handle the new table type
+    CREATE DATA ro_data TYPE HANDLE lo_new_tab.
+ 
+ 
+  ENDMETHOD.                    "create_from_field_catalog
+ENDCLASS.                    "zcl_RTTS_ITAB IMPLEMENTATION
+
+
+
+REPORT znp_demo_rtts_from_fcat.
+*&---------------------------------------------------------------------*
+*& Purpose - Demo program Utility to migrate from create_dynamic_table
+*&           to RTTS cl_abap_tabledescr=>create
+*& Author  - Naimesh Patel
+*& URL     - http://zevolving.com/?p=2189
+*&---------------------------------------------------------------------*
+ 
+*
+DATA: lo_data     TYPE REF TO DATA,
+      lf_months   TYPE monat,
+      lf_run_mon  TYPE monat.
+*
+* Dynamic Selection fields
+TYPES: BEGIN OF ty_fields,
+       FIELD TYPE char30,
+       END   OF ty_fields.
+*
+DATA:  lt_fields TYPE STANDARD TABLE OF ty_fields,
+       la_fields TYPE ty_fields.
+*
+* field symbols to access the dynamic table
+FIELD-SYMBOLS: <f_tab>   TYPE ANY TABLE.
+*
+DATA: lt_fieldcat TYPE lvc_t_fcat,
+      la_fieldcat TYPE lvc_s_fcat.
+ 
+*
+FIELD-SYMBOLS: <f_tab_new> TYPE ANY TABLE.
+DATA: lo_data_new TYPE REF TO DATA.
+* Selection Screen
+PARAMETERS: p_mon_fr TYPE monat,
+            p_mon_to TYPE monat.
+*
+START-OF-SELECTION.
+*=========== using the create_dynamic_table ==================
+ 
+* 1. Adding fields in the field catalog
+  la_fieldcat-fieldname = 'KSTAR'.
+  la_fieldcat-datatype  = 'CHAR'.
+  la_fieldcat-dd_roll   = 'KSTAR'.
+  la_fieldcat-outputlen = 10.
+  APPEND la_fieldcat TO lt_fieldcat.
+  CLEAR  la_fieldcat.
+*
+* 2. Adding required fields based on the selection months
+* Determining Number of fields
+  lf_months = ( p_mon_to - p_mon_fr ) + 1.
+  lf_run_mon = p_mon_fr.
+*
+  DO lf_months TIMES.
+*   Field name
+    CONCATENATE 'WTG0' lf_run_mon INTO la_fieldcat-fieldname.
+    la_fieldcat-datatype  = 'CURR'.
+    la_fieldcat-outputlen = 17.
+    la_fieldcat-dd_roll   = 'WTGXXX'.
+*
+*   Filling the fieldcatalog
+    APPEND la_fieldcat TO lt_fieldcat.
+    CLEAR  la_fieldcat.
+*
+    lf_run_mon = lf_run_mon + 1.
+  ENDDO.
+*
+* Calling method to generate the dynamic internal table based on
+* ALV field catalog
+  cl_alv_table_create=>create_dynamic_table(
+    EXPORTING
+      it_fieldcatalog = lt_fieldcat
+    IMPORTING
+      ep_table = lo_data ).
+*
+  ASSIGN lo_data->* TO <f_tab>.
+ 
+*=========== using RTTS ==============================
+  DATA: lo_rtts_tab TYPE REF TO zcl_rtts_itab.
+  CREATE OBJECT lo_rtts_tab.
+  lo_data_new = lo_rtts_tab->create_from_field_catalog( lt_fieldcat ).
+* Get in Field Symbol to work local
+  ASSIGN lo_data_new->* TO <f_tab_new>.
+ 
+  WRITE: 'done'.
