@@ -10,19 +10,18 @@ __________________________
 
 Example inside of a Get Entity Set
 
-      CALL METHOD /iwbep/cl_mgw_data_util=>paging
-        EXPORTING
-          is_paging = is_paging
-        CHANGING
-          ct_data   = et_entityset.
-          
-          
   " $filter
   CALL METHOD /iwbep/cl_mgw_data_util=>filtering
     EXPORTING
       it_select_options = it_filter_select_options
     CHANGING
       ct_data           = et_entityset.
+
+      CALL METHOD /iwbep/cl_mgw_data_util=>paging
+        EXPORTING
+          is_paging = is_paging
+        CHANGING
+          ct_data   = et_entityset
 
   " $order by
   DATA lt_order     TYPE /iwbep/t_mgw_sorting_order.
