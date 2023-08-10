@@ -1,0 +1,73 @@
+        MoveIntoDoor: function (oEvent) {
+            this._move("MoveIntoDoor", oEvent);
+        },
+
+        MoveOutOfDoor: function (oEvent) {
+            this._move("MoveOutOfDoor", oEvent);
+        },
+
+        _move: function (action, oEvent) {
+            
+            this.action = action;
+            this.selectedItem = oEvent.getSource().getParent().getParent().getSelectedItem().getBindingContext().getObject();
+
+            const oFilters = [new sap.ui.model.Filter("Pgmid", sap.ui.model.FilterOperator.EQ, "ZYARD_TU"),
+            new sap.ui.model.Filter("EnhId", sap.ui.model.FilterOperator.EQ, "LGTY"),
+            new sap.ui.model.Filter("Lgnum", sap.ui.model.FilterOperator.EQ, this.selectedItem.YardNo)
+            ];
+
+            const oModel = this.getOwnerComponent().getModel();
+
+            var that = this;
+
+            oModel.read("/EnhancementValuesSet", {
+                filters: oFilters,
+                success: function (oData, oResponse) {
+                    var vNavigationParameters = {
+                        "YardTaskActivityType": that.action === "MoveIntoDoor" ? oData.results[0].Key2 : oData.results[0].Key3,
+                        "YardNo": that.selectedItem.YardNo,
+                        "TuNumExt": that.selectedItem.TuNumExt
+                    };
+                    that.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+                },
+                error: function (oError) {
+                    var vNavigationParameters = {
+                        "YardTaskActivityType": that.action === "MoveIntoDoor" ? "MV01" : "MV02",
+                        "YardNo": that.selectedItem.YardNo,
+                        "TuNumExt": that.selectedItem.TuNumExt
+                    };
+                    that.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+                }
+            })
+        }
+
+________________________________________
+manifest.json
+"dataSources": {
+            "mainService": {
+                "uri": "/sap/opu/odata/sap/ZYARD_FIORI_TUS_CDS_CDS_SRV/",
+                "type": "OData",
+                "settings": {
+                    "annotations": [
+                        "ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL",
+                        "annotation"
+                    ],
+                    "localUri": "localService/metadata.xml",
+                    "odataVersion": "2.0"
+                }
+            },
+            "ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL": {
+                "uri": "/sap/opu/odata/IWFND/CATALOGSERVICE;v=2/Annotations(TechnicalName='ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL',Version='0001')/$value/",
+                "type": "ODataAnnotation",
+                "settings": {
+                    "localUri": "localService/ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL.xml"
+                }
+            },
+            "annotation": {
+                "type": "ODataAnnotation",
+                "uri": "annotations/annotation.xml",
+                "settings": {
+                    "localUri": "annotations/annotation.xml"
+                }
+            }
+        }
