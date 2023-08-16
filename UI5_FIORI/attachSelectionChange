@@ -1,0 +1,11 @@
+onBeforeRendering: function(oEvent){
+            const oTable = this.getView().byId("yardtu::sap.suite.ui.generic.template.ListReport.view.ListReport::ZYARD_FIORI_TUS_CDS--responsiveTable")
+            oTable.attachSelectionChange(function(oEvent){
+                const line = oEvent.getParameter("listItem").getBindingContext().getObject();
+                if (line.StorType == "DOOR") {
+                    this.getView().byId("yardtu::sap.suite.ui.generic.template.ListReport.view.ListReport::ZYARD_FIORI_TUS_CDS--MoveIntoDoorButton").setEnabled(false);
+                } else {
+                    this.getView().byId("yardtu::sap.suite.ui.generic.template.ListReport.view.ListReport::ZYARD_FIORI_TUS_CDS--MoveOutOfDoorButton").setEnabled(false);
+                }
+            }.bind(this));
+        },
