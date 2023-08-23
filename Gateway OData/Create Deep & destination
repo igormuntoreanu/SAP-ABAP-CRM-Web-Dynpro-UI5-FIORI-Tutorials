@@ -1,0 +1,67 @@
+METHOD /iwbep/if_mgw_appl_srv_runtime~create_deep_entity.
+
+  DATA: ls_deep_entity TYPE zcl70plm_ibase_visu_mpc_ext=>ty_deep_entity,
+        lt_return      TYPE bapiret2_t,
+        ls_equi        TYPE zcl70plm_ibase_visu_mpc_ext=>ty_equiheader2,
+        lv_equnr       TYPE c LENGTH 18.
+
+  DATA(lv_destination) = /iwbep/cl_sb_gen_dpc_rt_util=>get_rfc_destination( io_dp_facade = /iwbep/if_mgw_conv_srv_runtime~get_dp_facade( ) ).
+
+  TRY.
+
+      io_data_provider->read_entry_data(
+        IMPORTING
+          es_data = ls_deep_entity ).
+
+      MOVE-CORRESPONDING ls_deep_entity TO ls_equi.
+      "Format Partner_Key - Because of incompatibility with Batch Input Dynpro Field
+      LOOP AT ls_deep_entity-topartner ASSIGNING FIELD-SYMBOL(<fs_partner>).
+        CONDENSE <fs_partner>-partner_key.
+        <fs_partner>-partner_key = <fs_partner>-partner_key+2.
+        SHIFT <fs_partner>-partner_key LEFT DELETING LEADING '0'.
+      ENDLOOP.
+
+      IF ls_equi-eqtyp IS INITIAL.
+        ls_equi-eqtyp = 'S'.
+      ENDIF.
+
+      CALL FUNCTION 'Z_20PLM_IBASE_VISU_EQUI_HELPER' DESTINATION lv_destination
+        EXPORTING
+          is_equi        = ls_equi
+          it_partner     = ls_deep_entity-topartner
+        IMPORTING
+          ev_equnr       = lv_equnr
+          et_return      = lt_return
+        EXCEPTIONS
+          system_failure = 1000
+          OTHERS         = 1002.
+
+      IF sy-subrc = 0.
+
+        IF lv_equnr IS INITIAL.
+          READ TABLE lt_return INTO DATA(ls_return) WITH KEY type = 'E'.
+          IF sy-subrc = 0.
+            mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = ls_return-message ).
+            RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+          ELSE.
+            READ TABLE lt_return INTO ls_return INDEX 1.
+            IF sy-subrc = 0.
+              mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = ls_return-message ).
+              RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+
+        ls_deep_entity-equnr    = lv_equnr.
+
+        CALL METHOD me->copy_data_to_ref   "Populating the ER_DEEP_ENTITY
+          EXPORTING
+            is_data = ls_deep_entity
+          CHANGING
+            cr_data = er_deep_entity.
+      ENDIF.
+
+    CATCH /iwbep/cx_mgw_tech_exception /iwbep/cx_mgw_busi_exception cx_root.
+  ENDTRY.
+
+ENDMETHOD.
