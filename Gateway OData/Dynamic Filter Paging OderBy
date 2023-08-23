@@ -17,12 +17,6 @@ Example inside of a Get Entity Set
     CHANGING
       ct_data           = et_entityset.
 
-      CALL METHOD /iwbep/cl_mgw_data_util=>paging
-        EXPORTING
-          is_paging = is_paging
-        CHANGING
-          ct_data   = et_entityset
-
   " $order by
   DATA lt_order     TYPE /iwbep/t_mgw_sorting_order.
 
@@ -35,12 +29,20 @@ Example inside of a Get Entity Set
       CHANGING
         ct_data  = et_entityset.
   ENDIF.
+
+      CALL METHOD /iwbep/cl_mgw_data_util=>paging
+        EXPORTING
+          is_paging = is_paging
+        CHANGING
+          ct_data   = et_entityset
+
+
   
   " $top
-  IF is_paging-top IS NOT INITIAL.
-    LOOP AT et_entityset ASSIGNING FIELD-SYMBOL(<fs_entity_set>).
-      IF sy-tabix > is_paging-top.
-        DELETE et_entityset INDEX sy-tabix.
-      ENDIF.
-    ENDLOOP.
-  ENDIF.  
+"IF is_paging-top IS NOT INITIAL.
+"    LOOP AT et_entityset ASSIGNING FIELD-SYMBOL(<fs_entity_set>).
+"      IF sy-tabix > is_paging-top.
+"       DELETE et_entityset INDEX sy-tabix.
+"     ENDIF.
+"   ENDLOOP.
+" ENDIF.  
