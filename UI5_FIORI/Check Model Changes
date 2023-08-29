@@ -1,0 +1,3 @@
+if (that.myModel.hasPendingChanges && Object.keys(that.myModel.getPendingChanges()).length > 0 ) {
+
+}
