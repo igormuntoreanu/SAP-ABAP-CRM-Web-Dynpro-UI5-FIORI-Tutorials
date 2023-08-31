@@ -1,0 +1,40 @@
+1)
+define view entity ZYL_TU_PROD_MAIN_CDS
+  as select from /sapyl/tu_prod
+{
+  key db_key,
+      valid_from,
+      valid_to,
+      tstmp_to_dats( valid_from, //tstmp_current_utctimestamp(),
+                   abap_user_timezone( $session.user, $session.client,'NULL' ),
+                   $session.client,
+                   'NULL' )   as ValidFromDate,
+      tstmp_to_dats( valid_to, //tstmp_current_utctimestamp(),
+                   abap_user_timezone( $session.user, $session.client,'NULL' ),
+                   $session.client,
+                   'NULL' )   as ValidToDate,
+      DATS_IS_VALID( tstmp_to_dats( valid_to, //tstmp_current_utctimestamp(),
+                   abap_user_timezone( $session.user, $session.client,'NULL' ),
+                   $session.client,
+                   'NULL' ) ) as ToDateIsValid,
+      dummy_prod
+}
+
+2)
+
+define view entity ZYARD_TU_PROD_CDS
+  as select from ZYL_TU_PROD_MAIN_CDS
+{
+  key db_key           as DbKey,
+      valid_to         as ValidTo,
+      ValidFromDate,
+      ValidToDate,
+      ToDateIsValid
+}
+where
+       ValidFromDate <= $session.system_date
+  and(
+       ValidToDate   >= $session.system_date
+    or ToDateIsValid = 0
+  )
+
