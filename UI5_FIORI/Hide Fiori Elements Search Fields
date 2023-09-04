@@ -1,0 +1,18 @@
+onInitSmartFilterBarExtension: function (oEvent) {
+            var oFilterItems = oEvent.oSource.getAllFilterItems();
+            for (let index = 0; index < oFilterItems.length; index++) {
+                var item = oFilterItems[index];
+                if (item.mProperties.name !== "YardNo" &&
+                    item.mProperties.name !== "TuNumExt" &&
+                    item.mProperties.name !== "StorBin" &&
+                    item.mProperties.name !== "FilterProduct" &&
+                    item.mProperties.name !== "FilterDelivery" &&
+                    item.mProperties.name !== "TuType" &&
+                    item.mProperties.name !== "LicPlate" &&
+                    item.mProperties.name !== "TuEmptyCustom"
+                ) {
+                    item.setVisible(false);
+                }
+
+            }
+        },
