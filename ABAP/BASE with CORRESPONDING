@@ -11,3 +11,9 @@
   CHECK lt_entityset_aux IS NOT INITIAL.
   
   lt_counter = CORRESPONDING #( BASE ( lt_counter ) lt_entityset_aux MAPPING counter = field_value )
+
+_________________-
+
+LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'FilterReference'.
+ lr_ref = CORRESPONDING #( BASE ( lr_ref ) ls_filter-select_options ).
+ENDLOOP.
