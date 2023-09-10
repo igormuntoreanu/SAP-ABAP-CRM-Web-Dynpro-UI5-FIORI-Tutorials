@@ -1,0 +1,75 @@
+FORM create_job .
+  CONSTANTS: c_difstart TYPE sy-uzeit VALUE '000030'.
+
+  DATA: lv_jobname   TYPE btcjob,
+        lv_jobid     TYPE btcjobcnt,
+        lv_datestart TYPE sy-datum,
+        lv_timestart TYPE sy-uzeit.
+
+  lv_jobname = |Determinação_auto{ sy-datum }{ '_' }{ sy-uzeit }|.
+
+  CLEAR gv_indx.
+  EXPORT gt_arq = gt_arq TO DATABASE indx(xy) FROM gv_indx CLIENT sy-mandt ID 'ZRERPMM014_COPY'.
+*  // Cria o job //
+  CALL FUNCTION 'JOB_OPEN'
+    EXPORTING
+      jobname          = lv_jobname
+    IMPORTING
+      jobcount         = lv_jobid
+    EXCEPTIONS
+      cant_create_job  = 1
+      invalid_job_data = 2
+      jobname_missing  = 3
+      OTHERS           = 4.
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+*  // Agenda o programa de processamento no job criado //
+  SUBMIT zrerpmm014_copy VIA JOB lv_jobname NUMBER lv_jobid
+                    WITH p_file = p_file
+                    WITH p_imp  = p_imp
+                    WITH p_bgd  = p_bgd
+                    WITH p_exp  = p_exp AND RETURN.
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+  CALL FUNCTION 'C14B_ADD_TIME'
+    EXPORTING
+      i_starttime = sy-uzeit
+      i_startdate = sy-datum
+      i_addtime   = c_difstart
+    IMPORTING
+      e_endtime   = lv_timestart
+      e_enddate   = lv_datestart.
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+*  // Inicia o job //
+  CALL FUNCTION 'JOB_CLOSE'
+    EXPORTING
+      jobcount             = lv_jobid
+      jobname              = lv_jobname
+      sdlstrtdt            = lv_datestart
+      sdlstrttm            = lv_timestart
+      strtimmed            = 'X'
+    EXCEPTIONS
+      cant_start_immediate = 1
+      invalid_startdate    = 2
+      jobname_missing      = 3
+      job_close_failed     = 4
+      job_nosteps          = 5
+      job_notex            = 6
+      lock_failed          = 7
+      invalid_target       = 8
+      OTHERS               = 9.
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+  MESSAGE s000(zfi) WITH TEXT-001.
+ENDFORM.
