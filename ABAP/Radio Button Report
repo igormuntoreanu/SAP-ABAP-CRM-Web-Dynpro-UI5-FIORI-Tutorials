@@ -1,0 +1,38 @@
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-s01.
+  PARAMETERS: p_regra TYPE kotabnr OBLIGATORY.
+  PARAMETERS: p_file TYPE string DEFAULT 'C:\TEMP\'.
+  PARAMETERS: p_exp RADIOBUTTON GROUP rg1 USER-COMMAND rg1 DEFAULT 'X',
+              p_imp RADIOBUTTON GROUP rg1.
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-s02.
+  PARAMETERS: p_bgd AS CHECKBOX USER-COMMAND z1 MODIF ID b2,
+              p_sim AS CHECKBOX USER-COMMAND z1 MODIF ID b2.
+SELECTION-SCREEN END OF BLOCK b2.
+
+AT SELECTION-SCREEN OUTPUT.
+  PERFORM radio_button_screen.
+
+*&---------------------------------------------------------------------*
+*& Form radio_button_screen
+*&---------------------------------------------------------------------*
+FORM radio_button_screen.
+
+  IF p_imp IS NOT INITIAL.
+    CLEAR p_file.
+  ENDIF.
+
+  LOOP AT SCREEN.
+    IF p_exp IS NOT INITIAL.
+      IF screen-group1 EQ 'B2'.
+        screen-active = '0'.
+        MODIFY SCREEN.
+      ENDIF.
+    ELSE.
+      IF screen-group1 EQ 'B2'.
+        screen-active = '1'.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
