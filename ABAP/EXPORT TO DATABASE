@@ -1,0 +1,3 @@
+EXPORT gt_arq = gt_arq TO DATABASE indx(xy) FROM gv_indx CLIENT sy-mandt ID 'ZRERPMM014_COPY'.
+IMPORT gt_arq = gt_arq[] FROM DATABASE indx(xy) TO gv_indx CLIENT sy-mandt ID 'ZRERPMM014_COPY'.
+DELETE FROM DATABASE indx(xy) CLIENT sy-mandt ID 'ZRERPMM014_COPY'.
