@@ -1,0 +1,2 @@
+DATA: lv_matnr TYPE mara-matnr.
+          lv_matnr = |{ <fs_value> ALPHA = IN }|.
