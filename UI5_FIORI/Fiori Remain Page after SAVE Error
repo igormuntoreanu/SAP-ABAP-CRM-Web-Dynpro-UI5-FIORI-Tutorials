@@ -1,0 +1,34 @@
+//Remain on the page after an error by saving at the Object page
+
+onInit: function (oEvent) {
+var that = this;
+        this.extensionAPI.getTransactionController().attachAfterSave(function (oEvent) {
+          oEvent.saveEntityPromise
+            .then(function (result) {
+              console.log(result, this);
+            })
+            .catch(function (error) {
+              that._setCreatable(that.getOwnerComponent(), true);
+            });
+        })
+
+},
+
+_setCreatable: function (oOwner, bBoolean) {
+        var appView = oOwner.oContainer.getParent().getParent().getModel("appView").getData();
+        appView.createMode = bBoolean;
+        oOwner.oContainer.getParent().getParent().getModel("appView").setData(appView);
+}
+
+___________________
+manifest.json under models:
+"appView": {
+                "type": "sap.ui.model.json.JSONModel",
+                "uri": "model/appView.json"
+            }
+_______________________ 
+appView.json:
+{
+    "editMode": false,
+    "createMode": false
+}
