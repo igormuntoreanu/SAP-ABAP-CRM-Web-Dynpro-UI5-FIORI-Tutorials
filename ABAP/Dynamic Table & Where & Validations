@@ -1,0 +1,1422 @@
+REPORT YXXXXXXXXXXXXXXXXX.
+
+
+TYPES: BEGIN OF ty_arq,
+         line(2048),
+       END OF ty_arq.
+
+TYPES: BEGIN OF ty_alv,
+         icon   TYPE icon-id,
+         status TYPE c LENGTH 38,
+         line   TYPE c LENGTH 2048,
+         msg    TYPE c LENGTH 255,
+       END OF ty_alv.
+
+TYPES: BEGIN OF ty_alv_erro,
+         icon   TYPE icon-id,
+         status TYPE c LENGTH 38,
+         line   TYPE c LENGTH 2048,
+         msg    TYPE c LENGTH 255,
+       END OF ty_alv_erro.
+
+TYPES: BEGIN OF ty_icon,
+         id   TYPE icon-id,
+         name TYPE icon-name,
+       END OF ty_icon.
+
+DATA: gs_t681 TYPE t681,
+      gs_arq  TYPE ty_arq,
+      gs_arq2 TYPE ty_arq,
+      gt_arq  TYPE stringtab, "TYPE TABLE OF ty_arq,
+      gv_tab  TYPE dd03l-tabname,
+      gv_indx TYPE indx,
+      gt_icon TYPE TABLE OF ty_icon.
+
+*TYPES: BEGIN OF ty_erro,
+*         line(512),
+*       END OF ty_erro.
+DATA:
+*  gs_tab_erro TYPE ty_erro,
+*  gt_tab_erro TYPE TABLE OF ty_erro,
+  gt_alv      TYPE TABLE OF ty_alv,
+  gt_alv_erro TYPE TABLE OF ty_alv_erro,
+  gs_alv_erro TYPE ty_alv_erro,
+  gs_alv      TYPE ty_alv.
+DATA: dataref TYPE REF TO data.
+DATA: gt_records TYPE TABLE OF komv.
+
+DATA: go_csv TYPE REF TO z_csv_import.
+
+CONSTANTS: gc_acess     TYPE t685-kozgf  VALUE 'Z003',
+           gc_appl      TYPE t685a-kappl VALUE 'M',
+           gc_kschl     TYPE t685a-kschl VALUE 'ZNAV',
+           gc_use       TYPE t685-kvewe  VALUE 'A',
+           gc_text(1)   VALUE 'X',
+           gc_tb_gen(1) VALUE 'X'.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-s01.
+  PARAMETERS: p_regra TYPE kotabnr OBLIGATORY.
+  PARAMETERS: p_file TYPE string MODIF ID pf.
+  PARAMETERS: p_exp RADIOBUTTON GROUP rg1 USER-COMMAND rg1 DEFAULT 'X',
+              p_imp RADIOBUTTON GROUP rg1.
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE TEXT-s02.
+  PARAMETERS: p_bgd AS CHECKBOX MODIF ID b2,
+              p_sim AS CHECKBOX MODIF ID b2.
+SELECTION-SCREEN END OF BLOCK b2.
+
+AT SELECTION-SCREEN OUTPUT.
+  PERFORM radio_button_screen.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_regra.
+*  PERFORM select_key_combination.
+  PERFORM regras_matchcode.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+  PERFORM select_path.
+
+AT SELECTION-SCREEN.
+  PERFORM check_rule.
+
+START-OF-SELECTION.
+  PERFORM check_rule.
+  IF NOT p_regra IS INITIAL.
+    gv_tab = |{ 'A' }{ p_regra }|.
+  ENDIF.
+
+  IF p_exp IS NOT INITIAL.
+    PERFORM select_data USING gv_tab.
+    PERFORM download_file USING gv_tab p_file.
+
+  ELSEIF p_imp IS NOT INITIAL AND p_bgd IS INITIAL.
+    PERFORM upload_file.
+    PERFORM fill_data.
+    IF gt_alv_erro IS INITIAL.
+      PERFORM process_data.
+      PERFORM alv_after_bapi.
+    ELSE.
+      PERFORM alv_erro.
+    ENDIF.
+
+  ELSEIF p_imp IS NOT INITIAL AND p_bgd IS NOT INITIAL.
+
+    IMPORT gt_arq = gt_arq[] FROM DATABASE indx(xy) TO gv_indx CLIENT sy-mandt ID 'ZRERPMM014'.
+    IF gt_arq IS INITIAL AND sy-batch IS INITIAL.
+      PERFORM upload_file.
+      PERFORM fill_data.
+      IF gt_alv_erro IS NOT INITIAL.
+        PERFORM alv_erro.
+      ELSE.
+        PERFORM create_job.
+      ENDIF.
+    ELSEIF gt_arq IS NOT INITIAL.
+      DELETE FROM DATABASE indx(xy) CLIENT sy-mandt ID 'ZRERPMM014'.
+      PERFORM fill_data.
+      IF gt_alv_erro IS INITIAL.
+        PERFORM process_data.
+        PERFORM alv_after_bapi.
+      ELSE.
+        PERFORM alv_erro.
+      ENDIF.
+    ENDIF.
+
+  ENDIF.
+
+*&---------------------------------------------------------------------*
+*& Form select_data
+*&---------------------------------------------------------------------*
+FORM select_data USING p_tab .
+  DATA: lv_text(60).
+
+
+  CREATE DATA dataref TYPE TABLE OF (p_tab).
+  FIELD-SYMBOLS: <fs_tab> TYPE STANDARD TABLE.
+
+  ASSIGN dataref->* TO <fs_tab>.
+
+  SELECT *
+    FROM (p_tab)
+    INTO TABLE <fs_tab>.
+  IF sy-subrc NE 0.
+    APPEND INITIAL LINE TO <fs_tab> ASSIGNING FIELD-SYMBOL(<fs_wa>).
+  ENDIF.
+  DATA(ol_ref_str) = CAST cl_abap_structdescr( cl_abap_typedescr=>describe_by_data( <fs_tab>[ 1 ] ) ).
+  DATA(lt_componetnts) = ol_ref_str->get_components( ).
+
+  TRY.
+      LOOP AT lt_componetnts ASSIGNING FIELD-SYMBOL(<fs_comp>).
+
+        CASE <fs_comp>-name.
+          WHEN 'MANDT' OR 'KAPPL' OR 'KSCHL' OR 'KFRST' OR 'KBSTAT' OR 'KNUMH'.
+          WHEN OTHERS.
+            IF  gs_arq-line IS INITIAL.
+              gs_arq-line = <fs_comp>-name.
+              CLEAR lv_text.
+              PERFORM get_text_field USING p_tab <fs_comp>-name CHANGING lv_text.
+              gs_arq2-line = lv_text.
+            ELSE.
+              CONCATENATE gs_arq-line <fs_comp>-name INTO gs_arq-line SEPARATED BY ';'.
+              CLEAR lv_text.
+              PERFORM get_text_field USING p_tab <fs_comp>-name CHANGING lv_text.
+              CONCATENATE gs_arq2-line lv_text INTO gs_arq2-line SEPARATED BY ';'.
+            ENDIF.
+        ENDCASE.
+        AT LAST.
+          CONCATENATE gs_arq-line 'MWSK1' INTO gs_arq-line SEPARATED BY ';'.
+          CLEAR lv_text.
+          PERFORM get_text_field USING 'KONP' 'MWSK1' CHANGING lv_text.
+          CONCATENATE gs_arq2-line lv_text INTO gs_arq2-line SEPARATED BY ';'.
+
+          CONCATENATE gs_arq-line 'LOEVM_KO' INTO gs_arq-line SEPARATED BY ';'.
+          CLEAR lv_text.
+          PERFORM get_text_field USING 'KONP' 'LOEVM_KO' CHANGING lv_text.
+          CONCATENATE gs_arq2-line lv_text INTO gs_arq2-line SEPARATED BY ';'.
+        ENDAT.
+      ENDLOOP.
+
+      APPEND gs_arq TO gt_arq.
+      APPEND gs_arq2 TO gt_arq.
+    CATCH cx_root.
+  ENDTRY.
+
+  CLEAR: gs_arq.
+  LOOP AT <fs_tab> ASSIGNING <fs_wa>.
+    LOOP AT lt_componetnts ASSIGNING <fs_comp>.
+      ASSIGN COMPONENT <fs_comp>-name OF STRUCTURE <fs_wa> TO FIELD-SYMBOL(<fs_field>).
+      IF sy-subrc EQ 0 AND <fs_field> IS ASSIGNED.
+        CASE <fs_comp>-name.
+          WHEN 'MANDT' OR 'KAPPL' OR 'KSCHL' OR 'KFRST' OR 'KBSTAT' OR 'KNUMH'.
+            IF <fs_comp>-name EQ 'KNUMH'.
+              SELECT SINGLE mwsk1, loevm_ko
+                FROM konp
+                INTO @DATA(ls_konp)
+                WHERE knumh EQ @<fs_field>.
+              IF sy-subrc EQ 0.
+                CONCATENATE gs_arq-line ls_konp-mwsk1 INTO gs_arq-line SEPARATED BY ';'.
+                CONCATENATE gs_arq-line ls_konp-loevm_ko INTO gs_arq-line SEPARATED BY ';'.
+              ENDIF.
+            ENDIF.
+          WHEN 'DATAB' OR 'DATBI'.
+            DATA(lv_data) = <fs_field>+6(2) && '.' && <fs_field>+4(2) && '.' && <fs_field>(4).
+            IF  gs_arq-line IS INITIAL.
+              gs_arq-line = lv_data.
+            ELSE.
+              CONCATENATE gs_arq-line lv_data INTO gs_arq-line SEPARATED BY ';'.
+            ENDIF.
+          WHEN OTHERS.
+            IF  gs_arq-line IS INITIAL.
+              gs_arq-line = <fs_field>.
+            ELSE.
+              CONCATENATE gs_arq-line <fs_field> INTO gs_arq-line SEPARATED BY ';'.
+            ENDIF.
+        ENDCASE.
+      ENDIF.
+    ENDLOOP.
+    APPEND gs_arq TO gt_arq.
+    CLEAR: gs_arq, ls_konp.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form select_path
+*&---------------------------------------------------------------------*
+FORM select_path .
+*----------------------------------------------------------*
+* Declarando tabelas e wa para trabalhar com File Open Dialog
+*----------------------------------------------------------*
+  DATA: lt_filetable TYPE         filetable,
+        ls_filetable TYPE LINE OF filetable,
+        l_rc         TYPE i.
+
+  CLEAR: ls_filetable.
+  IF p_imp IS NOT INITIAL.
+    CALL METHOD cl_gui_frontend_services=>file_open_dialog
+      EXPORTING
+        window_title            = 'Caminho importação do arquivo'
+        default_extension       = '*.csv'
+      CHANGING
+        file_table              = lt_filetable
+        rc                      = l_rc
+      EXCEPTIONS
+        file_open_dialog_failed = 1
+        cntl_error              = 2
+        error_no_gui            = 3
+        not_supported_by_gui    = 4
+        OTHERS                  = 5.
+
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ELSE.
+* Identifica o arquivo selecionado e joga para o parametro de seleção
+      READ TABLE lt_filetable INTO ls_filetable INDEX 1.
+      p_file = ls_filetable-filename.
+      FREE MEMORY ID 'P_FILE'.
+      EXPORT p_file TO MEMORY ID 'P_FILE'.
+    ENDIF.
+
+  ELSEIF p_exp IS NOT INITIAL.
+    DATA: lv_file     TYPE string,
+          lv_filename TYPE string,
+          lv_path     TYPE string,
+          lt_file     TYPE filetable,
+          lv_rc       TYPE i.
+    CALL METHOD cl_gui_frontend_services=>file_save_dialog
+      EXPORTING
+        window_title              = 'Caminho exportação do arquivo'
+        default_extension         = '*.csv'
+        initial_directory         = 'C:\'
+        prompt_on_overwrite       = 'X'
+      CHANGING
+        filename                  = lv_filename
+        path                      = lv_path
+        fullpath                  = lv_file
+      EXCEPTIONS
+        cntl_error                = 1
+        error_no_gui              = 2
+        not_supported_by_gui      = 3
+        invalid_default_file_name = 4
+        OTHERS                    = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ELSE.
+      p_file = lv_file.
+      FREE MEMORY ID 'P_FILE'.
+      EXPORT p_file TO MEMORY ID 'P_FILE'.
+    ENDIF.
+
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form DOWNLOAD_FILE
+*&---------------------------------------------------------------------*
+FORM download_file USING p_tab p_file.
+
+*  p_file = |{ p_file }{ p_tab }{ '.csv' }|.
+  CALL METHOD cl_gui_frontend_services=>gui_download
+    EXPORTING
+      filename                = p_file                     " Name of file
+      filetype                = 'ASC'                " File type (ASCII, binary ...)
+    CHANGING
+      data_tab                = gt_arq                     " Transfer table
+    EXCEPTIONS
+      file_write_error        = 1                    " Cannot write to file
+      no_batch                = 2                    " Cannot execute front-end function in background
+      gui_refuse_filetransfer = 3                    " Incorrect Front End
+      invalid_type            = 4                    " Invalid value for parameter FILETYPE
+      no_authority            = 5                    " No Download Authorization
+      unknown_error           = 6                    " Unknown error
+      header_not_allowed      = 7                    " Invalid header
+      separator_not_allowed   = 8                    " Invalid separator
+      filesize_not_allowed    = 9                    " Invalid file size
+      header_too_long         = 10                   " Header information currently restricted to 1023 bytes
+      dp_error_create         = 11                   " Cannot create DataProvider
+      dp_error_send           = 12                   " Error Sending Data with DataProvider
+      dp_error_write          = 13                   " Error Writing Data with DataProvider
+      unknown_dp_error        = 14                   " Error when calling data provider
+      access_denied           = 15                   " Access to file denied.
+      dp_out_of_memory        = 16                   " Not enough memory in data provider
+      disk_full               = 17                   " Storage medium is full.
+      dp_timeout              = 18                   " Data provider timeout
+      file_not_found          = 19                   " Could not find file
+      dataprovider_exception  = 20                   " General Exception Error in DataProvider
+      control_flush_error     = 21                   " Error in Control Framework
+      not_supported_by_gui    = 22                   " GUI does not support this
+      error_no_gui            = 23                   " GUI not available
+      OTHERS                  = 24.
+
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_text_field
+*&---------------------------------------------------------------------*
+FORM get_text_field USING p_tab p_field CHANGING p_text.
+
+  SELECT SINGLE d4~ddtext
+    FROM dd03l AS d3
+    INNER JOIN dd04t AS d4
+    ON d4~rollname   = d3~rollname AND
+       d4~ddlanguage = sy-langu
+    INTO p_text
+    WHERE d3~tabname EQ p_tab
+      AND d3~fieldname EQ p_field.
+
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form upload_file
+*&---------------------------------------------------------------------*
+FORM upload_file .
+
+  CALL METHOD cl_gui_frontend_services=>gui_upload
+    EXPORTING
+      filename                = p_file            " Name of file
+      filetype                = 'ASC'            " File Type (ASCII, Binary)
+    CHANGING
+      data_tab                = gt_arq                  " Transfer table for file contents
+    EXCEPTIONS
+      file_open_error         = 1                " File does not exist and cannot be opened
+      file_read_error         = 2                " Error when reading file
+      no_batch                = 3                " Cannot execute front-end function in background
+      gui_refuse_filetransfer = 4                " Incorrect front end or error on front end
+      invalid_type            = 5                " Incorrect parameter FILETYPE
+      no_authority            = 6                " No upload authorization
+      unknown_error           = 7                " Unknown error
+      bad_data_format         = 8                " Cannot Interpret Data in File
+      header_not_allowed      = 9                " Invalid header
+      separator_not_allowed   = 10               " Invalid separator
+      header_too_long         = 11               " Header information currently restricted to 1023 bytes
+      unknown_dp_error        = 12               " Error when calling data provider
+      access_denied           = 13               " Access to file denied.
+      dp_out_of_memory        = 14               " Not enough memory in data provider
+      disk_full               = 15               " Storage medium is full.
+      dp_timeout              = 16               " Data provider timeout
+      not_supported_by_gui    = 17               " GUI does not support this
+      error_no_gui            = 18               " GUI not available
+      OTHERS                  = 19.
+  IF sy-subrc <> 0.
+    MESSAGE 'Erro ao importar arquivo' TYPE 'S' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form fill_data
+*&---------------------------------------------------------------------*
+FORM fill_data.
+
+  DATA: lt_fields    TYPE TABLE OF fieldname,
+        lt_value     TYPE TABLE OF string,
+        lr_no_fields TYPE RANGE OF dd03l-fieldname,
+        lt_where     TYPE TABLE OF where_tab,
+        lv_datum     TYPE sy-datum,
+        lv_datab(10),
+        lv_datbi(10),
+        l_cont(10).
+
+  DATA: ls_sel_table TYPE sel_table,
+        lt_sel_table TYPE TABLE OF sel_table.
+
+  SELECT id, name
+    FROM icon
+    INTO TABLE @gt_icon
+    WHERE name = 'ICON_GREEN_LIGHT' OR name = 'ICON_RED_LIGHT'.
+  IF sy-subrc EQ 0.
+    SORT gt_icon BY name.
+  ENDIF.
+
+  lr_no_fields = VALUE #( sign = 'I' option = 'EQ' ( low = 'MANDT' )
+                                                   ( low = 'KAPPL' )
+                                                   ( low = 'KSCHL' )
+                                                   ( low = 'KFRST' )
+                                                   ( low = 'KBSTAT' )
+                                                   ( low = 'KNUMH' ) ).
+
+  SELECT SINGLE *
+    FROM t682i
+    INTO @DATA(ls_682i)
+    WHERE kvewe   EQ 'A'
+      AND kappl   EQ 'M'
+      AND kozgf   EQ 'Z003'
+      AND kotabnr EQ @p_regra.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-007 TYPE 'S' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+  READ TABLE gt_arq INTO gs_arq INDEX 1.
+  IF sy-subrc EQ 0.
+    SPLIT gs_arq AT ';' INTO TABLE lt_fields.
+    IF NOT lt_fields IS INITIAL.
+      DATA(lv_lines) = lines( lt_fields[] ).
+      DO 2 TIMES.
+        DELETE lt_fields INDEX lv_lines.
+        SUBTRACT 1 FROM lv_lines.
+      ENDDO.
+
+      gv_tab = |{ 'A' }{ ls_682i-kotabnr }|.
+
+      SELECT *
+        FROM dd03l
+        INTO TABLE @DATA(lt_03l)
+        WHERE tabname EQ @gv_tab
+          AND NOT fieldname IN @lr_no_fields
+        ORDER BY position.
+      IF sy-subrc EQ 0.
+        IF lines( lt_03l ) EQ lines( lt_fields ).
+          LOOP AT lt_fields ASSIGNING FIELD-SYMBOL(<fs_fields>).
+            CHECK sy-tabix LE lv_lines.
+            READ TABLE lt_03l ASSIGNING FIELD-SYMBOL(<fs_03l>) WITH KEY fieldname = <fs_fields>.
+            IF sy-subrc NE 0.
+              CLEAR: gv_tab.
+              DATA(lv_rule) = abap_false.
+            ELSE.
+              lv_rule = abap_true.
+            ENDIF.
+          ENDLOOP.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+  IF lv_rule IS INITIAL. "Arquivo inválido
+    MESSAGE TEXT-008 TYPE 'S' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+  CREATE DATA dataref TYPE TABLE OF (gv_tab).
+  FIELD-SYMBOLS: <fs_tab> TYPE STANDARD TABLE.
+  ASSIGN dataref->* TO <fs_tab>.
+
+  READ TABLE gt_arq INTO gs_arq INDEX 1.
+  IF sy-subrc EQ 0.
+    SPLIT gs_arq AT ';' INTO TABLE lt_fields.
+  ENDIF.
+  LOOP AT gt_arq INTO gs_arq.
+    ADD 1 TO l_cont.  CONDENSE l_cont.
+    CHECK sy-tabix GT 2.
+
+    SPLIT gs_arq AT ';' INTO TABLE lt_value.
+
+    LOOP AT lt_fields ASSIGNING <fs_fields>.
+      READ TABLE lt_value ASSIGNING FIELD-SYMBOL(<fs_value>) INDEX sy-tabix.
+      CHECK sy-subrc EQ 0.
+
+      CASE <fs_fields>.
+        WHEN 'DATAB' OR 'DATBI'.
+
+          IF <fs_value> IS NOT INITIAL.
+            IF <fs_value> CS '.' OR <fs_value> CS '/'.
+              lv_datum = <fs_value>+6(4) && <fs_value>+3(2) && <fs_value>(2).
+            ELSE.
+              lv_datum = <fs_value>.
+            ENDIF.
+
+            CALL FUNCTION 'DATE_CHECK_PLAUSIBILITY'
+              EXPORTING
+                date                      = lv_datum
+              EXCEPTIONS
+                plausibility_check_failed = 1
+                OTHERS                    = 2.
+            IF sy-subrc <> 0.
+              CONCATENATE 'Data inválida:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+              gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+              gs_alv_erro-status = text-010. "Registro com erro
+              gs_alv_erro-line = gs_arq.
+              APPEND gs_alv_erro TO gt_alv_erro.
+              CLEAR gs_alv_erro.
+            ELSE.
+              ls_sel_table-low    = lv_datum.
+            ENDIF.
+          ELSE.
+            IF <fs_fields> EQ 'DATAB'.
+              lv_datum = sy-datum.
+            ENDIF.
+            IF <fs_fields> EQ 'DATBI'.
+              lv_datum = '99991231'.
+            ENDIF.
+            ls_sel_table-low    = lv_datum.
+          ENDIF.
+
+          IF <fs_fields> EQ 'DATAB'.
+            lv_datab = lv_datum.
+          ENDIF.
+          IF <fs_fields> EQ 'DATBI'.
+            lv_datbi = lv_datum.
+          ENDIF.
+
+        WHEN 'LOEVM_KO'.
+          IF <fs_value> NE 'X' AND <fs_value> NE space.
+            CONCATENATE 'Cód.Elim. incorreto:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'MATKL'.
+          SELECT COUNT(*)
+            FROM t023
+            WHERE matkl = <fs_value>.
+          IF sy-subrc <> 0.
+            CONCATENATE 'Grupo de mercadorias inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'ZZ_LEGAL_ORG'.
+          SELECT COUNT(*)
+            FROM tb032
+            WHERE legal_org = <fs_value>.
+          IF sy-subrc <> 0.
+            CONCATENATE 'Pessoa jurídica inválida:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'LAND1'.
+          SELECT SINGLE land1
+            FROM t005
+            INTO @DATA(lv_land1)
+            WHERE land1 = @<fs_value>.
+          IF sy-subrc <> 0.
+            CONCATENATE 'País inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'REGIO' OR 'WKREG'.
+          SELECT COUNT(*)
+            FROM t005s
+            WHERE land1 = lv_land1
+              AND bland = <fs_value>.
+          IF sy-subrc <> 0.
+            CONCATENATE 'Região inválida:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'ICMSTAXPAY'.
+          SELECT COUNT(*)
+            FROM j_1bticmstaxpay
+            WHERE j_1bicmstaxpay = <fs_value>.
+          IF sy-subrc <> 0.
+            CONCATENATE 'Contribuinte ICMS inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'MTORG'.
+          IF NOT <fs_value> BETWEEN '0' AND '8'.
+            CONCATENATE 'Origem de material inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'CRTN'.
+          IF NOT <fs_value> BETWEEN '1' AND '3'.
+            CONCATENATE 'Código de Regime Tributário inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN 'LIFNR'.
+          DATA: lv_lifnr TYPE lfa1-lifnr.
+          lv_lifnr = |{ <fs_value> ALPHA = IN }|.
+          SELECT COUNT(*)
+            FROM lfa1
+            WHERE lifnr = lv_lifnr.
+          IF sy-subrc <> 0.
+            CONCATENATE 'Fornecedor inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = lv_lifnr.
+        WHEN 'MATNR'.
+          DATA: lv_matnr TYPE mara-matnr.
+          lv_matnr = |{ <fs_value> ALPHA = IN }|.
+          SELECT COUNT(*)
+            FROM mara
+            WHERE matnr = lv_matnr.
+          IF sy-subrc <> 0.
+            CONCATENATE 'Material inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = lv_matnr.
+        WHEN 'MWSK1'.
+          SELECT COUNT(*)
+            FROM t007a
+            WHERE mwskz = <fs_value>.
+          IF sy-subrc <> 0.
+            CONCATENATE 'IVA inválido:' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ENDIF.
+          ls_sel_table-low    = <fs_value>.
+        WHEN OTHERS.
+          IF <fs_value> IS INITIAL.
+            CONCATENATE 'Campo de regras não preenchido: ' <fs_fields> 'linha' l_cont 'do arquivo ' INTO gs_alv_erro-msg SEPARATED BY space.
+            gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+            gs_alv_erro-status = text-010. "Registro com erro
+            gs_alv_erro-line = gs_arq.
+            APPEND gs_alv_erro TO gt_alv_erro.
+            CLEAR gs_alv_erro.
+          ELSE.
+            ls_sel_table-low    = <fs_value>.
+          ENDIF.
+      ENDCASE.
+
+      IF <fs_fields> NE 'LOEVM_KO' AND
+         <fs_fields> NE 'MWSK1'    AND
+         <fs_fields> NE 'DATAB'.
+
+        ls_sel_table-field = <fs_fields>.
+        ls_sel_table-option = 'EQ'.
+        ls_sel_table-sign   = 'I'.
+        ls_sel_table-table  = gv_tab.
+        APPEND ls_sel_table TO lt_sel_table.
+        CLEAR ls_sel_table.
+      ENDIF.
+
+    ENDLOOP.
+    IF lv_datab GT lv_datbi AND NOT lv_datbi IS INITIAL AND NOT lv_datab IS INITIAL.
+      CONCATENATE 'A data de início da validade não pode ser maior que a data fim'  'linha' l_cont 'do arquivo' INTO gs_alv_erro-msg SEPARATED BY space.
+      gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+      gs_alv_erro-status = text-010. "Registro com erro
+      gs_alv_erro-line = gs_arq.
+      APPEND gs_alv_erro TO gt_alv_erro.
+      CLEAR gs_alv_erro.
+    ENDIF.
+
+* 2)  Quando importo um registro com a data de início do arquivo com uma data menor que a início do vigente da tabela está ocorrendo a modificação deste registro existente.
+* Regra: Neste cenário não deve permitir que data de início do arquivo [ARQUIVO-DATAB] seja menor do que a data início da tabela [AXXX-DATAB] para o registro vigente.
+* Não realizar a modificação e notificar com mensagem “Início da validade inválida”.
+    CALL FUNCTION 'CONVERT_SELECT_INTO_WHERE'
+      EXPORTING
+        select_tablename = gv_tab
+      TABLES
+        in_select_fields = lt_sel_table
+        out_where_cond   = lt_where
+      EXCEPTIONS
+        wrong_input_data = 1
+        OTHERS           = 2.
+    IF sy-subrc EQ 0.
+      SELECT *
+        FROM (gv_tab)
+        INTO TABLE <fs_tab>
+        WHERE (lt_where).
+      IF sy-subrc = 0.
+        LOOP AT <fs_tab> ASSIGNING FIELD-SYMBOL(<fs_line>).
+          ASSIGN COMPONENT 'DATAB' OF STRUCTURE <fs_line> TO FIELD-SYMBOL(<fs_datab>).
+          IF sy-subrc = 0.
+            IF lv_datab < <fs_datab>.
+              CONCATENATE 'Início da validade inválida,'  'linha' l_cont 'do arquivo' INTO gs_alv_erro-msg SEPARATED BY space.
+              gs_alv_erro-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+              gs_alv_erro-status = text-010. "Registro com erro
+              gs_alv_erro-line = gs_arq.
+              APPEND gs_alv_erro TO gt_alv_erro.
+              CLEAR gs_alv_erro.
+              EXIT.
+            ENDIF.
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+    ENDIF.
+
+    REFRESH: lt_where, lt_sel_table.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form process_data
+*&---------------------------------------------------------------------*
+FORM process_data .
+  DATA: lt_fields      TYPE TABLE OF fdname,
+        lt_value       TYPE TABLE OF string,
+        lv_field       TYPE char100,
+        ls_komp        TYPE komp,
+        ls_komk        TYPE komk,
+        ls_key_fields  TYPE komg,
+        lv_datab       TYPE dats,
+        lv_datbi       TYPE dats,
+        lv_where(2048)..
+
+  MESSAGE s000(zmm) WITH TEXT-005 INTO DATA(lv_ajustado).
+  MESSAGE s000(zmm) WITH TEXT-006 INTO DATA(lv_criado).
+
+  CREATE DATA dataref TYPE TABLE OF (gv_tab).
+  FIELD-SYMBOLS: <fs_tab> TYPE STANDARD TABLE.
+  ASSIGN dataref->* TO <fs_tab>.
+
+  SELECT *
+    FROM (gv_tab)
+    INTO TABLE <fs_tab>.
+
+  READ TABLE gt_arq INTO gs_arq INDEX 1.
+  IF sy-subrc EQ 0.
+    SPLIT gs_arq AT ';' INTO TABLE lt_fields.
+  ENDIF.
+
+
+  LOOP AT gt_arq INTO gs_arq.
+    CHECK sy-tabix GT 2.
+    SPLIT gs_arq AT ';' INTO TABLE lt_value.
+
+    APPEND INITIAL LINE TO gt_records ASSIGNING FIELD-SYMBOL(<fs_rec>).
+
+    LOOP AT lt_fields ASSIGNING FIELD-SYMBOL(<fs_fields>).
+      READ TABLE lt_value ASSIGNING FIELD-SYMBOL(<fs_value>) INDEX sy-tabix.
+      CHECK sy-subrc EQ 0.
+
+      ASSIGN COMPONENT <fs_fields> OF STRUCTURE ls_key_fields TO FIELD-SYMBOL(<lfs_field>).
+      IF <lfs_field> IS ASSIGNED AND sy-subrc EQ 0.
+
+        lv_field = <fs_value>.
+        <lfs_field> = lv_field.
+
+      ELSE.
+
+        IF <fs_fields> EQ 'DATAB'.
+          IF <fs_value> CS '.' OR <fs_value> CS '/'.
+            lv_datab = <fs_value>+6(4) && <fs_value>+3(2) && <fs_value>(2).
+          ELSE.
+            lv_datab = <fs_value>.
+          ENDIF.
+
+          IF lv_datab IS INITIAL.
+            lv_datab = sy-datum.
+          ENDIF.
+
+          CLEAR: <fs_value>.
+          <fs_value> = lv_datab.
+        ENDIF.
+
+        IF <fs_fields> EQ 'DATBI'.
+          IF <fs_value> CS '.' OR <fs_value> CS '/'.
+            lv_datbi = <fs_value>+6(4) && <fs_value>+3(2) && <fs_value>(2).
+          ELSE.
+            lv_datbi = <fs_value>.
+          ENDIF.
+          IF lv_datbi IS INITIAL.
+            lv_datbi = '99991231'.
+          ENDIF.
+
+          CLEAR: <fs_value>.
+          <fs_value> = lv_datbi.
+        ENDIF.
+
+        IF <fs_fields> EQ 'LOEVM_KO'.
+          ASSIGN COMPONENT <fs_fields> OF STRUCTURE <fs_rec> TO FIELD-SYMBOL(<fs_fld>).
+          IF sy-subrc EQ 0.
+            <fs_fld> = <fs_value>.
+          ENDIF.
+        ENDIF.
+
+        IF <fs_fields> EQ 'MWSK1'.
+          ASSIGN COMPONENT 'MWSKZ' OF STRUCTURE ls_key_fields TO <lfs_field>.
+          IF <lfs_field> IS ASSIGNED AND sy-subrc EQ 0.
+            lv_field = <fs_value>.
+            <lfs_field> = lv_field.
+          ENDIF.
+        ENDIF.
+        ASSIGN COMPONENT <fs_fields> OF STRUCTURE <fs_rec> TO <fs_fld>.
+        IF sy-subrc EQ 0.
+          <fs_fld> = <fs_value>.
+          <fs_rec>-kappl  = gc_appl.
+          <fs_rec>-kschl  = gc_kschl.
+          <fs_rec>-krech  = gc_use.
+          <fs_rec>-waers  = '%'.
+
+          IF <fs_fields> EQ 'MWSK1'.
+            <fs_rec>-mwsk2  = COND #( WHEN <fs_rec>-mwsk1 IS INITIAL THEN space ELSE <fs_rec>-mwsk1 ).
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    "Try to find the correct KNUMH and check if necessary to be updated or created - Begin
+    LOOP AT <fs_tab> ASSIGNING FIELD-SYMBOL(<fs_line>).
+      DATA(lv_correct_line) = sy-tabix.
+      DATA(lv_correct) = abap_true.
+      LOOP AT lt_fields ASSIGNING <fs_fields>.
+        CHECK <fs_fields> NE 'MWSK1' AND <fs_fields> NE 'LOEVM_KO'.
+        READ TABLE lt_value ASSIGNING <fs_value> INDEX sy-tabix.
+        IF sy-subrc NE 0.
+          CONTINUE.
+        ENDIF.
+
+        ASSIGN COMPONENT <fs_fields> OF STRUCTURE <fs_line> TO FIELD-SYMBOL(<fs_data>).
+        IF sy-subrc = 0.
+          IF <fs_data> NE <fs_value>.
+            CLEAR lv_correct.
+            EXIT.
+          ENDIF.
+          UNASSIGN <fs_data>.
+        ELSE.
+          CLEAR lv_correct.
+          EXIT.
+        ENDIF.
+      ENDLOOP.
+      IF lv_correct = abap_true.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+
+    IF lv_correct IS NOT INITIAL.
+      READ TABLE <fs_tab> ASSIGNING <fs_line> INDEX lv_correct_line.
+      IF sy-subrc = 0.
+        ASSIGN COMPONENT 'KNUMH' OF STRUCTURE <fs_line> TO FIELD-SYMBOL(<fs_knumh>).
+        IF sy-subrc = 0.
+          SELECT SINGLE knumh, kopos
+                 FROM konp
+                 INTO @DATA(ls_konp)
+                 WHERE knumh = @<fs_knumh>.
+          IF sy-subrc = 0.
+            <fs_rec>-knumh = ls_konp-knumh.
+            <fs_rec>-kopos = ls_konp-kopos.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    DATA(lv_mode) = COND #( WHEN <fs_rec>-knumh IS INITIAL THEN 'A' ELSE 'B' ).
+
+    "Try to find KNUMH and check if necessary to be updated or created - End
+
+    CALL FUNCTION 'RV_CONDITION_COPY'
+      EXPORTING
+        application                 = gc_appl
+        condition_table             = gv_tab+1(3)
+        condition_type              = gc_kschl
+        date_from                   = lv_datab
+        date_to                     = lv_datbi
+        enqueue                     = abap_true
+        key_fields                  = ls_key_fields
+*       i_komp                      = ls_komp
+*       i_komk                      = ls_komk
+        maintain_mode               = lv_mode
+        no_authority_check          = 'X'
+        no_field_check              = 'X'
+        selection_date              = lv_datab
+        keep_old_records            = abap_false
+        overlap_confirmed           = abap_true
+        no_db_update                = p_sim "Simulation
+      TABLES
+        copy_records                = gt_records
+      EXCEPTIONS
+        enqueue_on_record           = 1
+        invalid_application         = 2
+        invalid_condition_number    = 3
+        invalid_condition_type      = 4
+        no_authority_ekorg          = 5
+        no_authority_kschl          = 6
+        no_authority_vkorg          = 7
+        no_selection                = 8
+        table_not_valid             = 9
+        no_material_for_settlement  = 10
+        no_unit_for_period_cond     = 11
+        no_unit_reference_magnitude = 12
+        invalid_condition_table     = 13
+        OTHERS                      = 14.
+    IF sy-subrc EQ 0.
+
+      gs_alv-icon = VALUE #( gt_icon[ name = 'ICON_GREEN_LIGHT' ]-id OPTIONAL ).
+      gs_alv-line = gs_arq-line.
+      gs_alv-msg = SWITCH #( lv_mode WHEN 'A' THEN lv_criado WHEN 'B' THEN lv_ajustado ).
+      gs_alv-status = TEXT-009. "Registro criado/atualizado com sucesso
+      APPEND gs_alv TO gt_alv.
+      CLEAR gs_alv.
+
+      IF p_sim IS INITIAL.
+        CALL FUNCTION 'RV_CONDITION_SAVE'.
+        CALL FUNCTION 'RV_CONDITION_RESET'.
+        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+          EXPORTING
+            wait = abap_true.
+      ELSE.
+        CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'.
+      ENDIF.
+
+    ELSE.
+
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO gs_alv-msg.
+
+      gs_alv-icon = VALUE #( gt_icon[ name = 'ICON_RED_LIGHT' ]-id OPTIONAL ).
+      gs_alv-status = TEXT-010. "Registro com erro
+      gs_alv-line = gs_arq-line.
+      APPEND gs_alv TO gt_alv.
+      CLEAR gs_alv.
+
+    ENDIF.
+
+    CLEAR: gt_records[], ls_key_fields, lv_correct, lv_correct_line.
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form create_job
+*&---------------------------------------------------------------------*
+FORM create_job .
+  CONSTANTS: c_difstart TYPE sy-uzeit VALUE '000005'.
+
+  DATA: lv_jobname   TYPE btcjob,
+        lv_jobid     TYPE btcjobcnt,
+        lv_datestart TYPE sy-datum,
+        lv_timestart TYPE sy-uzeit.
+
+  lv_jobname = |{ gv_tab }:Det.IVA{ sy-datum }{ '_' }{ sy-uzeit }|.
+
+  CLEAR gv_indx.
+  EXPORT gt_arq = gt_arq TO DATABASE indx(xy) FROM gv_indx CLIENT sy-mandt ID 'ZRERPMM014'.
+*  // Cria o job //
+  CALL FUNCTION 'JOB_OPEN'
+    EXPORTING
+      jobname          = lv_jobname
+    IMPORTING
+      jobcount         = lv_jobid
+    EXCEPTIONS
+      cant_create_job  = 1
+      invalid_job_data = 2
+      jobname_missing  = 3
+      OTHERS           = 4.
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+*  // Agenda o programa de processamento no job criado //
+  SUBMIT zrerpmm014 VIA JOB lv_jobname NUMBER lv_jobid
+                    WITH p_regra = p_regra
+                    WITH p_file  = p_file
+                    WITH p_imp   = p_imp
+                    WITH p_bgd   = p_bgd
+                    WITH p_sim   = p_sim
+                    WITH p_exp   = p_exp AND RETURN.
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+  CALL FUNCTION 'C14B_ADD_TIME'
+    EXPORTING
+      i_starttime = sy-uzeit
+      i_startdate = sy-datum
+      i_addtime   = c_difstart
+    IMPORTING
+      e_endtime   = lv_timestart
+      e_enddate   = lv_datestart.
+
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+*  // Inicia o job //
+  CALL FUNCTION 'JOB_CLOSE'
+    EXPORTING
+      jobcount             = lv_jobid
+      jobname              = lv_jobname
+      sdlstrtdt            = lv_datestart
+      sdlstrttm            = lv_timestart
+      strtimmed            = 'X'
+    EXCEPTIONS
+      cant_start_immediate = 1
+      invalid_startdate    = 2
+      jobname_missing      = 3
+      job_close_failed     = 4
+      job_nosteps          = 5
+      job_notex            = 6
+      lock_failed          = 7
+      invalid_target       = 8
+      OTHERS               = 9.
+  IF sy-subrc <> 0.
+    RETURN.
+  ENDIF.
+
+  MESSAGE s000(zfi) WITH TEXT-001 lv_jobname.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form alv_erro
+*&---------------------------------------------------------------------*
+FORM alv_erro.
+  DATA: gr_table TYPE REF TO cl_salv_table.
+  DATA: gr_functions TYPE REF TO cl_salv_functions.
+  DATA: gr_display TYPE REF TO cl_salv_display_settings.
+
+  TRY.
+      cl_salv_table=>factory( IMPORTING r_salv_table = gr_table CHANGING t_table = gt_alv_erro ).
+      gr_functions = gr_table->get_functions( ).
+      gr_functions->set_all( abap_true ).
+
+      gr_display = gr_table->get_display_settings( ).
+      gr_display->set_striped_pattern( cl_salv_display_settings=>true ).
+      gr_display->set_list_header( 'Log de Validação do Arquivo' ).
+
+      DATA(gr_columns) = gr_table->get_columns( ).
+      DATA(lt_columns) = gr_columns->get( ).
+      LOOP AT lt_columns ASSIGNING FIELD-SYMBOL(<fs_column>).
+        "icon
+        "status
+        "line
+        "msg
+        CASE <fs_column>-columnname.
+          WHEN 'STATUS'.
+            <fs_column>-r_column->set_short_text( value = 'Status' ).
+            <fs_column>-r_column->set_long_text( value = 'Status' ).
+            <fs_column>-r_column->set_medium_text( value = 'Status' ).
+          WHEN 'LINE'.
+            <fs_column>-r_column->set_short_text( value = 'Linha Arq.' ).
+            <fs_column>-r_column->set_long_text( value = 'Linha Arq.' ).
+            <fs_column>-r_column->set_medium_text( value = 'Linha Arq.' ).
+          WHEN 'MSG'.
+            <fs_column>-r_column->set_short_text( value = 'Mensagem' ).
+            <fs_column>-r_column->set_long_text( value = 'Mensagem' ).
+            <fs_column>-r_column->set_medium_text( value = 'Mensagem' ).
+          WHEN OTHERS.
+        ENDCASE.
+
+      ENDLOOP.
+
+      gr_columns->set_optimize( value = abap_true ).
+
+      gr_table->display( ).
+    CATCH cx_salv_msg.
+  ENDTRY.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form select_key_combination
+*&---------------------------------------------------------------------*
+FORM select_key_combination.
+
+  DATA: lt_dynpro_values TYPE TABLE OF dynpread,
+        ls_dynpro_values TYPE dynpread.
+
+  CALL FUNCTION 'RV_GET_CONDITION_TABLES'
+    EXPORTING
+      access_sequence        = 'Z003'
+      application            = 'M'
+      condition_type         = 'ZNAV'
+      condition_use          = 'A'
+      display_always         = 'X'
+      get_text               = 'X'
+      like_pf4               = 'X'
+      table_generate         = 'X'
+    IMPORTING
+      table_t681             = gs_t681
+    EXCEPTIONS
+      invalid_condition_type = 1
+      missing_parameter      = 2
+      no_selection_done      = 3
+      no_table_found         = 4
+      table_not_valid        = 5
+      OTHERS                 = 6.
+  IF sy-subrc = 0.
+    p_regra = gs_t681-kotabnr.
+  ENDIF.
+  "Atualiza nome do arquivo
+  CHECK sy-batch IS INITIAL AND p_exp IS NOT INITIAL.
+
+  ls_dynpro_values-fieldname = 'P_REGRA'.
+  APPEND ls_dynpro_values TO lt_dynpro_values.
+  ls_dynpro_values-fieldname = 'P_FILE'.
+  APPEND ls_dynpro_values TO lt_dynpro_values.
+  CALL FUNCTION 'DYNP_VALUES_READ'
+    EXPORTING
+      dyname     = sy-repid
+      dynumb     = sy-dynnr
+    TABLES
+      dynpfields = lt_dynpro_values.
+
+  READ TABLE lt_dynpro_values WITH KEY fieldname = 'P_REGRA'
+                            ASSIGNING FIELD-SYMBOL(<fs_d>).
+  IF sy-subrc = 0.
+    <fs_d>-fieldvalue = p_regra.
+  ENDIF.
+
+  READ TABLE lt_dynpro_values WITH KEY fieldname = 'P_FILE'
+                              ASSIGNING <fs_d>.
+  IF sy-subrc = 0.
+    <fs_d>-fieldvalue = 'C:\TEMP\' && p_regra && '-' && 'EXPORT' && sy-datum && '_' && sy-uzeit &&'.CSV'.
+  ENDIF.
+
+  CALL FUNCTION 'DYNP_VALUES_UPDATE'
+    EXPORTING
+      dyname               = sy-repid
+      dynumb               = sy-dynnr
+    TABLES
+      dynpfields           = lt_dynpro_values
+    EXCEPTIONS
+      invalid_abapworkarea = 1
+      invalid_dynprofield  = 2
+      invalid_dynproname   = 3
+      invalid_dynpronummer = 4
+      invalid_request      = 5
+      no_fielddescription  = 6
+      undefind_error       = 7
+      OTHERS               = 8.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form radio_button_screen
+*&---------------------------------------------------------------------*
+FORM radio_button_screen.
+
+  CHECK sy-batch IS INITIAL.
+
+  LOOP AT SCREEN.
+    IF p_exp IS NOT INITIAL.
+      IF screen-group1 EQ 'B2'.
+        screen-active = '0'.
+        MODIFY SCREEN.
+      ENDIF.
+    ELSE.
+      IF screen-group1 EQ 'B2'.
+        screen-active = '1'.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+
+  IF p_imp IS NOT INITIAL AND p_file IS INITIAL.
+    IMPORT p_file FROM MEMORY ID 'P_FILE'.
+    FREE MEMORY ID 'P_FILE'.
+  ELSEIF p_exp IS NOT INITIAL.
+    IMPORT p_file FROM MEMORY ID 'P_FILE'.
+    IF sy-subrc IS NOT INITIAL.
+      IF p_regra IS NOT INITIAL.
+        p_file = 'C:\TEMP\' && p_regra && '-' && 'EXPORT' && sy-datum && '_' && sy-uzeit &&'.CSV'.
+*      ELSE.
+*        p_file = 'C:\TEMP\' && 'EXPORT' && sy-datum && '_' && sy-uzeit &&'.CSV'.
+      ENDIF.
+    ENDIF.
+    FREE MEMORY ID 'P_FILE'.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form alv_after_bapi
+*&---------------------------------------------------------------------*
+FORM alv_after_bapi .
+  DATA: gr_table TYPE REF TO cl_salv_table.
+  DATA: gr_functions TYPE REF TO cl_salv_functions.
+  DATA: gr_display TYPE REF TO cl_salv_display_settings.
+
+  TRY.
+      cl_salv_table=>factory( IMPORTING r_salv_table = gr_table CHANGING t_table = gt_alv ).
+      gr_functions = gr_table->get_functions( ).
+      gr_functions->set_all( abap_true ).
+
+      gr_display = gr_table->get_display_settings( ).
+      gr_display->set_striped_pattern( cl_salv_display_settings=>true ).
+      gr_display->set_list_header( 'Log Processamento' ).
+
+      DATA(gr_columns) = gr_table->get_columns( ).
+      DATA(lt_columns) = gr_columns->get( ).
+      LOOP AT lt_columns ASSIGNING FIELD-SYMBOL(<fs_column>).
+        "icon
+        "status
+        "line
+        "msg
+        CASE <fs_column>-columnname.
+          WHEN 'STATUS'.
+            <fs_column>-r_column->set_short_text( value = 'Status' ).
+            <fs_column>-r_column->set_long_text( value = 'Status' ).
+            <fs_column>-r_column->set_medium_text( value = 'Status' ).
+          WHEN 'LINE'.
+            <fs_column>-r_column->set_short_text( value = 'Linha Arq.' ).
+            <fs_column>-r_column->set_long_text( value = 'Linha Arq.' ).
+            <fs_column>-r_column->set_medium_text( value = 'Linha Arq.' ).
+          WHEN 'MSG'.
+            <fs_column>-r_column->set_short_text( value = 'Mensagem' ).
+            <fs_column>-r_column->set_long_text( value = 'Mensagem' ).
+            <fs_column>-r_column->set_medium_text( value = 'Mensagem' ).
+          WHEN OTHERS.
+        ENDCASE.
+
+      ENDLOOP.
+
+      gr_columns->set_optimize( value = abap_true ).
+
+      gr_table->display( ).
+    CATCH cx_salv_msg.
+  ENDTRY.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form check_rule
+*&---------------------------------------------------------------------*
+FORM check_rule.
+
+  IF p_regra IS NOT INITIAL.
+    SELECT COUNT(*)
+      FROM t681
+      WHERE kvewe = 'A'
+        AND kotabnr = p_regra
+        AND kappl = 'M'.
+    IF sy-subrc <> 0.
+      MESSAGE TEXT-007 TYPE 'S' DISPLAY LIKE 'E'.
+      CLEAR p_file.
+      LEAVE LIST-PROCESSING.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form regras_matchcode
+*&---------------------------------------------------------------------*
+FORM regras_matchcode .
+
+  TYPES: BEGIN OF ty_regra,
+           kolnr   TYPE t682i-kolnr,
+           kotabnr TYPE t682i-kotabnr,
+           descr   TYPE /scmb/pb_description_100,
+         END OF ty_regra.
+
+  DATA: lt_regra  TYPE TABLE OF ty_regra,
+        ls_regra  TYPE ty_regra,
+        lt_return TYPE TABLE OF ddshretval,
+        ls_tmc1t  TYPE tmc1t.
+
+  DATA: lt_dynpro_values TYPE TABLE OF dynpread,
+        ls_dynpro_values TYPE dynpread.
+
+  CONSTANTS gc_001 TYPE c LENGTH 21 VALUE 'Regras Determinação IVA'.
+
+  SELECT *
+    FROM t682i
+    INTO TABLE @DATA(lt_682i)
+    WHERE kvewe EQ 'A'
+      AND kappl EQ 'M'
+      AND kozgf EQ 'Z003'.
+
+  SELECT *
+    FROM t682z
+    INTO TABLE @DATA(lt_682z)
+    FOR ALL ENTRIES IN @lt_682i
+    WHERE kvewe EQ @lt_682i-kvewe
+      AND kappl EQ @lt_682i-kappl
+      AND kozgf EQ @lt_682i-kozgf.
+  SORT lt_682z  ASCENDING BY kolnr zaehk.
+  SORT lt_682i  ASCENDING BY kolnr kotabnr.
+  LOOP AT lt_682i ASSIGNING FIELD-SYMBOL(<fs_682i>).
+
+    ls_regra-kolnr = <fs_682i>-kolnr.
+    ls_regra-kotabnr = <fs_682i>-kotabnr.
+    LOOP AT lt_682z ASSIGNING FIELD-SYMBOL(<fs_682z>) WHERE kvewe = <fs_682i>-kvewe
+                                                        AND kappl = <fs_682i>-kappl
+                                                        AND kozgf = <fs_682i>-kozgf
+                                                        AND kolnr = <fs_682i>-kolnr
+                                                        AND qustr IS NOT INITIAL
+                                                        AND qufna IS NOT INITIAL.
+
+      SELECT a~tabname, a~fieldname, a~rollname, b~scrtext_s
+        FROM dd03l AS a
+        LEFT OUTER JOIN dd04t AS b ON a~rollname = b~rollname
+        INTO TABLE @DATA(lt_dsc)
+        WHERE a~tabname = @<fs_682z>-qustr
+          AND a~fieldname = @<fs_682z>-qufna
+          AND b~ddlanguage = @sy-langu.
+      IF sy-subrc = 0.
+        IF ls_regra-descr IS INITIAL.
+          ls_regra-descr = VALUE #( lt_dsc[ 1 ]-scrtext_s OPTIONAL ).
+          CONDENSE ls_regra-descr .
+        ELSE.
+          DATA(lv_dsc) = VALUE #( lt_dsc[ 1 ]-scrtext_s OPTIONAL ).
+          IF lv_dsc IS NOT INITIAL.
+            CONCATENATE ls_regra-descr lv_dsc INTO ls_regra-descr SEPARATED BY '/'.
+            CONDENSE ls_regra-descr .
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+    APPEND ls_regra TO lt_regra.
+    CLEAR ls_regra-descr.
+  ENDLOOP.
+
+  IF NOT lt_regra[] IS INITIAL.
+
+    CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+      EXPORTING
+        retfield        = 'KOTABNR'
+        window_title    = gc_001
+        value_org       = 'S'
+      TABLES
+        value_tab       = lt_regra
+        return_tab      = lt_return
+      EXCEPTIONS
+        parameter_error = 1
+        no_values_found = 2
+        OTHERS          = 3.
+
+    IF sy-subrc = 0.
+      READ TABLE lt_return INTO DATA(ls_return) INDEX 1.
+      p_regra = ls_return-fieldval.
+      CLEAR gv_tab.
+      gv_tab = |{ 'A' }{ p_regra }|.
+
+      "Atualiza nome do arquivo
+      CHECK sy-batch IS INITIAL AND p_exp IS NOT INITIAL.
+
+      ls_dynpro_values-fieldname = 'P_REGRA'.
+      APPEND ls_dynpro_values TO lt_dynpro_values.
+      ls_dynpro_values-fieldname = 'P_FILE'.
+      APPEND ls_dynpro_values TO lt_dynpro_values.
+      CALL FUNCTION 'DYNP_VALUES_READ'
+        EXPORTING
+          dyname     = sy-repid
+          dynumb     = sy-dynnr
+        TABLES
+          dynpfields = lt_dynpro_values.
+
+      READ TABLE lt_dynpro_values WITH KEY fieldname = 'P_REGRA'
+                                ASSIGNING FIELD-SYMBOL(<fs_d>).
+      IF sy-subrc = 0.
+        <fs_d>-fieldvalue = p_regra.
+      ENDIF.
+
+      READ TABLE lt_dynpro_values WITH KEY fieldname = 'P_FILE'
+                                  ASSIGNING <fs_d>.
+      IF sy-subrc = 0.
+        <fs_d>-fieldvalue = 'C:\TEMP\' && p_regra && '-' && 'EXPORT' && sy-datum && '_' && sy-uzeit &&'.CSV'.
+      ENDIF.
+
+      CALL FUNCTION 'DYNP_VALUES_UPDATE'
+        EXPORTING
+          dyname               = sy-repid
+          dynumb               = sy-dynnr
+        TABLES
+          dynpfields           = lt_dynpro_values
+        EXCEPTIONS
+          invalid_abapworkarea = 1
+          invalid_dynprofield  = 2
+          invalid_dynproname   = 3
+          invalid_dynpronummer = 4
+          invalid_request      = 5
+          no_fielddescription  = 6
+          undefind_error       = 7
+          OTHERS               = 8.
+
+
+    ELSE.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
