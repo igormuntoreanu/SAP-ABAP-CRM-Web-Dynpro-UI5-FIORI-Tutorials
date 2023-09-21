@@ -1,0 +1,75 @@
+      onBeforeRebindTableExtension: function (oEvent) {
+        var oMtable = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ObjectPage.view.Details::ShuttlingLoadingSet--HeaderZuItems::responsiveTable");
+
+        if (oMtable) {
+          oMtable.attachUpdateFinished(function (oEvent) {
+            var oTable = oEvent.getSource();
+            //if (oTable.MESSAGECRIT == "1") {
+            var aItems = oTable.getItems();
+            var oColumns = oTable.getColumns();
+            var indexColumnMessage;
+            var indexStatusNew;
+            var indexStatusProfile;
+
+            //Get Index of the Message Text Column
+            for (var i = 0; i < oColumns.length; i++) {
+              if (oColumns[i].sId.includes("Message")) {
+                indexColumnMessage = i;
+                break;
+              }
+            }
+
+            if (indexColumnMessage) {
+              for (var i = 0; i < aItems.length; i++) {
+                aItems[i].mAggregations.cells[indexColumnMessage].mAggregations.display.addStyleClass("red");
+              }
+            }
+
+            //Get Index of the StatusNew Column
+            for (var i = 0; i < oColumns.length; i++) {
+              if (oColumns[i].sId.includes("StatusNew")) {
+                indexStatusNew = i;
+                break;
+              }
+            }
+
+            //Get Index of the StatusProfile Column
+            for (var i = 0; i < oColumns.length; i++) {
+              if (oColumns[i].sId.includes("StatusProfile")) {
+                indexStatusProfile = i;
+                break;
+              }
+            }
+
+            if (indexStatusNew) {
+              for (var i = 0; i < aItems.length; i++) {
+                //Get Status Profile
+                var statusProfile = aItems[i].mAggregations.cells[indexStatusProfile].mAggregations.display.getText();
+                //Create filter based on the StatusProfile
+                var oFilter = new sap.ui.model.Filter("StatusProfile", "EQ", statusProfile);
+                //Apply the filter to the items of the Dropdown
+                aItems[i].mAggregations.cells[indexStatusNew].getBinding("items").filter([oFilter]); // apply the filter to the select control's binding
+
+                //Set Correct Status to the Select StatusNew
+                var sPath = aItems[i].getBindingContext().getPath();
+                var sStatus = aItems[i].getModel().getProperty( sPath + '/Status' );
+                aItems[i].mAggregations.cells[indexStatusNew].setSelectedKey(sStatus);
+              }
+            }
+          }.bind(this));
+        }
+
+        // Remove Edit Button from Object Page
+        var editButton = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ObjectPage.view.Details::ShuttlingLoadingSet--edit");
+        // editButton.setVisible(false);
+
+        // Remove Delete Button from Object Page
+        var deleteButton = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ObjectPage.view.Details::ShuttlingLoadingSet--delete");
+        deleteButton.setVisible(false);
+
+        // Remove Delete Button from Object Page
+        var deleteButtonItem = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ObjectPage.view.Details::ShuttlingLoadingSet--HeaderZuItems::deleteEntry");
+        deleteButtonItem.setVisible(false);
+
+
+      },
