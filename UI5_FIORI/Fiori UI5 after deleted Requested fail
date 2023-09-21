@@ -1,0 +1,8 @@
+At the ListReport Extension page, do:
+
+beforeDeleteExtension: function(oEvent){
+            oEvent.aContexts[0].oModel.attachRequestFailed(function(oEvent){
+                var oError = oEvent.oSource.getMessagesByEntity("ShuttlingLoadingSet");
+                MessageBox.error(oError[0].message);
+            })
+        },
