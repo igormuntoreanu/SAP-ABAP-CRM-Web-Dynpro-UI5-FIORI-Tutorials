@@ -1,0 +1,8 @@
+onStatusChange: function (oEvent) {
+        //Get Selected Item Key
+        var oSelectedItem = oEvent.getSource().getSelectedItem();
+        var sKey = oSelectedItem.getKey();
+        //Get Model via path of the table Line - which is the parent of the property StatusNew
+        var sPath = oSelectedItem.getParent().getBindingContext().getPath();
+        oSelectedItem.getParent().getModel().setProperty( sPath + "/Status" , sKey);
+},
