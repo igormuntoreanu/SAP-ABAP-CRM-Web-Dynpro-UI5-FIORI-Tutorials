@@ -1,0 +1,9 @@
+this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+                var storType = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/StorType");
+
+}.bind(this));
+
+_______________
+
+on the list Report:
+this.selectedItem = oEvent.getSource().getParent().getParent().getSelectedItem().getBindingContext().getObject();
