@@ -1,0 +1,134 @@
+sap.ui.define([
+    "sap/ui/generic/app/navigation/service/NavigationHandler",
+    "sap/ui/generic/app/navigation/service/NavType",
+    "sap/m/MessageToast"
+], function (NavigationHandler, NavType, MessageToast) {
+    'use strict';
+
+    return {
+
+        onInit: function (oEvent) {
+            // create an instance of the navigation handler
+            this.oNavigationHandler = new NavigationHandler(this.getOwnerComponent());
+
+            // on back navigation, the previous app state is returned in a Promise
+            this.oNavigationHandler
+                .parseNavigation()
+                .done(this.onNavigationDone.bind(this));
+
+            this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+                var storType = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/StorType");
+                if (storType) {
+                    if (storType == "DOOR") {
+                        this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--action::MoveIntoDoorButtonButton").setVisible(false);
+                        this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--action::MoveOutOfDoorButton").setVisible(true);
+                    } else {
+                        this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--action::MoveOutOfDoorButton").setVisible(false);
+                        this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--action::MoveIntoDoorButtonButton").setVisible(true);
+                    }
+
+                    if (storType == "DOOR" || storType == "PARK") {
+                        this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--action::IMUnloading").setVisible(true);
+                    } else {
+                        this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--action::IMUnloading").setVisible(false);
+                    }
+                }
+
+                //Check if Iphone and set ... to Critical
+                var actions = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--template::ObjectPage::ObjectPageHeader-_actionsToolbar-overflowButton");
+                if (actions) {
+                    actions.setType("Critical");
+                }
+            }.bind(this));
+        },
+
+        MoveIntoDoor: function (oEvent) {
+            this._move("MoveIntoDoor", oEvent);
+        },
+
+        MoveOutOfDoor: function (oEvent) {
+            this._move("MoveOutOfDoor", oEvent);
+        },
+
+        IMUnloading: function (oEvent) {
+            this._move("IMUnloading", oEvent);
+        },
+
+        onNavigationDone: function (oAppData, oURLParameters, sNavType) {
+            switch (sNavType) {
+                case NavType.initial:
+                    break;
+                case NavType.iAppState:
+                    break;
+            }
+        },
+
+        getCustomAppStateDataExtension: function (oCustomData) {
+            //the content of the custom field will be stored in the app state, so that it can be restored later, for example after a back navigation.
+            //The developer has to ensure that the content of the field is stored in the object that is passed to this method.
+            if (oCustomData) {
+                var oCustomField1 = this.oView.byId("TuEmptyCustom");
+                if (oCustomField1) {
+                    oCustomData.TuEmptyCustom = oCustomField1.getSelectedKey();
+                }
+            }
+        },
+
+        restoreCustomAppStateDataExtension: function (oCustomData) {
+            //in order to restore the content of the custom field in the filter bar, for example after a back navigation,
+            //an object with the content is handed over to this method. Now the developer has to ensure that the content of the custom filter is set to the control
+            if (oCustomData) {
+                if (oCustomData.TuEmptyCustom) {
+                    var oComboBox = this.oView.byId("TuEmptyCustom");
+                    oComboBox.setSelectedKey(
+                        oCustomData.TuEmptyCustom
+                    );
+                }
+            }
+        },
+
+        _move: function (action, oEvent) {
+
+            this.action = action;
+            var yardNo = oEvent.getSource().getBindingContext().getProperty("YardNo");
+            var tuNumExt = oEvent.getSource().getBindingContext().getProperty("TuNumExt");
+            if (action === "MoveOutOfDoor" || action === "MoveIntoDoor") {
+                const oFilters = [new sap.ui.model.Filter("Pgmid", sap.ui.model.FilterOperator.EQ, "ZYARD_TU"),
+                new sap.ui.model.Filter("EnhId", sap.ui.model.FilterOperator.EQ, "LGTY"),
+                new sap.ui.model.Filter("Lgnum", sap.ui.model.FilterOperator.EQ, yardNo)
+                ];
+
+                const oModel = this.getOwnerComponent().getModel();
+
+                var that = this;
+
+                oModel.read("/EnhancementValuesSet", {
+                    filters: oFilters,
+                    success: function (oData, oResponse) {
+                        var vNavigationParameters = {
+                            "YardTaskActivityType": that.action === "MoveIntoDoor" ? oData.results[0].Key2 : oData.results[0].Key3,
+                            "YardNo": yardNo,
+                            "TuNumExt": tuNumExt
+                        };
+                        that.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+                    },
+                    error: function (oError) {
+                        var vNavigationParameters = {
+                            "YardTaskActivityType": that.action === "MoveIntoDoor" ? "MV01" : "MV02",
+                            "YardNo": yardNo,
+                            "TuNumExt": tuNumExt
+                        };
+                        that.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+                    }
+                })
+
+            } else if (action === "IMUnloading") {
+                var vNavigationParameters = {
+                    "YardNo": yardNo,
+                    "TuNumExt": tuNumExt
+                };
+                this.oNavigationHandler.navigate("ZYL_IM_UNLOADING", "display", vNavigationParameters, {});
+            }
+        }
+    };
+});
