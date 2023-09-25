@@ -1,0 +1,675 @@
+class ZCL_20PS_FDT_JSON definition
+  public
+  create public .
+
+public section.
+
+  class-methods DATA_TO_JSON
+    importing
+      !IA_DATA type ANY
+    returning
+      value(RV_JSON) type STRING .
+  class-methods JSON_TO_DATA
+    importing
+      !IV_JSON type STRING
+    changing
+      !CA_DATA type ANY .
+protected section.
+
+  class-data GC_ELEMENT_AMOUNT type ABAP_ABSTYPENAME value '\INTERFACE=IF_FDT_TYPES\TYPE=ELEMENT_AMOUNT'. "#EC NOTEXT       " .
+  class-data GC_ELEMENT_QUANTITY type ABAP_ABSTYPENAME value '\INTERFACE=IF_FDT_TYPES\TYPE=ELEMENT_QUANTITY'. "#EC NOTEXT       " .
+  class-data GC_ELEMENT_BOOLEAN type ABAP_ABSTYPENAME value '\INTERFACE=IF_FDT_TYPES\TYPE=ELEMENT_BOOLEAN'. "#EC NOTEXT       " .
+  class-data GC_ELEMENT_NUMBER type ABAP_ABSTYPENAME value '\INTERFACE=IF_FDT_TYPES\TYPE=ELEMENT_NUMBER'. "#EC NOTEXT       " .
+  class-data GC_ELEMENT_TIMEPOINT type ABAP_ABSTYPENAME value '\INTERFACE=IF_FDT_TYPES\TYPE=ELEMENT_TIMEPOINT'. "#EC NOTEXT       " .
+  class-data GC_ELEMENT_TEXT type ABAP_ABSTYPENAME value '\INTERFACE=IF_FDT_TYPES\TYPE=ELEMENT_TEXT'. "#EC NOTEXT       " .
+  class-data GC_ABAP_BOOL type ABAP_ABSTYPENAME value '\TYPE-POOL=ABAP\TYPE=ABAP_BOOL'. "#EC NOTEXT
+  class-data GC_FDT_BOOLEAN type ABAP_ABSTYPENAME value '\TYPE=FDT_BOOLEAN'. "#EC NOTEXT
+  class-data GC_FDT_AMOUNT type ABAP_ABSTYPENAME value '\TYPE=FDT_S_AMOUNT'. "#EC NOTEXT
+  class-data GC_FDT_QUANTITY type ABAP_ABSTYPENAME value '\TYPE=FDT_S_QUANTITY'. "#EC NOTEXT
+  class-data GC_FDT_TIMEPOINT type ABAP_ABSTYPENAME value '\TYPE=FDT_S_TIMEPOINT'. "#EC NOTEXT
+  class-data GC_FDT_NUMBER type ABAP_ABSTYPENAME value '\TYPE=FDT_NUMBER_DECFLOAT'. "#EC NOTEXT
+private section.
+
+  class-methods BRF_STRUC_TO_JSON
+    importing
+      !IA_DATA type ANY
+      !IV_TYPE type ABAP_ABSTYPENAME
+    returning
+      value(RV_JSON) type STRING .
+  class-methods CONVERT_TOKEN
+    importing
+      !IA_DATA type ANY
+    changing
+      !CV_TOKEN type ANY .
+  class-methods DATA_TO_JSON_INTERNAL
+    importing
+      !IA_DATA type ANY
+      !IO_DESCR type ref to CL_ABAP_TYPEDESCR optional
+    returning
+      value(RV_JSON) type STRING .
+  class-methods GET_STRING
+    exporting
+      !EV_STRING type STRING
+    changing
+      !CV_JSON type STRING .
+  class-methods JSON_TO_BRF_STRUC
+    changing
+      !CV_JSON type STRING
+      !CA_DATA type ANY .
+  class-methods JSON_TO_DATA_INTERNAL
+    importing
+      !IV_IS_TABLINE type ABAP_BOOL default ABAP_FALSE
+    exporting
+      !EV_IS_FILLED type ABAP_BOOL
+    changing
+      !CV_JSON type STRING
+      !CA_DATA type ANY .
+ENDCLASS.
+
+
+
+CLASS ZCL_20PS_FDT_JSON IMPLEMENTATION.
+
+
+  METHOD BRF_STRUC_TO_JSON.
+    DATA:
+      lv_str_number TYPE string,
+      lv_str_timest TYPE string.
+
+    FIELD-SYMBOLS:
+      <a_number>       TYPE if_fdt_types=>element_amount-number,
+      <currency>       TYPE if_fdt_types=>element_amount-currency,
+      <q_number>       TYPE if_fdt_types=>element_quantity-number,
+      <unit>           TYPE if_fdt_types=>element_quantity-unit,
+      <date>           TYPE if_fdt_types=>element_timepoint-date,
+      <time>           TYPE if_fdt_types=>element_timepoint-time,
+      <timestamp>      TYPE if_fdt_types=>element_timepoint-timestamp,
+      <offset_time>    TYPE if_fdt_types=>element_timepoint-offset_time,
+      <offset_sign>    TYPE if_fdt_types=>element_timepoint-offset_sign,
+      <type>           TYPE if_fdt_types=>element_timepoint-type.
+
+* Predetermined structures have an additional key value pair at the beginning: "$T": CHAR, which
+* describes the data type. The dollar symbol was chosen, because it is not allowed as first character
+* for elements in ABAP structures and therefore $T can never be a name for a structure element.
+    CASE iv_type.
+      WHEN gc_element_amount
+        OR gc_fdt_amount.
+        ASSIGN COMPONENT 'NUMBER'   OF STRUCTURE ia_data TO <a_number>.
+        ASSIGN COMPONENT 'CURRENCY' OF STRUCTURE ia_data TO <currency>.
+        lv_str_number = <a_number>.
+*        lv_str_number = data_to_json_internal( <a_number> ).
+        CONCATENATE '{ "$T":"' if_fdt_constants=>gc_element_type_amount '", "NUMBER":' lv_str_number ', "CURRENCY":"' <currency> '"}' INTO rv_json.
+      WHEN gc_element_quantity
+        OR gc_fdt_quantity.
+        ASSIGN COMPONENT 'NUMBER' OF STRUCTURE ia_data TO <q_number>.
+        ASSIGN COMPONENT 'UNIT'   OF STRUCTURE ia_data TO <unit>.
+        lv_str_number = <q_number>.
+*        lv_str_number = data_to_json_internal( <q_number> ).
+        CONCATENATE '{ "$T":"' if_fdt_constants=>gc_element_type_quantity '", "NUMBER":' lv_str_number ', "UNIT":"' <unit> '"}' INTO rv_json.
+      WHEN gc_element_timepoint
+        OR gc_fdt_timepoint.
+        ASSIGN COMPONENT 'TYPE'        OF STRUCTURE ia_data TO <type>.
+        CASE <type>.
+          WHEN if_fdt_constants=>gc_tp_date.
+            ASSIGN COMPONENT 'DATE'        OF STRUCTURE ia_data TO <date>.
+            CONCATENATE '{"$T":"' if_fdt_constants=>gc_element_type_timepoint '",'
+                        '"DATE":"' <date> '",'
+                        '"TYPE":"' <type>  '"}' INTO rv_json.
+          WHEN if_fdt_constants=>gc_tp_time.
+            ASSIGN COMPONENT 'TIME'        OF STRUCTURE ia_data TO <time>.
+            CONCATENATE '{"$T":"' if_fdt_constants=>gc_element_type_timepoint '",'
+                        '"TIME":"' <time> '",'
+                        '"TYPE":"' <type>  '"}' INTO rv_json.
+          WHEN if_fdt_constants=>gc_tp_datetime.
+            ASSIGN COMPONENT 'DATE'        OF STRUCTURE ia_data TO <date>.
+            ASSIGN COMPONENT 'TIME'        OF STRUCTURE ia_data TO <time>.
+            CONCATENATE '{"$T":"' if_fdt_constants=>gc_element_type_timepoint '",'
+                        '"DATE":"' <date> '",'
+                        '"TIME":"' <time> '",'
+                        '"TYPE":"' <type>  '"}' INTO rv_json.
+          WHEN if_fdt_constants=>gc_tp_timestamp_utc.
+            ASSIGN COMPONENT 'TIMESTAMP'   OF STRUCTURE ia_data TO <timestamp>.
+            lv_str_timest = <timestamp>.
+            IF <timestamp> LT 0. "get sign to the front!
+              SHIFT lv_str_timest CIRCULAR RIGHT.
+            ENDIF.
+*            lv_str_timest = data_to_json_internal( <timestamp> ).
+            CONCATENATE '{"$T":"' if_fdt_constants=>gc_element_type_timepoint '",'
+                        '"TIMESTAMP":' lv_str_timest ','
+                        '"TYPE":"' <type>  '"}' INTO rv_json.
+          WHEN if_fdt_constants=>gc_tp_datetime_offset_utc.
+            ASSIGN COMPONENT 'DATE'        OF STRUCTURE ia_data TO <date>.
+            ASSIGN COMPONENT 'TIME'        OF STRUCTURE ia_data TO <time>.
+            ASSIGN COMPONENT 'OFFSET_TIME' OF STRUCTURE ia_data TO <offset_time>.
+            ASSIGN COMPONENT 'OFFSET_SIGN' OF STRUCTURE ia_data TO <offset_sign>.
+            CONCATENATE '{"$T":"' if_fdt_constants=>gc_element_type_timepoint '",'
+                        '"DATE":"' <date> '",'
+                        '"TIME":"' <time> '",'
+                        '"OFFSET_TIME":"' <offset_time> '",'
+                        '"OFFSET_SIGN":"' <offset_sign> '",'
+                        '"TYPE":"' <type>  '"}' INTO rv_json.
+          WHEN OTHERS.
+        ENDCASE.
+      WHEN OTHERS.
+        CLEAR rv_json.
+    ENDCASE.
+
+  ENDMETHOD.
+
+
+  METHOD CONVERT_TOKEN.
+    DATA:
+      lo_descr      TYPE REF TO cl_abap_typedescr.
+
+    " Check target type if conversion is needed
+    lo_descr = cl_abap_typedescr=>describe_by_data( ia_data ).
+    CASE lo_descr->absolute_name.
+      WHEN gc_abap_bool
+        OR gc_fdt_boolean
+        OR gc_element_boolean.
+        IF cv_token EQ 'true'.
+          cv_token = abap_true.
+        ELSEIF cv_token EQ 'false'.
+          cv_token = abap_false.
+        ENDIF.
+      WHEN OTHERS.
+*        cv_token = cv_token.
+        " replace escape characters
+        REPLACE ALL OCCURRENCES OF '\n' IN cv_token WITH cl_abap_char_utilities=>newline.
+        REPLACE ALL OCCURRENCES OF '\t' IN cv_token WITH cl_abap_char_utilities=>horizontal_tab.
+        REPLACE ALL OCCURRENCES OF '\f' IN cv_token WITH cl_abap_char_utilities=>form_feed.
+        REPLACE ALL OCCURRENCES OF '\v' IN cv_token WITH cl_abap_char_utilities=>vertical_tab.
+        REPLACE ALL OCCURRENCES OF '\b' IN cv_token WITH cl_abap_char_utilities=>backspace.
+        REPLACE ALL OCCURRENCES OF '\r' IN cv_token WITH cl_abap_char_utilities=>cr_lf(1).
+        REPLACE ALL OCCURRENCES OF '\"' IN cv_token WITH '"'.
+        REPLACE ALL OCCURRENCES OF '\/' IN cv_token WITH '/'.
+        REPLACE ALL OCCURRENCES OF '\\' IN cv_token WITH '\'.
+    ENDCASE.
+  ENDMETHOD.
+
+
+  METHOD DATA_TO_JSON.
+    DATA:
+      lo_descr TYPE REF TO cl_abap_typedescr.
+
+    lo_descr = cl_abap_typedescr=>describe_by_data( ia_data ).
+    rv_json = data_to_json_internal( ia_data = ia_data io_descr = lo_descr ).
+    "Test if root is an single element, if yes root object { ...} needed
+    IF lo_descr->kind EQ cl_abap_typedescr=>kind_elem.
+      CONCATENATE '{"$ROOT":' rv_json '}' INTO rv_json.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD DATA_TO_JSON_INTERNAL.
+    DATA:
+      lo_descr       TYPE REF TO cl_abap_typedescr,
+      lo_struc_descr TYPE REF TO cl_abap_structdescr,
+      lo_table_descr TYPE REF TO cl_abap_tabledescr,
+      lt_comp        TYPE cl_abap_structdescr=>included_view,
+      lv_first       TYPE abap_bool VALUE abap_true,
+      lv_json        TYPE string.
+    FIELD-SYMBOLS:
+      <la_data> TYPE any,
+      <lt_data> TYPE ANY TABLE,
+      <ls_comp> TYPE LINE OF cl_abap_structdescr=>included_view.
+
+    IF io_descr IS SUPPLIED.
+      lo_descr = io_descr.
+    ELSE.
+      lo_descr = cl_abap_typedescr=>describe_by_data( ia_data ).
+    ENDIF.
+
+    CASE lo_descr->type_kind.
+      WHEN cl_abap_typedescr=>typekind_struct1
+        OR cl_abap_typedescr=>typekind_struct2.
+        "check brf+ structures first
+        rv_json = brf_struc_to_json(
+          ia_data = ia_data
+          iv_type = lo_descr->absolute_name ).
+        IF rv_json IS INITIAL. "do standard evaluation
+          "JSON starts with {"elem1":value1, ...
+          rv_json = '{'.
+          lo_struc_descr ?= lo_descr.
+          "use following method instead of method get_components to get includes directly included!
+          lt_comp = lo_struc_descr->get_included_view( ).
+          LOOP AT lt_comp ASSIGNING <ls_comp>.
+            IF lv_first EQ abap_false.
+              CONCATENATE rv_json  ',' INTO rv_json.
+            ENDIF.
+****************************************************************
+*           zzseiti: JS ist case sensitive, es wird alles auf lower Case umgestellt
+****************************************************************
+            translate <ls_comp>-name to LOWER CASE.
+****************************************************************
+*           zzseiti: JS ist case sensitive, es wird alles auf lower Case umgestellt
+****************************************************************
+            ASSIGN COMPONENT <ls_comp>-name OF STRUCTURE ia_data TO <la_data>.
+            lv_json = data_to_json_internal( ia_data = <la_data> io_descr = <ls_comp>-type ).
+            CONCATENATE rv_json '"' <ls_comp>-name '":' lv_json INTO rv_json.
+            lv_first = abap_false.
+          ENDLOOP.
+          CONCATENATE rv_json '}' INTO rv_json.
+        ENDIF.
+      WHEN cl_abap_typedescr=>typekind_table.
+        "JSON starts with [value1, ...
+        rv_json = '['.
+        ASSIGN ia_data TO <lt_data>.
+        lo_table_descr ?= lo_descr.
+        lo_descr = lo_table_descr->get_table_line_type( ).
+        LOOP AT <lt_data> ASSIGNING <la_data>.
+          IF lv_first EQ abap_false.
+            CONCATENATE rv_json  ',' INTO rv_json.
+          ENDIF.
+          lv_json = data_to_json_internal( ia_data = <la_data> io_descr = lo_descr ).
+          CONCATENATE rv_json lv_json INTO rv_json.
+          lv_first = abap_false.
+        ENDLOOP.
+        CONCATENATE rv_json ']' INTO rv_json.
+      WHEN cl_abap_typedescr=>typekind_dref.
+        ASSIGN ia_data->* TO <la_data>.
+        IF sy-subrc = 0.
+          rv_json = '{'.          "needed?
+          lv_json = data_to_json_internal( ia_data = <la_data> ).
+          CONCATENATE rv_json lv_json '}' INTO rv_json.
+        ELSE.
+          rv_json = '{}'. "Will produce empty JS object
+        ENDIF.
+      WHEN OTHERS.
+        "convert single field value
+        CASE lo_descr->absolute_name.
+          WHEN gc_element_boolean
+            OR gc_fdt_boolean
+            OR gc_abap_bool.
+            IF ia_data EQ abap_true.
+              rv_json = 'true'.                             "#EC NOTEXT
+            ELSE.
+              rv_json = 'false'.                            "#EC NOTEXT
+            ENDIF.
+          WHEN OTHERS.
+            CASE lo_descr->type_kind.
+              WHEN cl_abap_typedescr=>typekind_clike
+                OR cl_abap_typedescr=>typekind_string
+                OR cl_abap_typedescr=>typekind_char.
+                rv_json = ia_data.
+                " Escape special characters
+                REPLACE ALL OCCURRENCES OF '\'                                    IN rv_json WITH '\\'.
+                REPLACE ALL OCCURRENCES OF '/'                                    IN rv_json WITH '\/'.
+                REPLACE ALL OCCURRENCES OF '"'                                    IN rv_json WITH '\"'.
+                REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf(1)       IN rv_json WITH '\r'.
+                REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline        IN rv_json WITH '\n'.
+                REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>horizontal_tab IN rv_json WITH '\t'.
+                REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>form_feed      IN rv_json WITH '\f'.
+                REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>vertical_tab   IN rv_json WITH '\v'.
+                REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>backspace      IN rv_json WITH '\b'.
+                CONCATENATE '"' rv_json '"' INTO rv_json.
+              WHEN cl_abap_typedescr=>typekind_num
+                OR cl_abap_typedescr=>typekind_date
+                OR cl_abap_typedescr=>typekind_time.
+                CONCATENATE '"' ia_data '"' INTO rv_json.
+              WHEN cl_abap_typedescr=>typekind_float
+                OR cl_abap_typedescr=>typekind_decfloat16
+                OR cl_abap_typedescr=>typekind_decfloat34
+                OR cl_abap_typedescr=>typekind_decfloat.
+                rv_json = ia_data.
+              WHEN cl_abap_typedescr=>typekind_int
+                OR cl_abap_typedescr=>typekind_packed
+                OR cl_abap_typedescr=>typekind_int8.
+                rv_json = ia_data.
+                IF ia_data LT 0. "get sign to the front!
+                  SHIFT rv_json CIRCULAR RIGHT.
+                ENDIF.
+              WHEN OTHERS.
+                rv_json = ia_data.
+            ENDCASE.
+        ENDCASE.
+    ENDCASE.
+  ENDMETHOD.
+
+
+  METHOD GET_STRING.
+    DATA:
+      lv_escape   TYPE i,
+      lv_char     TYPE string, "instead of 'C' to keep spaces
+      lv_is_string TYPE abap_bool VALUE abap_true.
+
+    WHILE strlen( cv_json ) > 0
+      AND lv_is_string EQ abap_true.
+      lv_char = cv_json(1).
+      SHIFT cv_json BY 1 PLACES.
+      CASE lv_char.
+        WHEN '\'.
+          lv_escape = lv_escape + 1.
+          CONCATENATE ev_string lv_char INTO ev_string.
+        WHEN '"'.
+          lv_escape = lv_escape MOD 2.
+          IF lv_escape EQ 0.         "end of string?
+            lv_is_string = abap_false.
+          ELSE.
+            CONCATENATE ev_string lv_char INTO ev_string.
+          ENDIF.
+          clear lv_escape.
+        WHEN OTHERS. "all other chars could be collected without any check!
+          CONCATENATE ev_string lv_char INTO ev_string.
+          clear lv_escape.
+      ENDCASE.
+    ENDWHILE.
+  ENDMETHOD.
+
+
+  METHOD JSON_TO_BRF_STRUC.
+
+    DATA:
+      lv_token      TYPE string,
+      ls_amount     TYPE fdt_s_amount,
+      ls_quantity   TYPE fdt_s_quantity,
+      ls_timepoint  TYPE fdt_s_timepoint,
+      lo_descr      TYPE REF TO cl_abap_typedescr,
+      lx_root       TYPE REF TO cx_root.
+
+    FIELD-SYMBOLS:
+      <la_any>      TYPE any.
+
+    "JSON example:' "A", "AMOUNT":1234,"CURRENCY":"EUR"} ...'
+    lo_descr = cl_abap_typedescr=>describe_by_data( ca_data ).
+
+    "1. get the special type
+    SHIFT cv_json UP TO '"'.
+    SHIFT cv_json BY 1 PLACES. "eleminate quotes '"'
+    get_string(
+      IMPORTING
+        ev_string = lv_token
+      CHANGING
+        cv_json = cv_json ).
+
+    SHIFT cv_json UP TO ','.
+    SHIFT cv_json BY 1 PLACES. "eleminate comma ','
+    CASE lv_token.
+      WHEN if_fdt_constants=>gc_element_type_amount.
+        ASSIGN ls_amount TO <la_any>.
+      WHEN if_fdt_constants=>gc_element_type_quantity.
+        ASSIGN ls_quantity TO <la_any>.
+      WHEN if_fdt_constants=>gc_element_type_timepoint.
+        ASSIGN ls_timepoint TO <la_any>.
+      WHEN OTHERS.
+        RETURN. "?
+    ENDCASE.
+
+    "2. get values for special type
+    IF <la_any> IS ASSIGNED.
+      json_to_data_internal(
+        CHANGING
+          cv_json = cv_json
+          ca_data = <la_any> ).
+      TRY.
+          CASE lv_token.
+            WHEN if_fdt_constants=>gc_element_type_amount.
+              "Check target type
+              CASE lo_descr->absolute_name.
+                WHEN gc_element_amount
+                  OR gc_fdt_amount.
+                  ca_data = ls_amount.                "no conversion needed
+                WHEN gc_element_number.
+                  ca_data = ls_amount-number.
+                WHEN gc_element_text.
+                  ca_data = cl_fdt_amount_conv=>to_string( ls_amount ).
+                WHEN OTHERS.
+                  CASE lo_descr->type_kind.
+                    WHEN cl_abap_typedescr=>typekind_float
+                      OR cl_abap_typedescr=>typekind_decfloat
+                      OR cl_abap_typedescr=>typekind_decfloat16
+                      OR cl_abap_typedescr=>typekind_decfloat34
+                      OR cl_abap_typedescr=>typekind_packed
+                      OR cl_abap_typedescr=>typekind_int
+                      OR cl_abap_typedescr=>typekind_int8.
+                      ca_data = ls_amount-number.
+                    WHEN cl_abap_typedescr=>typekind_clike
+                      OR cl_abap_typedescr=>typekind_char
+                      OR cl_abap_typedescr=>typekind_string.
+                      ca_data = cl_fdt_amount_conv=>to_string( ls_amount ).
+                    WHEN OTHERS.
+                      CLEAR ca_data. "no conversion possible
+                  ENDCASE.
+              ENDCASE.
+            WHEN if_fdt_constants=>gc_element_type_quantity.
+              CASE lo_descr->absolute_name.
+                WHEN gc_element_quantity
+                  OR gc_fdt_quantity.
+                  ca_data = ls_quantity.              "no conversion needed
+                WHEN gc_element_number.
+                  ca_data = ls_quantity-number.
+                WHEN gc_element_text.
+                  ca_data = cl_fdt_quantity_conv=>to_string( ls_quantity ).
+                WHEN OTHERS.
+                  CASE lo_descr->type_kind.
+                    WHEN cl_abap_typedescr=>typekind_float
+                      OR cl_abap_typedescr=>typekind_decfloat
+                      OR cl_abap_typedescr=>typekind_decfloat16
+                      OR cl_abap_typedescr=>typekind_decfloat34
+                      OR cl_abap_typedescr=>typekind_packed
+                      OR cl_abap_typedescr=>typekind_int
+                      OR cl_abap_typedescr=>typekind_int8.
+                      ca_data = ls_quantity-number.
+                    WHEN cl_abap_typedescr=>typekind_clike
+                      OR cl_abap_typedescr=>typekind_char
+                      OR cl_abap_typedescr=>typekind_string.
+                      ca_data = cl_fdt_quantity_conv=>to_string( ls_quantity ).
+                    WHEN OTHERS.
+                      CLEAR ca_data. "no conversion possible
+                  ENDCASE.
+              ENDCASE.
+            WHEN if_fdt_constants=>gc_element_type_timepoint.
+              CASE lo_descr->absolute_name.
+                WHEN gc_element_timepoint
+                  OR gc_fdt_timepoint.
+                  ca_data = ls_timepoint.             "no conversion needed
+                WHEN gc_element_number.
+                  ca_data = ls_timepoint-timestamp.
+                WHEN gc_element_text.
+                  ca_data = cl_fdt_date_time=>convert_timepoint_to_text( ls_timepoint ).
+                WHEN OTHERS.
+                  CASE lo_descr->type_kind.
+                    WHEN cl_abap_typedescr=>typekind_float
+                      OR cl_abap_typedescr=>typekind_decfloat
+                      OR cl_abap_typedescr=>typekind_decfloat16
+                      OR cl_abap_typedescr=>typekind_decfloat34
+                      OR cl_abap_typedescr=>typekind_packed
+                      OR cl_abap_typedescr=>typekind_int
+                      OR cl_abap_typedescr=>typekind_int8.
+                      ca_data = ls_timepoint-timestamp.
+                    WHEN cl_abap_typedescr=>typekind_clike
+                      OR cl_abap_typedescr=>typekind_char
+                      OR cl_abap_typedescr=>typekind_string.
+                      ca_data = cl_fdt_date_time=>convert_timepoint_to_text( ls_timepoint ).
+                    WHEN cl_abap_typedescr=>typekind_date.
+                      ca_data = ls_timepoint-date.
+                    WHEN cl_abap_typedescr=>typekind_time.
+                      ca_data = ls_timepoint-time.
+                    WHEN OTHERS.
+                      CLEAR ca_data. "no conversion possible
+                  ENDCASE.
+              ENDCASE.
+          ENDCASE.
+        CATCH cx_root INTO lx_root.
+          CLEAR ca_data.
+      ENDTRY.
+
+      "to end the level - as this sign is already stripped in method before
+      CONCATENATE '}' cv_json INTO cv_json RESPECTING BLANKS.
+
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD JSON_TO_DATA.
+
+    DATA:
+      lv_json TYPE string.
+
+    lv_json = iv_json.
+    json_to_data_internal(
+      CHANGING
+        cv_json = lv_json
+        ca_data = ca_data ).
+
+  ENDMETHOD.
+
+
+  METHOD JSON_TO_DATA_INTERNAL.
+    "JSON               ABAP
+    "{...} object  -->  field, structure, ...
+    "[...] array   -->  table
+    DATA:
+      lv_char      TYPE c,
+      lv_token     TYPE string,
+      lv_dummy     TYPE string,   "is used in case of invalid fieldname
+      lt_dummy     LIKE STANDARD TABLE OF lv_dummy, "is used in case of invalid table
+      lv_is_filled TYPE abap_bool,
+      lr_line      TYPE REF TO data,
+      lr_td        TYPE REF TO cl_abap_typedescr,
+      lr_ttd       TYPE REF TO cl_abap_tabledescr,
+      lx_root      TYPE REF TO cx_root.
+    FIELD-SYMBOLS:
+      <la_any>  TYPE any,
+      <la_line> TYPE any,
+      <lt_any>  TYPE ANY TABLE,
+      <lt_srtd> TYPE SORTED TABLE,
+      <lt_hash> TYPE HASHED TABLE,
+      <lt_stnd> TYPE STANDARD TABLE.
+
+    lr_td = cl_abap_typedescr=>describe_by_data( ca_data ).
+    CASE lr_td->type_kind.
+      WHEN cl_abap_typedescr=>typekind_dref.
+        ASSIGN ca_data->* TO <la_any>.
+        IF sy-subrc <> 0. ASSIGN lv_dummy TO <la_any>. ENDIF.
+      WHEN OTHERS.
+        ASSIGN ca_data TO <la_any>.
+    ENDCASE.
+    WHILE strlen( cv_json ) > 0.
+      lv_char = cv_json(1).
+      SHIFT cv_json BY 1 PLACES.
+      CASE lv_char.
+        WHEN '{'.   "object starts --> next level
+          json_to_data_internal(
+            EXPORTING
+              iv_is_tabline = abap_false
+            IMPORTING
+              ev_is_filled  = ev_is_filled
+            CHANGING
+              cv_json     = cv_json
+              ca_data     = <la_any> ).
+        WHEN '['.   "array starts --> next level
+          lr_td = cl_abap_typedescr=>describe_by_data( <la_any> ).
+          IF lr_td->kind EQ cl_abap_typedescr=>kind_table.
+            ASSIGN <la_any> TO <lt_any>.
+          ELSE. "Type mismatch - to prevent short dump
+            ASSIGN lt_dummy TO <lt_any>.
+          ENDIF.
+          CREATE DATA lr_line LIKE LINE OF <lt_any>.
+          ASSIGN lr_line->* TO <la_line>.
+          CLEAR lv_is_filled.
+          json_to_data_internal(
+            EXPORTING
+              iv_is_tabline = abap_true
+            IMPORTING
+              ev_is_filled  = lv_is_filled
+            CHANGING
+              cv_json     = cv_json
+              ca_data     = <la_line> ).
+          IF <la_line> IS NOT INITIAL
+          OR lv_is_filled EQ abap_true.
+            ev_is_filled = abap_true.
+            lr_td = cl_abap_typedescr=>describe_by_data( <lt_any> ).
+            lr_ttd ?= lr_td.
+            IF lr_ttd->table_kind EQ cl_abap_tabledescr=>tablekind_sorted.
+              "           sorted table
+              ASSIGN <lt_any> TO <lt_srtd>.
+              INSERT <la_line> INTO TABLE <lt_srtd>.
+            ELSEIF lr_ttd->table_kind = cl_abap_tabledescr=>tablekind_hashed.
+              "           hashed table
+              ASSIGN <lt_any> TO <lt_hash>.
+              INSERT <la_line> INTO TABLE <lt_hash>.
+            ELSE.
+              "           standard table
+              ASSIGN <lt_any> TO <lt_stnd>.
+              APPEND <la_line> TO <lt_stnd>.
+            ENDIF.
+          ENDIF.
+        WHEN ']'.   "Array ends --> previous level
+          IF lv_token IS NOT INITIAL.
+            convert_token(
+              EXPORTING
+                ia_data      = <la_any>
+              CHANGING
+                cv_token     = lv_token ).
+            TRY.
+                <la_any> = lv_token.
+                ev_is_filled = abap_true.
+              CATCH cx_root INTO lx_root.               "#EC NO_HANDLER
+            ENDTRY.
+          ENDIF.
+          RETURN.
+        WHEN '}'.   "Object ends --> previous level
+          IF lv_token IS NOT INITIAL.
+            convert_token(
+              EXPORTING
+                ia_data      = <la_any>
+              CHANGING
+                cv_token     = lv_token ).
+            TRY.
+                <la_any> = lv_token.
+                ev_is_filled = abap_true.
+              CATCH cx_root INTO lx_root.               "#EC NO_HANDLER
+            ENDTRY.
+          ENDIF.
+          RETURN.
+        WHEN ':'.   "key ends, value starts
+          TRANSLATE lv_token TO UPPER CASE.
+          SHIFT lv_token LEFT DELETING LEADING space.
+          IF lv_token IS NOT INITIAL.
+            IF lv_token EQ '$ROOT'.              "Do nothing - already assigned!
+            ELSEIF lv_token EQ '$T'.             "ignore the value! do special things
+              json_to_brf_struc(
+                CHANGING
+                  ca_data    = <la_any>
+                  cv_json    = cv_json ).
+              ev_is_filled = abap_true.
+            ELSE.
+              ASSIGN COMPONENT lv_token OF STRUCTURE ca_data TO <la_any>.
+              IF sy-subrc NE 0.                  "Field not found?
+                ASSIGN lv_dummy TO <la_any>.     "ignore the value!
+              ENDIF.
+            ENDIF.
+          ENDIF.
+          CLEAR lv_token.
+        WHEN ','.   "next value -- same level
+          IF lv_token IS NOT INITIAL.
+            convert_token(
+              EXPORTING
+                ia_data      = <la_any>
+              CHANGING
+                cv_token     = lv_token ).
+            TRY.
+                <la_any> = lv_token.
+                ev_is_filled = abap_true.
+              CATCH cx_root INTO lx_root.               "#EC NO_HANDLER
+            ENDTRY.
+          ENDIF.
+          CLEAR lv_token.
+          IF iv_is_tabline EQ abap_true.  "to trigger next table line
+            CONCATENATE '[' cv_json INTO cv_json.
+            RETURN.
+          ENDIF.
+        WHEN '"'.    "string starts
+          get_string(
+            IMPORTING
+              ev_string = lv_token
+            CHANGING
+              cv_json = cv_json ).
+        WHEN OTHERS. "ie. numbers, ...
+          CONCATENATE lv_token lv_char INTO lv_token.
+      ENDCASE.
+    ENDWHILE.
+  ENDMETHOD.
+ENDCLASS.
