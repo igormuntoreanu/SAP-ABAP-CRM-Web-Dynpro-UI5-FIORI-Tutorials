@@ -1,0 +1,13 @@
+oModel.read("/YLMoveSet", {
+                        filters: oFilters,
+                        success: function (oData, oResponse) {
+                            debugger;
+                        },
+                        error: function (oError) {
+                            debugger;
+                            const jsonString = oError.responseText.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                            const parsedObject = JSON.parse(jsonString);
+                            const errorMessage = parsedObject.error.innererror.errordetails[0].message;
+                            MessageBox.error(errorMessage);
+                        }
+                    })
