@@ -7,3 +7,5 @@
               iv_msg_id                 = 'V1'
               iv_msg_number             = 302
               iv_msg_v1                 = CONV #( lv_so ) ).
+
+          mo_context->get_message_container( )->add_messages_from_bapi( EXPORTING it_bapi_messages = lt_return ). "bapiret2_t
