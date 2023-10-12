@@ -1,0 +1,79 @@
+A union combines rows of tables to one result. The keyword to use it is UNION or UNION ALL. Without the keyword ALL the duplicates will be removed.
+Important when dealing with a UNION is that all selected fields of tables must match. The constant # can be assigned manually if needed.
+
+_________
+
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'CDS Merging all Selects of Yard Tasks'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+define view entity ZYARD_TU_YTS_FINAL
+  as select from ZYARD_TU_YTS
+{
+  key YtDbkey,
+  key YtItemDbKey,
+  key TuKey,
+      tu_num_ext,
+      yard_no,
+      yard_task_no,
+      activity_category,
+      activity_category_desc,
+      activity_type,
+      activity_type_text,
+      lifecycle_status,
+      LIFECYCLE_STATUS_DESC,
+      driver_type,
+      tanum,
+      who,
+      stor_typesrc,
+      stor_sectionsrc,
+      stor_binsrc,
+      stor_typedst,
+      stor_sectiondst,
+      stor_bindst,
+      confirmed_by,
+      confirmed_on,
+      start_tmstmp_plan,
+      @Semantics.quantity.unitOfMeasure : 'time_unit'
+      duration_plan,
+      time_unit,
+      start_tmstmp_act,
+      @Semantics.quantity.unitOfMeasure : 'time_unit'
+      duration_act
+}
+union select from ZYARD_TU_YTS_1
+{
+  key YtDbkey,
+  key YtItemDbKey,
+  key TuKey,
+      tu_no_ext as tu_num_ext,
+      yard_no,
+      yard_task_no,
+      activity_category,
+      activity_category_desc,
+      activity_type,
+      activity_type_text,
+      lifecycle_status,
+      LIFECYCLE_STATUS_DESC,
+      driver_type,
+      tanum,
+      who,
+      stor_typesrc,
+      stor_sectionsrc,
+      stor_binsrc,
+      stor_typedst,
+      stor_sectiondst,
+      stor_bindst,
+      confirmed_by,
+      confirmed_on,
+      start_tmstmp_plan,
+      duration_plan,
+      time_unit,
+      start_tmstmp_act,
+      duration_act
+}
