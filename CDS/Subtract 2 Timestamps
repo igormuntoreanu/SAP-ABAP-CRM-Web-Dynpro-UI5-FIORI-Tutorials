@@ -1,0 +1,2 @@
+//Calculate Time since Checkin in Days
+cast(round( tstmp_seconds_between( act.tu_arrival_tstmp, tstmp_current_utctimestamp(), 'NULL' ) / 86400 , 0 ) as abap.int8 ) as DaysSinceCheckIn
