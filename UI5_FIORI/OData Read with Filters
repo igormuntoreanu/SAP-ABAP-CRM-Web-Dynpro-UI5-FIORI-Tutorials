@@ -41,33 +41,506 @@
             })
         }
 
-________________________________________
+______________________________________________________________________________________________
 manifest.json
-"dataSources": {
+{
+
+    "_version": "1.37.0",
+
+    "sap.app": {
+
+        "id": "yardtu",
+
+        "type": "application",
+
+        "i18n": "i18n/i18n.properties",
+
+        "applicationVersion": {
+
+            "version": "0.0.1"
+
+        },
+
+        "title": "{{appTitle}}",
+
+        "description": "{{appDescription}}",
+
+        "resources": "resources.json",
+
+        "sourceTemplate": {
+
+            "id": "@sap/generator-fiori:lrop",
+
+            "version": "1.10.1",
+
+            "toolsId": "c5af002c-aee6-41fb-b147-9996353988cd"
+
+        },
+
+        "dataSources": {
+
             "mainService": {
+
                 "uri": "/sap/opu/odata/sap/ZYARD_FIORI_TUS_CDS_CDS_SRV/",
+
                 "type": "OData",
+
                 "settings": {
+
                     "annotations": [
+
                         "ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL",
+
                         "annotation"
+
                     ],
+
                     "localUri": "localService/metadata.xml",
+
                     "odataVersion": "2.0"
+
                 }
+
             },
+
             "ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL": {
+
                 "uri": "/sap/opu/odata/IWFND/CATALOGSERVICE;v=2/Annotations(TechnicalName='ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL',Version='0001')/$value/",
+
                 "type": "ODataAnnotation",
+
                 "settings": {
+
                     "localUri": "localService/ZYARD_FIORI_TUS_CDS_CDS_ANNO_MDL.xml"
+
                 }
+
             },
+
             "annotation": {
+
                 "type": "ODataAnnotation",
+
                 "uri": "annotations/annotation.xml",
+
                 "settings": {
+
                     "localUri": "annotations/annotation.xml"
+
                 }
+
             }
+
         }
+
+    },
+
+    "sap.ui": {
+
+        "technology": "UI5",
+
+        "icons": {
+
+            "icon": "",
+
+            "favIcon": "",
+
+            "phone": "",
+
+            "phone@2": "",
+
+            "tablet": "",
+
+            "tablet@2": ""
+
+        },
+
+        "deviceTypes": {
+
+            "desktop": true,
+
+            "tablet": true,
+
+            "phone": true
+
+        }
+
+    },
+
+    "sap.ui5": {
+
+        "flexEnabled": true,
+
+        "dependencies": {
+
+            "minUI5Version": "1.96.23",
+
+            "libs": {
+
+                "sap.m": {},
+
+                "sap.ui.core": {},
+
+                "sap.ushell": {},
+
+                "sap.f": {},
+
+                "sap.ui.comp": {},
+
+                "sap.ui.generic.app": {},
+
+                "sap.suite.ui.generic.template": {}
+
+            }
+
+        },
+
+        "contentDensities": {
+
+            "compact": true,
+
+            "cozy": true
+
+        },
+
+        "models": {
+
+            "i18n": {
+
+                "type": "sap.ui.model.resource.ResourceModel",
+
+                "settings": {
+
+                    "bundleName": "yardtu.i18n.i18n"
+
+                }
+
+            },
+
+            "": {
+
+                "dataSource": "mainService",
+
+                "preload": true,
+
+                "settings": {
+
+                    "defaultBindingMode": "TwoWay",
+
+                    "defaultCountMode": "Inline",
+
+                    "refreshAfterChange": false,
+
+                    "metadataUrlParams": {
+
+                        "sap-value-list": "none"
+
+                    }
+
+                }
+
+            },
+
+            "@i18n": {
+
+                "type": "sap.ui.model.resource.ResourceModel",
+
+                "uri": "i18n/i18n.properties"
+
+            }
+
+        },
+
+        "resources": {
+
+            "css": []
+
+        },
+
+        "routing": {
+
+            "config": {},
+
+            "routes": [],
+
+            "targets": {}
+
+        },
+
+        "extends": {
+
+            "extensions": {
+
+                "sap.ui.controllerExtensions": {
+
+                    "sap.suite.ui.generic.template.ListReport.view.ListReport": {
+
+                        "controllerName": "yardtu.ext.controller.ListReportExt",
+
+                        "sap.ui.generic.app": {
+
+                            "ZYARD_FIORI_TUS_CDS": {
+
+                                "EntitySet": "ZYARD_FIORI_TUS_CDS"
+
+                            }
+
+                        }
+
+                    },
+
+                    "sap.suite.ui.generic.template.ObjectPage.view.Details": {
+
+                        "controllerName": "yardtu.ext.controller.ObjectPageExt",
+
+                        "sap.ui.generic.app": {
+
+                            "ZYARD_FIORI_TUS_CDS": {
+
+                                "EntitySet": "ZYARD_FIORI_TUS_CDS",
+
+                                "Header": {
+
+                                    "Actions": {
+
+                                        "MoveIntoDoorButton": {
+
+                                            "id": "MoveIntoDoorButtonButton",
+
+                                            "text": "Move Into Door",
+
+                                            "press": "MoveIntoDoor",
+
+                                            "requiresSelection": true,
+
+                                            "logicalAction": "Test"
+
+                                        },
+
+                                        "MoveOutOfDoor": {
+
+                                            "id": "MoveOutOfDoorButton",
+
+                                            "text": "Move Out of Door",
+
+                                            "press": "MoveOutOfDoor",
+
+                                            "requiresSelection": true,
+
+                                            "logicalAction": "Test1"
+
+                                        },
+
+                                        "IMUnloading": {
+
+                                            "id": "IMUnloading",
+
+                                            "text": "IMUnloading",
+
+                                            "press": "IMUnloading",
+
+                                            "requiresSelection": true,
+
+                                            "logicalAction": "Test2"
+
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                },
+
+                "sap.ui.viewExtensions": {
+
+                    "sap.suite.ui.generic.template.ListReport.view.ListReport": {
+
+                        "SmartFilterBarControlConfigurationExtension|ZYARD_FIORI_TUS_CDS": {
+
+                            "className": "sap.ui.core.Fragment",
+
+                            "fragmentName": "yardtu.ext.fragments.customFilters",
+
+                            "type": "XML"
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    },
+
+    "sap.ui.generic.app": {
+
+        "_version": "1.3.0",
+
+        "settings": {
+
+            "forceGlobalRefresh": false,
+
+            "objectPageHeaderType": "Dynamic",
+
+            "considerAnalyticalParameters": true,
+
+            "showDraftToggle": false,
+
+            "flexibleColumnLayout": {
+
+                "defaultTwoColumnLayoutType": "TwoColumnsMidExpanded",
+
+                "defaultThreeColumnLayoutType": "ThreeColumnsMidExpanded"
+
+            }
+
+        },
+
+        "pages": {
+
+            "ListReport|ZYARD_FIORI_TUS_CDS": {
+
+                "entitySet": "ZYARD_FIORI_TUS_CDS",
+
+                "component": {
+
+                    "name": "sap.suite.ui.generic.template.ListReport",
+
+                    "list": true,
+
+                    "settings": {
+
+                        "smartVariantManagement": true,
+
+                        "enableTableFilterInPageVariant": true,
+
+                        "filterSettings": {
+
+                            "dateSettings": {
+
+                                "useDateRange": true
+
+                            }
+
+                        },
+
+                        "tableSettings": {
+
+                            "multiSelect": false,
+
+                            "type": "ResponsiveTable"
+
+                        },
+
+                        "dataLoadSettings": {
+
+                            "loadDataOnAppLaunch": "always"
+
+                        }
+
+                    }
+
+                },
+
+                "pages": {
+
+                    "ObjectPage|ZYARD_FIORI_TUS_CDS": {
+
+                        "entitySet": "ZYARD_FIORI_TUS_CDS",
+
+                        "defaultLayoutTypeIfExternalNavigation": "MidColumnFullScreen",
+
+                        "component": {
+
+                            "name": "sap.suite.ui.generic.template.ObjectPage",
+
+                            "settings": {
+
+                                "sections": {
+
+                                    "ProductsTable": {
+
+                                        "tableSettings": {
+
+                                            "type": "ResponsiveTable"
+
+                                        }
+
+                                    },
+
+                                    "YardOrderTable": {
+
+                                        "tableSettings": {
+
+                                            "type": "ResponsiveTable"
+
+                                        }
+
+                                    },
+
+                                    "References": {
+
+                                        "tableSettings": {
+
+                                            "type": "ResponsiveTable"
+
+                                        }
+
+                                    },
+
+                                    "Deliveries": {
+
+                                        "tableSettings": {
+
+                                            "type": "ResponsiveTable"
+
+                                        }
+
+                                    },
+
+                                    "YardTasksTable": {
+
+                                        "tableSettings": {
+
+                                            "type": "ResponsiveTable"
+
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
+                        },
+
+                        "pages": {}
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    },
+
+    "sap.fiori": {
+
+        "registrationIds": [],
+
+        "archeType": "transactional"
+
+    }
+
+}
