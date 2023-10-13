@@ -1,0 +1,26 @@
+
+//Results like: 30d12h30m
+DATA lv_tuarrival TYPE c LENGTH 15.
+DATA lv_days TYPE p DECIMALS 3.
+DATA lv_decimals TYPE decfloat16.
+DATA lv_days_i TYPE i.
+DATA lv_hours_i TYPE i.
+DATA lv_min_i TYPE i.
+
+GET TIME STAMP FIELD DATA(lv_actualtimestamp).
+BREAK-POINT.
+DATA(lv_seconds) = cl_abap_tstmp=>subtract( tstmp1 = lv_actualtimestamp tstmp2 = CONV #('20230913124221') ).
+"Get Days
+lv_days = lv_seconds / 86400. "Seconds per day
+lv_decimals = frac( lv_days ).
+"Get Hours
+DATA(lv_hours) = lv_decimals * 24.
+"Get Minutes
+lv_decimals = frac( lv_hours ).
+DATA(lv_min) = lv_decimals * 60.
+"Truncate it to ignore decimals.
+lv_days_i = trunc( lv_days ).
+lv_hours_i = trunc( lv_hours ).
+lv_min_i   = trunc( lv_min ).
+
+lv_tuarrival = lv_days_i && 'd ' && lv_hours_i && 'h ' && lv_min_i && 'm'.
