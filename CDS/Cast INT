@@ -1,0 +1,1 @@
+cast( 0  as abap.int4)                                                 as LastConfSeconds,
