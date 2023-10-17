@@ -1,0 +1,893 @@
+CDS:
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'CDS for YARD TUs FIORI'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+
+//@OData.publish: true - Using SEGW instead
+
+@Search.searchable: true
+
+@UI.headerInfo.typeNamePlural: 'TUs'
+@UI.headerInfo.typeName: 'Transportation Unit'
+@UI.headerInfo.title.value: 'TuNumExt'
+@UI.headerInfo.description.value: 'TuType'
+
+define view entity ZYARD_FIORI_TUS_CDS
+  as select distinct from zyard_tus_join as tu
+  association [*] to ZYARD_TU_PROD_CDS        as _prod       on $projection.DbKeyTu = _prod.RootKey
+  association [*] to zyard_yo_hdr             as _headers    on $projection.DbKeyAct = _headers.TuSrActKey
+  association [*] to ZYARD_TU_YTS_FINAL       as _tasks      on $projection.DbKeyTu = _tasks.TuKey
+  association [*] to ZYARD_TUS_REFERENCES     as _references on $projection.DbKeyTu = _references.DbKeyTu
+  association [*] to ZYARD_TUS_DELIVERIES_CDS as _deliveries on $projection.DbKeyTu = _deliveries.DbKeyTu
+{
+
+      @UI.facet: [{ purpose: #STANDARD,
+                    type: #COLLECTION,
+                    id: 'TUDETAILSID',
+                    label: 'TU Details'
+                  },
+                  { purpose: #STANDARD,
+                    type: #FIELDGROUP_REFERENCE,
+                    targetQualifier: 'TUDETAILS',
+                    parentId: 'TUDETAILSID',
+                    position: 10
+                  },
+                  { purpose: #STANDARD,
+                    id: 'ProductsTable',
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_prod',
+                    label: 'Products',
+                    position: 20
+                  },
+                  { purpose: #STANDARD,
+                    id: 'YardOrderTable', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_headers',
+                    label: 'Yard Order',
+                    position: 30
+                  },
+                  { purpose: #STANDARD,
+                    id: 'YardTasksTable', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_tasks',
+                    label: 'Yard Task',
+                    position: 40
+                  },
+                  { purpose: #STANDARD,
+                    id: 'References', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_references',
+                    label: 'References',
+                    position: 50
+                  },
+                  { purpose: #STANDARD,
+                    id: 'Deliveries', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_deliveries',
+                    label: 'Deliveries',
+                    position: 60
+                  }]
+
+  key tu.DbKeyTu                                                             as DbKeyTu,
+      @UI.hidden: true
+  key tu.DbKeyAct                                                            as DbKeyAct,
+      @UI.hidden: true
+  key tu.DbKeyItem                                                           as DbKeyItem,
+      @UI.hidden: true
+  key tu.DbKeyHeader                                                         as DbKeyHeader,
+      //      @UI: { lineItem: [{ position: 10, cssDefault: { width: '10rem' }},
+      //        { type: #FOR_ACTION, invocationGrouping: #CHANGE_SET, position: 0, dataAction: 'MPC_EXT:MoveIntoDoor', label: 'Move into Door'},
+      //        { type: #FOR_ACTION, invocationGrouping: #CHANGE_SET, position: 0, dataAction: 'MPC_EXT:UnloadIntoIM', label: 'Unload into IM'}
+      //      ]}
+      @UI.selectionField: [{ position: 10 }]
+      @UI.lineItem: [{ position: 10, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 10 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.yard_no                                                             as YardNo,
+
+      @UI.selectionField: [{ position: 20 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'zyard_tus_join', element : 'tu_num_ext' }}]
+      @UI.lineItem: [{ position: 20, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 20 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.tu_num_ext                                                          as TuNumExt,
+
+      @UI.selectionField: [{ position: 30 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_TU_TYPE_VH', element : 'TuType' }}]
+      @UI.lineItem: [{ position: 100, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 90 }]
+      tu.tu_type                                                             as TuType,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'zyard_tus_join', element : 'tu_num' }}]
+      @UI.lineItem: [{ position: 30, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 30 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.tu_num                                                              as TuNum,
+
+      @UI.selectionField: [{ position: 40 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_BIN_VH', element : 'lgpla' }}]
+      @UI.lineItem: [{ position: 40, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 40 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.stor_bin                                                            as StorBin,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_SECTION_VH', element : 'lgber' }}]
+      @UI.lineItem: [{ position: 50, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 50 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.stor_section                                                        as StorSection,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_TYPE_VH', element : 'lgtyp' }}]
+      @UI.lineItem: [{ position: 60, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 60 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.stor_type                                                           as StorType,
+
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 70 }]
+      tu.mtr                                                                 as Mtr,
+
+      @UI.hidden: true
+      tu.pmat                                                                as Pmat,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_PRODUCT_VH', element : 'matnr' }}]
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @EndUserText.label: 'Pack.Material'
+      cast( ''  as abap.char(40))                                            as FilterMaterial,
+
+      @UI.selectionField: [{ position: 50 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_PRODUCT_VH', element : 'matnr' }}]
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @EndUserText.label: 'Product'
+      cast( ''  as abap.char(40))                                            as FilterProduct,
+
+      @UI.selectionField: [{ position: 60 }]
+      @EndUserText.label: 'Delivery'
+      cast( ''  as abap.char(10))                                            as FilterDelivery,
+
+      @EndUserText.label: 'Reference(Any)'
+      cast( ''  as abap.char(40))                                            as FilterReference,
+
+      @UI.selectionField: [{ position: 70 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_LICENSE_PLATE_VH', element : 'lic_plate' }}]
+      @UI.lineItem: [{ position: 110, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 100 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.lic_plate                                                           as LicPlate,
+
+      //      @UI.selectionField: [{ position: 80 }]
+      //      @EndUserText.label: 'Message'
+      //      cast('' as abap.char(200))                                             as FilterMessage,
+
+      @UI.selectionField: [{ position: 80 }]
+      @EndUserText.label: 'Message/Comment TU'
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 160 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.yl_comment                                                          as Message,
+
+      @UI.lineItem: [{ position: 70, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 80 }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @EndUserText.label: 'Pack.Material'
+      cast( ''  as abap.char(40))                                            as Material,
+
+      @UI.lineItem: [{ position: 80, cssDefault: { width: '20rem' }}]
+      @EndUserText.label: 'Delivery'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      cast( ''  as abap.char(110))                                           as Delivery,
+
+      @UI.lineItem: [{ position: 90, cssDefault: { width: '20rem' }}]
+      @EndUserText.label: 'Product'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      cast( ''  as abap.char(110))                                           as Product,
+
+      @UI.hidden: true
+      tu.tu_empty                                                            as TuEmpty,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_COUNTRIES_VH', element : 'land1' }}]
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 110 }]
+      tu.lic_plate_country                                                   as LicPlateCountry,
+
+      @EndUserText.label: 'TU Arrival Timestamp'
+      tu.tu_arrival_tstmp                                                    as TuArrivalTstmp,
+
+      @EndUserText.label: 'Time Since Checkin'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Filtered direclty in the DPC_EXT class because it is CAST field
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Sorted direclty in the DPC_EXT class because it is CAST field
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }, importance: #HIGH}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 110 }]
+      cast( ''  as abap.char(15))                                            as TuArrival,
+
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }}]
+      @EndUserText.label: 'Time Since Checkin in Seconds'
+      cast( 0  as abap.int4(10))                                             as TuArrivalSeconds,
+
+      @EndUserText.label: 'Time Last YT Conf.'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Filtered direclty in the DPC_EXT class because it is CAST field
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Sorted direclty in the DPC_EXT class because it is CAST field
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }, importance: #HIGH}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 110 }]
+      cast( ''  as abap.char(15))                                            as LastConf,
+
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }}]
+      @EndUserText.label: 'Time Last YT Conf. in Seconds'
+      cast( 0  as abap.int4)                                                 as LastConfSeconds,
+
+      @UI.lineItem: [{ position: 130, cssDefault: { width: '10rem' }}]
+      tu.archiving_status                                                    as ArchivingStatus,
+
+      @UI.lineItem: [{ position: 140, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 120 }]
+      tu.created_by                                                          as CreatedBy,
+
+      @UI.hidden: true
+      tu.created_on                                                          as CreatedOn,
+
+      @UI.lineItem: [{ position: 150, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 130 }]
+      @EndUserText.label: 'Created on'
+      cast(substring(cast(tu.created_on as abap.char(32)),1,8) as abap.dats) as CreatedOnConv,
+
+      @UI.lineItem: [{ position: 160, cssDefault: { width: '10rem' }}]
+      tu.changed_by                                                          as ChangedBy,
+
+      @UI.hidden: true
+      tu.changed_on                                                          as ChangedOn,
+
+      @UI.lineItem: [{ position: 170, cssDefault: { width: '10rem' }}]
+      @EndUserText.label: 'Changed on'
+      cast(substring(cast(tu.changed_on as abap.char(32)),1,8) as abap.dats) as ChangedOnConv,
+
+
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 140 }]
+      tu.tu_num_ext_ewm                                                      as TuNumExtEwm,
+
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 150 }]
+      tu.tu_num_ewm                                                          as TuNumEwm,
+
+      _prod,
+      _headers,
+      _tasks,
+      _references,
+      _deliveries
+
+}
+
+_____________________________
+Class:
+class ZCL_YARDTU_CDS_CALC definition
+  public
+  final
+  create public .
+
+public section.
+
+  interfaces IF_SADL_EXIT .
+  interfaces IF_SADL_EXIT_CALC_ELEMENT_READ .
+  interfaces IF_SADL_EXIT_FILTER_TRANSFORM .
+  interfaces IF_SADL_EXIT_SORT_TRANSFORM .
+protected section.
+private section.
+ENDCLASS.
+
+
+
+CLASS ZCL_YARDTU_CDS_CALC IMPLEMENTATION.
+
+
+METHOD if_sadl_exit_calc_element_read~calculate.
+
+  DATA: lt_cds          TYPE STANDARD TABLE OF zyard_fiori_tus_cds,
+        lv_delivery     TYPE zyard_fiori_tus_cds-delivery,
+        lv_prods        TYPE zyard_fiori_tus_cds-product,
+        lt_delivery_aux TYPE TABLE OF zyard_fiori_tus_cds-delivery,
+        lt_prods_aux    TYPE TABLE OF zyard_fiori_tus_cds-product.
+
+  DATA lv_tuarrival TYPE c LENGTH 15.
+  DATA lv_days TYPE p DECIMALS 3.
+  DATA lv_decimals TYPE decfloat16.
+  DATA lv_days_i TYPE i.
+  DATA lv_hours_i TYPE i.
+  DATA lv_min_i TYPE i.
+
+  MOVE-CORRESPONDING it_original_data[] TO lt_cds[].
+
+  IF lt_cds IS NOT INITIAL.
+    SELECT *
+      FROM zyard_fiori_tus_cds
+      INTO TABLE @DATA(lt_zyard_fiori_tus_cds)
+      FOR ALL ENTRIES IN @lt_cds
+      WHERE dbkeytu = @lt_cds-dbkeytu
+        AND dbkeyact = @lt_cds-dbkeyact
+        AND dbkeyitem = @lt_cds-dbkeyitem
+        AND dbkeyheader = @lt_cds-dbkeyheader.
+    IF sy-subrc = 0.
+      SORT lt_zyard_fiori_tus_cds BY dbkeytu dbkeyact dbkeyitem dbkeyheader.
+      SELECT tukey, confirmed_on
+        FROM zyard_tu_yts_final
+        INTO TABLE @DATA(lt_yts)
+        FOR ALL ENTRIES IN @lt_zyard_fiori_tus_cds
+        WHERE  tukey = @lt_zyard_fiori_tus_cds-dbkeytu.
+      IF sy-subrc = 0.
+        SORT lt_yts BY tukey confirmed_on DESCENDING.
+      ENDIF.
+    ENDIF.
+    SELECT db_key, pmat
+      FROM /sapyl/yard_tu
+      INTO TABLE @DATA(lt_yard)
+      FOR ALL ENTRIES IN @lt_cds
+      WHERE db_key = @lt_cds-dbkeytu.
+    IF sy-subrc = 0.
+      SORT lt_yard BY db_key.
+      SELECT *
+        FROM zyard_tus_deliveries_cds
+        INTO TABLE @DATA(lt_deliveries)
+        FOR ALL ENTRIES IN @lt_yard
+        WHERE dbkeytu = @lt_yard-db_key.
+      IF sy-subrc = 0.
+        SORT lt_deliveries BY dbkeytu.
+      ENDIF.
+
+      SELECT *
+        FROM zyard_tu_prod_cds
+        INTO TABLE @DATA(lt_prods)
+        FOR ALL ENTRIES IN @lt_yard
+        WHERE rootkey = @lt_yard-db_key.
+      IF sy-subrc = 0.
+        SORT lt_prods BY rootkey.
+      ENDIF.
+    ENDIF.
+
+  ENDIF.
+
+  LOOP AT lt_cds ASSIGNING FIELD-SYMBOL(<fs_cds>).
+    READ TABLE lt_yard INTO DATA(ls_yard) WITH KEY db_key = <fs_cds>-dbkeytu BINARY SEARCH.
+    IF sy-subrc = 0.
+      CALL FUNCTION 'CONVERSION_EXIT_MDLPD_OUTPUT'
+        EXPORTING
+          input  = ls_yard-pmat
+        IMPORTING
+          output = <fs_cds>-material.
+    ENDIF.
+    CLEAR lv_delivery.
+    LOOP AT lt_deliveries INTO DATA(ls_delivery) WHERE dbkeytu = <fs_cds>-dbkeytu.
+      READ TABLE lt_delivery_aux WITH KEY table_line = ls_delivery-delivery TRANSPORTING NO FIELDS.
+      IF sy-subrc <> 0. "Avoid duplicates
+        IF lv_delivery IS NOT INITIAL.
+          CONCATENATE lv_delivery ls_delivery-delivery INTO lv_delivery SEPARATED BY ';'.
+        ELSE.
+          lv_delivery = ls_delivery-delivery.
+        ENDIF.
+        APPEND ls_delivery-delivery TO lt_delivery_aux.
+      ENDIF.
+    ENDLOOP.
+    <fs_cds>-delivery = lv_delivery.
+
+    CLEAR lv_prods.
+    LOOP AT lt_prods INTO DATA(ls_prods) WHERE rootkey = <fs_cds>-dbkeytu.
+      READ TABLE lt_prods_aux WITH KEY table_line = ls_prods-matnr TRANSPORTING NO FIELDS.
+      IF sy-subrc <> 0. "Avoid duplicates
+        IF lv_prods IS NOT INITIAL.
+          SHIFT ls_prods-matnr LEFT DELETING LEADING '0'.
+          CONCATENATE lv_prods ls_prods-matnr INTO lv_prods SEPARATED BY ';'.
+        ELSE.
+          lv_prods = ls_prods-matnr.
+          SHIFT lv_prods LEFT DELETING LEADING '0'.
+        ENDIF.
+        APPEND ls_prods-matnr TO lt_prods_aux.
+      ENDIF.
+    ENDLOOP.
+    <fs_cds>-product = lv_prods.
+
+    "caclulate time since checkin
+    READ TABLE lt_zyard_fiori_tus_cds INTO DATA(ls_cds) WITH KEY dbkeytu = <fs_cds>-dbkeytu
+                                                                 dbkeyact = <fs_cds>-dbkeyact
+                                                                 dbkeyitem = <fs_cds>-dbkeyitem
+                                                                 dbkeyheader = <fs_cds>-dbkeyheader
+                                                        BINARY SEARCH.
+    IF sy-subrc = 0.
+
+      IF ls_cds-tuarrivaltstmp IS NOT INITIAL.
+        GET TIME STAMP FIELD DATA(lv_actualtimestamp).
+        DATA(lv_seconds) = cl_abap_tstmp=>subtract( tstmp1 = lv_actualtimestamp tstmp2 = ls_cds-tuarrivaltstmp ).
+        <fs_cds>-tuarrivalseconds = lv_seconds.
+        "Get Days
+        lv_days = lv_seconds / 86400. "Seconds per day
+        lv_decimals = frac( lv_days ).
+        "Get Hours
+        DATA(lv_hours) = lv_decimals * 24.
+        "Get Minutes
+        lv_decimals = frac( lv_hours ).
+        DATA(lv_min) = lv_decimals * 60.
+        "Truncate it to ignore decimals.
+        lv_days_i = trunc( lv_days ).
+        lv_hours_i = trunc( lv_hours ).
+        lv_min_i   = trunc( lv_min ).
+        <fs_cds>-tuarrival = lv_days_i && 'd ' && lv_hours_i && 'h ' && lv_min_i && 'm'.
+      ENDIF.
+    ENDIF.
+
+    "calculate last confirmed YT
+    READ TABLE lt_yts INTO DATA(ls_yt) WITH KEY tukey = <fs_cds>-dbkeytu BINARY SEARCH.
+    IF sy-subrc = 0.
+      IF ls_yt-confirmed_on IS NOT INITIAL.
+        GET TIME STAMP FIELD lv_actualtimestamp.
+        lv_seconds = cl_abap_tstmp=>subtract( tstmp1 = lv_actualtimestamp tstmp2 = ls_yt-confirmed_on ).
+        <fs_cds>-lastconfseconds = lv_seconds.
+        "Get Days
+        lv_days = lv_seconds / 86400. "Seconds per day
+        lv_decimals = frac( lv_days ).
+        "Get Hours
+        lv_hours = lv_decimals * 24.
+        "Get Minutes
+        lv_decimals = frac( lv_hours ).
+        lv_min = lv_decimals * 60.
+        "Truncate it to ignore decimals.
+        lv_days_i = trunc( lv_days ).
+        lv_hours_i = trunc( lv_hours ).
+        lv_min_i   = trunc( lv_min ).
+        <fs_cds>-lastconf = lv_days_i && 'd ' && lv_hours_i && 'h ' && lv_min_i && 'm'.
+      ENDIF.
+    ENDIF.
+
+    REFRESH: lt_prods_aux, lt_delivery_aux.
+  ENDLOOP.
+
+  MOVE-CORRESPONDING lt_cds[] TO ct_calculated_data[].
+
+ENDMETHOD.
+
+
+  method IF_SADL_EXIT_CALC_ELEMENT_READ~GET_CALCULATION_INFO.
+*    BREAK-POINT.
+  endmethod.
+
+
+METHOD if_sadl_exit_filter_transform~map_atom.
+
+  DATA: lv_guid TYPE /sapyl/yard_tu-pmat.
+  DATA(lo_condition_manager) = cl_sadl_cond_prov_factory_pub=>create_simple_cond_factory( ).
+
+  IF iv_element EQ 'FilterMaterial' OR iv_element EQ 'FilterProduct'.
+
+    IF iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'.
+      DATA(lo_filter) = lo_condition_manager->element( iv_name = 'PMAT' ).
+
+      CALL FUNCTION 'CONVERSION_EXIT_MDLPD_INPUT'
+        EXPORTING
+          input  = iv_value
+        IMPORTING
+          output = lv_guid.
+    ELSE.
+      lo_filter = lo_condition_manager->element( iv_name = iv_element ).
+    ENDIF.
+
+    CASE iv_operator.
+      WHEN if_sadl_exit_filter_transform~co_operator-equals.
+        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                                THEN lo_filter->equals( iv_value = lv_guid )
+                                ELSE lo_filter->equals( iv_value = iv_value ) ) .
+      WHEN if_sadl_exit_filter_transform~co_operator-less_than.
+        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                                THEN lo_filter->less_than( iv_value = lv_guid )
+                                ELSE lo_filter->less_than( iv_value = iv_value ) ) .
+      WHEN if_sadl_exit_filter_transform~co_operator-covers_pattern.
+        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct' ##TYPE
+                          THEN lo_filter->covers_pattern( iv_value = CONV #( lv_guid ) )
+                          ELSE lo_filter->covers_pattern( iv_value = iv_value ) ) .
+      WHEN if_sadl_exit_filter_transform~co_operator-is_null.
+        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                          THEN lo_filter->is_null( )
+                          ELSE lo_filter->is_null( ) ) .
+      WHEN if_sadl_exit_filter_transform~co_operator-greater_than.
+        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                          THEN lo_filter->greater_than( iv_value = lv_guid )
+                          ELSE lo_filter->greater_than( iv_value = iv_value ) ) .
+      WHEN OTHERS.
+        RAISE EXCEPTION TYPE cx_sadl_exit_filter_not_supp.
+    ENDCASE.
+
+  ELSE.
+    "Avoid Dump for Cast calculated CDS Columns
+*    lo_filter = lo_condition_manager->element( iv_name = 'TuNumExt' ).
+    DATA(lo_true) = lo_condition_manager->true( ).
+    ro_condition = lo_true.
+*    ro_condition = lo_filter->covers_pattern( iv_value = '*' ).
+  ENDIF.
+
+ENDMETHOD.
+
+
+METHOD if_sadl_exit_sort_transform~map_element.
+" Always with Uppercase
+  "CDS Cast Fields do not work
+*  CASE iv_element.
+*    WHEN 'TUARRIVAL'.
+*      APPEND VALUE #( name = 'TUARRIVALSECONDS' ) TO et_sort_elements.
+*    WHEN 'LASTCONF'.
+*      APPEND VALUE #( name = 'LASTCONFSECONDS' ) TO et_sort_elements.
+*    WHEN OTHERS.
+*  ENDCASE.
+
+ENDMETHOD.
+ENDCLASS.
+
+______________________________
+DPC_EXT:
+
+METHOD zyard_fiori_tus__get_entityset.
+  DATA lr_mat      TYPE RANGE OF zyard_fiori_tus_cds-filtermaterial.
+  DATA lv_del      TYPE likp-vbeln.
+  DATA lv_mat      TYPE /sapyl/tu_prod-matnr.
+  DATA ls_mat      LIKE LINE OF lr_mat.
+  DATA lt_del_so   TYPE /iwbep/t_cod_select_options.
+  DATA lt_prod_so  TYPE /iwbep/t_cod_select_options.
+  DATA lr_del      TYPE RANGE OF likp-vbeln.
+  DATA ls_del      LIKE LINE OF lr_del.
+  DATA lr_ref      TYPE RANGE OF /sapyl/yo_ref-reference_value.
+  DATA lr_lastconf  TYPE RANGE OF zyard_fiori_tus_cds-lastconf.
+  DATA lr_lastconfsecs  TYPE RANGE OF zyard_fiori_tus_cds-lastconfseconds.
+  DATA ls_lastconfsecs  LIKE LINE OF lr_lastconfsecs.
+  DATA lr_tuarrival TYPE RANGE OF zyard_fiori_tus_cds-tuarrival.
+  DATA lr_tuarrivalsecs TYPE RANGE OF zyard_fiori_tus_cds-tuarrivalseconds.
+  DATA ls_tuarrivalsecs LIKE LINE OF lr_tuarrivalsecs.
+  DATA lr_prod     TYPE RANGE OF zyard_tu_prod_cds-matnr.
+  DATA ls_ref      LIKE LINE OF lr_del.
+  DATA ls_prod     LIKE LINE OF lr_prod.
+
+  DATA tt_elements TYPE SORTED TABLE OF string WITH UNIQUE DEFAULT KEY.
+
+  DATA(it_filter_select_options_aux) = it_filter_select_options.
+  "Remove filters with CAST defined at CDS View!
+  DELETE it_filter_select_options_aux WHERE property = 'FilterDelivery'.
+  DELETE it_filter_select_options_aux WHERE property = 'FilterMaterial'.
+  DELETE it_filter_select_options_aux WHERE property = 'FilterReference'.
+  DELETE it_filter_select_options_aux WHERE property = 'FilterProduct'.
+  DELETE it_filter_select_options_aux WHERE property = 'TuArrival'.
+  DELETE it_filter_select_options_aux WHERE property = 'LastConf'.
+
+  DATA(lv_search) = iv_search_string.
+  IF NOT lv_search CS '*'.
+    lv_search = '*' && lv_search && '*'.
+  ENDIF.
+  DATA(lr_req) = io_tech_request_context->get_request_headers( ).
+  TRY.
+      super->zyard_fiori_tus__get_entityset( EXPORTING iv_entity_name           = iv_entity_name
+                                                       iv_entity_set_name       = iv_entity_set_name
+                                                       iv_source_name           = iv_source_name
+                                                       it_filter_select_options = it_filter_select_options_aux
+                                                       is_paging                = is_paging
+                                                       it_key_tab               = it_key_tab
+                                                       it_navigation_path       = it_navigation_path
+                                                       it_order                 = it_order
+                                                       iv_filter_string         = iv_filter_string
+                                                       iv_search_string         = lv_search
+                                                       io_tech_request_context  = io_tech_request_context
+                                             IMPORTING et_entityset             = et_entityset
+                                                       es_response_context      = es_response_context ).
+    CATCH /iwbep/cx_mgw_busi_exception .
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+    CATCH /iwbep/cx_mgw_tech_exception.
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_tech_exception.
+  ENDTRY.
+
+  " Try to find per Material and Delivery and Reference and Products
+  LOOP AT it_filter_select_options INTO DATA(ls_filter) WHERE property = 'FilterDelivery'.
+    LOOP AT ls_filter-select_options INTO DATA(ls_so).
+      CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+        EXPORTING
+          input  = ls_so-low
+        IMPORTING
+          output = lv_del.
+
+      CLEAR ls_so-low.
+      ls_so-low = lv_del.
+      APPEND ls_so TO lt_del_so.
+      CLEAR ls_so.
+    ENDLOOP.
+*    MOVE-CORRESPONDING ls_filter-select_options TO lr_del.
+    lr_del = CORRESPONDING #( BASE ( lr_del ) lt_del_so ).
+  ENDLOOP.
+
+  LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'FilterProduct'.
+    LOOP AT ls_filter-select_options INTO ls_so.
+      CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+        EXPORTING
+          input  = ls_so-low
+        IMPORTING
+          output = lv_mat.
+
+      CLEAR ls_so-low.
+      ls_so-low = lv_mat.
+      APPEND ls_so TO lt_prod_so.
+      CLEAR ls_so.
+    ENDLOOP.
+*    MOVE-CORRESPONDING ls_filter-select_options TO lr_prod.
+    lr_prod = CORRESPONDING #( BASE ( lr_prod ) lt_prod_so ).
+  ENDLOOP.
+
+  LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'FilterReference'.
+*    MOVE-CORRESPONDING ls_filter-select_options TO lr_ref.
+    lr_ref = CORRESPONDING #( BASE ( lr_ref ) ls_filter-select_options ).
+  ENDLOOP.
+
+  LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'LastConf'.
+*    MOVE-CORRESPONDING ls_filter-select_options TO lr_ref.
+    lr_lastconf = CORRESPONDING #( BASE ( lr_lastconf ) ls_filter-select_options ).
+  ENDLOOP.
+
+  LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'TuArrival'.
+*    MOVE-CORRESPONDING ls_filter-select_options TO lr_ref.
+    lr_tuarrival = CORRESPONDING #( BASE ( lr_tuarrival ) ls_filter-select_options ).
+  ENDLOOP.
+
+  IF iv_search_string IS NOT INITIAL OR lr_del  IS NOT INITIAL OR
+     lr_ref           IS NOT INITIAL OR lr_prod IS NOT INITIAL.
+
+    IF iv_search_string IS NOT INITIAL.
+      ls_mat-sign   = 'I'.
+      ls_mat-option = 'CP'.
+      ls_mat-low    = iv_search_string.
+      APPEND ls_mat TO lr_mat.
+
+      SELECT * " UP TO 99999 ROWS "Ensure performance
+        FROM zyard_fiori_tus_cds
+        INTO TABLE @DATA(lt_data)
+        WHERE pmat <> '00000000000000000000000000000000'.
+      IF sy-subrc = 0.
+        SORT lt_data BY material.
+        LOOP AT lt_data ASSIGNING FIELD-SYMBOL(<fs_data>).
+          CALL FUNCTION 'CONVERSION_EXIT_MDLPD_OUTPUT'
+            EXPORTING
+              input  = <fs_data>-pmat
+            IMPORTING
+              output = <fs_data>-filtermaterial.
+
+          <fs_data>-material = <fs_data>-filtermaterial.
+        ENDLOOP.
+
+        DELETE lt_data WHERE material NOT IN lr_mat.
+        et_entityset = CORRESPONDING #( BASE ( et_entityset ) lt_data ).
+
+      ENDIF.
+
+      " Find Delivery
+      ls_del-sign   = 'I'.
+      ls_del-option = 'CP'.
+      ls_del-low    = iv_search_string.
+      APPEND ls_del TO lr_del.
+
+      " Find Reference
+      ls_ref-sign   = 'I'.
+      ls_ref-option = 'CP'.
+      ls_ref-low    = iv_search_string.
+      APPEND ls_ref TO lr_ref.
+
+      " Find Product
+      ls_prod-sign   = 'I'.
+      ls_prod-option = 'CP'.
+      ls_prod-low    = iv_search_string.
+      APPEND ls_prod TO lr_prod.
+
+    ENDIF.
+
+    IF lr_del IS NOT INITIAL.
+      SELECT dbkeytu, delivery
+        FROM zyard_tus_deliveries_cds
+        INTO TABLE @DATA(lt_deliveries)
+        WHERE delivery IN @lr_del.
+      IF sy-subrc = 0.
+        SELECT *
+          FROM zyard_fiori_tus_cds
+          INTO TABLE @lt_data
+          FOR ALL ENTRIES IN @lt_deliveries
+          WHERE dbkeytu = @lt_deliveries-dbkeytu.
+        IF sy-subrc = 0.
+          et_entityset = CORRESPONDING #( BASE ( et_entityset ) lt_data ).
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    IF lr_ref IS NOT INITIAL.
+      SELECT dbkeytu, reference
+        FROM zyard_tus_references
+        INTO TABLE @DATA(lt_references)
+        WHERE reference IN @lr_ref.
+      IF sy-subrc = 0.
+        SELECT *
+          FROM zyard_fiori_tus_cds
+          INTO TABLE @lt_data
+          FOR ALL ENTRIES IN @lt_references
+          WHERE dbkeytu = @lt_references-dbkeytu.
+        IF sy-subrc = 0.
+          et_entityset = CORRESPONDING #( BASE ( et_entityset ) lt_data ).
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    IF lr_prod IS NOT INITIAL.
+      SELECT dbkey, rootkey, matnr
+        FROM zyard_tu_prod_cds
+        INTO TABLE @DATA(lt_prods)
+        WHERE matnr IN @lr_prod.
+      IF sy-subrc = 0.
+        SELECT *
+          FROM zyard_fiori_tus_cds
+          INTO TABLE @lt_data
+          FOR ALL ENTRIES IN @lt_prods
+          WHERE dbkeytu = @lt_prods-rootkey.
+        IF sy-subrc = 0.
+          et_entityset = CORRESPONDING #( BASE ( et_entityset ) lt_data ).
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    IF et_entityset IS INITIAL.
+      RETURN.
+    ENDIF.
+
+  ENDIF.
+
+  SORT et_entityset BY dbkeytu.
+  DELETE ADJACENT DUPLICATES FROM et_entityset COMPARING dbkeytu.
+
+  " $filter
+  IF lr_lastconf IS NOT INITIAL.
+    LOOP AT lr_lastconf ASSIGNING FIELD-SYMBOL(<fs_lastconf>).
+
+      ls_lastconfsecs-sign = <fs_lastconf>-sign.
+      ls_lastconfsecs-option = <fs_lastconf>-option.
+      DATA(lv_low) = <fs_lastconf>-low.
+      TRANSLATE lv_low USING 'd;'.
+      TRANSLATE lv_low USING 'h;'.
+      TRANSLATE lv_low USING 'm;'.
+      SPLIT lv_low AT ';' INTO TABLE DATA(lt_values).
+      LOOP AT lt_values ASSIGNING FIELD-SYMBOL(<fs_values>).
+        CASE  sy-tabix.
+          WHEN 1."d
+            DATA(lv_seconds_days_low) = <fs_values> * 86400 ##TYPE.
+          WHEN 2."h
+            DATA(lv_seconds_hours_low) = <fs_values> * 3600 ##TYPE.
+          WHEN 3."m
+            DATA(lv_seconds_mins_low) = <fs_values> * 60 ##TYPE.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+
+      REFRESH lt_values.
+      DATA(lv_high) = <fs_lastconf>-high.
+      TRANSLATE lv_high USING 'd;'.
+      TRANSLATE lv_high USING 'h;'.
+      TRANSLATE lv_high USING 'm;'.
+      SPLIT lv_high AT ';' INTO TABLE lt_values.
+      LOOP AT lt_values ASSIGNING <fs_values>.
+        CASE  sy-tabix.
+          WHEN 1."d
+            DATA(lv_seconds_days_high) = <fs_values> * 86400 ##TYPE.
+          WHEN 2."h
+            DATA(lv_seconds_hours_high) = <fs_values> * 3600 ##TYPE.
+          WHEN 3."m
+            DATA(lv_seconds_mins_high) = <fs_values> * 60 ##TYPE.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+
+      ls_lastconfsecs-low  =  lv_seconds_days_low + lv_seconds_hours_low + lv_seconds_mins_low.
+      ls_lastconfsecs-high = lv_seconds_days_high + lv_seconds_hours_high + lv_seconds_mins_high.
+      APPEND ls_lastconfsecs TO lr_lastconfsecs. CLEAR ls_lastconfsecs.
+    ENDLOOP.
+  ENDIF.
+
+  IF lr_tuarrival IS NOT INITIAL.
+    LOOP AT lr_tuarrival ASSIGNING FIELD-SYMBOL(<fs_tuarrival>).
+
+      ls_tuarrivalsecs-sign = <fs_tuarrival>-sign.
+      ls_tuarrivalsecs-option = <fs_tuarrival>-option.
+      lv_low = <fs_tuarrival>-low.
+      TRANSLATE lv_low USING 'd;'.
+      TRANSLATE lv_low USING 'h;'.
+      TRANSLATE lv_low USING 'm;'.
+      REFRESH lt_values.
+      SPLIT lv_low AT ';' INTO TABLE lt_values.
+      LOOP AT lt_values ASSIGNING <fs_values>.
+        CASE  sy-tabix.
+          WHEN 1."d
+            lv_seconds_days_low = <fs_values> * 86400.
+          WHEN 2."h
+            lv_seconds_hours_low = <fs_values> * 3600.
+          WHEN 3."m
+            lv_seconds_mins_low = <fs_values> * 60.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+
+      REFRESH lt_values.
+      lv_high = <fs_tuarrival>-high.
+      TRANSLATE lv_high USING 'd;'.
+      TRANSLATE lv_high USING 'h;'.
+      TRANSLATE lv_high USING 'm;'.
+      SPLIT lv_high AT ';' INTO TABLE lt_values.
+      LOOP AT lt_values ASSIGNING <fs_values>.
+        CASE  sy-tabix.
+          WHEN 1."d
+            lv_seconds_days_high = <fs_values> * 86400.
+          WHEN 2."h
+            lv_seconds_hours_high = <fs_values> * 3600.
+          WHEN 3."m
+            lv_seconds_mins_high = <fs_values> * 60.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+
+      ls_tuarrivalsecs-low  =  lv_seconds_days_low + lv_seconds_hours_low + lv_seconds_mins_low.
+      ls_tuarrivalsecs-high = lv_seconds_days_high + lv_seconds_hours_high + lv_seconds_mins_high.
+      APPEND ls_tuarrivalsecs TO lr_tuarrivalsecs. CLEAR ls_tuarrivalsecs.
+    ENDLOOP.
+  ENDIF.
+
+  DELETE et_entityset WHERE lastconfseconds  NOT IN lr_lastconfsecs.
+  DELETE et_entityset WHERE tuarrivalseconds NOT IN lr_tuarrivalsecs.
+
+  /iwbep/cl_mgw_data_util=>filtering( EXPORTING it_select_options = it_filter_select_options_aux
+                                      CHANGING  ct_data           = et_entityset ).
+
+  /iwbep/cl_mgw_data_util=>paging( EXPORTING is_paging = is_paging
+                                   CHANGING  ct_data   = et_entityset ).
+
+  " $order by
+  DATA lt_order TYPE /iwbep/t_mgw_sorting_order.
+
+  IF it_order IS NOT INITIAL.
+    lt_order = CORRESPONDING #( io_tech_request_context->get_orderby( ) ).
+    LOOP AT lt_order ASSIGNING FIELD-SYMBOL(<fs_order>).
+      CASE <fs_order>-property.
+        WHEN 'LASTCONF'.
+          <fs_order>-property = 'LASTCONFSECONDS'.
+        WHEN 'TUARRIVAL'.
+          <fs_order>-property = 'TUARRIVALSECONDS'.
+        WHEN OTHERS.
+      ENDCASE.
+    ENDLOOP.
+    " order by
+    /iwbep/cl_mgw_data_util=>orderby( EXPORTING it_order = lt_order
+                                      CHANGING  ct_data  = et_entityset ).
+  ENDIF.
+
+  " $top
+  IF is_paging-top IS NOT INITIAL.
+    " TODO: variable is assigned but never used (ABAP cleaner)
+    LOOP AT et_entityset ASSIGNING FIELD-SYMBOL(<fs_entity_set>).
+      IF sy-tabix > is_paging-top.
+        DELETE et_entityset INDEX sy-tabix.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+  DATA(lo_calc) = NEW zcl_yardtu_cds_calc( ).
+  TRY.
+      lo_calc->if_sadl_exit_calc_element_read~calculate( EXPORTING it_original_data           = et_entityset
+                                                                   it_requested_calc_elements = tt_elements
+                                                         CHANGING  ct_calculated_data         = et_entityset ).
+    CATCH cx_sadl_exit. " Exception from Exit Implementation
+  ENDTRY.
+
+  es_response_context-inlinecount = lines( et_entityset ).
+
+ENDMETHOD.
