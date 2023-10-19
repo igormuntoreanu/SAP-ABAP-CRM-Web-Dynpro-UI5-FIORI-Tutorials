@@ -1,0 +1,5 @@
+  TYPES BEGIN OF ty_cds_ext.
+  INCLUDE TYPE zyard_fiori_tus_cds.
+  TYPES lastconfseconds TYPE i.
+  TYPES tuarrivalseconds TYPE i.
+  TYPES END OF ty_cds_ext.
