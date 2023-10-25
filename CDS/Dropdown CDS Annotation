@@ -1,0 +1,287 @@
+Value Help CDS view:
+______________________
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Value Help for YardNo'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+@ObjectModel.resultSet: {
+    sizeCategory: #XS //DropDown
+}
+define view entity ZYL_YARDNO_VH as select distinct from /sapyl/yardno as a
+left outer join /sapyl/yardnot as  b on a.yard_no = b.yard_no
+{
+    key a.yard_no as YardNo,
+    b.yard_no_text as YardNoText
+} where b.spras = $session.system_language
+_________________________
+Main CDS View: association [0..*] to ZYL_YARDNO_VH as _yardnos on $projection.YardNo = _yardnos.YardNo
+
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'CDS for YARD TUs FIORI'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+
+//@OData.publish: true - Using SEGW instead
+
+@Search.searchable: true
+
+@UI.headerInfo.typeNamePlural: 'TUs'
+@UI.headerInfo.typeName: 'Transportation Unit'
+@UI.headerInfo.title.value: 'TuNumExt'
+@UI.headerInfo.description.value: 'TuType'
+
+define view entity ZYARD_FIORI_TUS_CDS
+  as select distinct from zyard_tus_join as tu
+  association [*] to ZYARD_TU_PROD_CDS        as _prod       on $projection.DbKeyTu = _prod.RootKey
+  association [*] to zyard_yo_hdr             as _headers    on $projection.DbKeyAct = _headers.TuSrActKey
+  association [*] to ZYARD_TU_YTS_FINAL       as _tasks      on $projection.DbKeyTu = _tasks.TuKey
+  association [*] to ZYARD_TUS_REFERENCES     as _references on $projection.DbKeyTu = _references.DbKeyTu
+  association [*] to ZYARD_TUS_DELIVERIES_CDS as _deliveries on $projection.DbKeyTu = _deliveries.DbKeyTu
+  association [0..*] to ZYL_YARDNO_VH as _yardnos on $projection.YardNo = _yardnos.YardNo
+{
+
+      @UI.facet: [{ purpose: #STANDARD,
+                    type: #COLLECTION,
+                    id: 'TUDETAILSID',
+                    label: 'TU Details'
+                  },
+                  { purpose: #STANDARD,
+                    type: #FIELDGROUP_REFERENCE,
+                    targetQualifier: 'TUDETAILS',
+                    parentId: 'TUDETAILSID',
+                    position: 10
+                  },
+                  { purpose: #STANDARD,
+                    id: 'ProductsTable',
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_prod',
+                    label: 'Products',
+                    position: 20
+                  },
+                  { purpose: #STANDARD,
+                    id: 'YardOrderTable', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_headers',
+                    label: 'Yard Order',
+                    position: 30
+                  },
+                  { purpose: #STANDARD,
+                    id: 'YardTasksTable', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_tasks',
+                    label: 'Yard Task',
+                    position: 40
+                  },
+                  { purpose: #STANDARD,
+                    id: 'References', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_references',
+                    label: 'References',
+                    position: 50
+                  },
+                  { purpose: #STANDARD,
+                    id: 'Deliveries', //avoid duplicate id error in frontend
+                    type: #LINEITEM_REFERENCE,
+                    targetElement: '_deliveries',
+                    label: 'Deliveries',
+                    position: 60
+                  }]
+
+  key tu.DbKeyTu                                                             as DbKeyTu,
+      @UI.hidden: true
+  key tu.DbKeyAct                                                            as DbKeyAct,
+      @UI.hidden: true
+  key tu.DbKeyItem                                                           as DbKeyItem,
+      @UI.hidden: true
+  key tu.DbKeyHeader                                                         as DbKeyHeader,
+
+      @UI.selectionField: [{ position: 10 }]
+      //@Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_YARDNO_VH', element : 'YardNo' }}]
+      @Consumption.valueHelp: '_yardnos'
+      @UI.lineItem: [{ position: 10, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 10 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.yard_no                                                             as YardNo,
+
+      @UI.selectionField: [{ position: 20 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'zyard_tus_join', element : 'tu_num_ext' }}]
+      @UI.lineItem: [{ position: 20, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 20 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.tu_num_ext                                                          as TuNumExt,
+
+      @UI.selectionField: [{ position: 30 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_TU_TYPE_VH', element : 'TuType' }}]
+      @UI.lineItem: [{ position: 100, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 90 }]
+      tu.tu_type                                                             as TuType,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'zyard_tus_join', element : 'tu_num' }}]
+      @UI.lineItem: [{ position: 30, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 30 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.tu_num                                                              as TuNum,
+
+      @UI.selectionField: [{ position: 40 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_BIN_VH', element : 'lgpla' }}]
+      @UI.lineItem: [{ position: 40, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 40 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.stor_bin                                                            as StorBin,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_SECTION_VH', element : 'lgber' }}]
+      @UI.lineItem: [{ position: 50, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 50 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.stor_section                                                        as StorSection,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_TYPE_VH', element : 'lgtyp' }}]
+      @UI.lineItem: [{ position: 60, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 60 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.stor_type                                                           as StorType,
+
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 70 }]
+      tu.mtr                                                                 as Mtr,
+
+      @UI.hidden: true
+      tu.pmat                                                                as Pmat,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_PRODUCT_VH', element : 'matnr' }}]
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @EndUserText.label: 'Pack.Material'
+      cast( ''  as abap.char(40))                                            as FilterMaterial,
+
+      @UI.selectionField: [{ position: 50 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_PRODUCT_VH', element : 'matnr' }}]
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @EndUserText.label: 'Product'
+      cast( ''  as abap.char(40))                                            as FilterProduct,
+
+      @UI.selectionField: [{ position: 60 }]
+      @EndUserText.label: 'Delivery'
+      cast( ''  as abap.char(10))                                            as FilterDelivery,
+
+      @EndUserText.label: 'Reference(Any)'
+      cast( ''  as abap.char(40))                                            as FilterReference,
+
+      @UI.selectionField: [{ position: 70 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_LICENSE_PLATE_VH', element : 'lic_plate' }}]
+      @UI.lineItem: [{ position: 110, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 100 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.lic_plate                                                           as LicPlate,
+
+      @UI.selectionField: [{ position: 80 }]
+      @EndUserText.label: 'Message/Comment TU'
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 160 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM }
+      tu.yl_comment                                                          as Message,
+
+      @UI.lineItem: [{ position: 70, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 80 }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Filtered direclty in the DPC_EXT class because it is CAST field
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Sorted direclty in the DPC_EXT class because it is CAST field
+      @EndUserText.label: 'Pack.Material'
+      cast( ''  as abap.char(40))                                            as Material,
+
+      @UI.lineItem: [{ position: 80, cssDefault: { width: '20rem' }}]
+      @EndUserText.label: 'Delivery'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      cast( ''  as abap.char(110))                                           as Delivery,
+
+      @UI.lineItem: [{ position: 90, cssDefault: { width: '20rem' }}]
+      @EndUserText.label: 'Product'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      cast( ''  as abap.char(110))                                           as Product,
+
+      @UI.hidden: true
+      tu.tu_empty                                                            as TuEmpty,
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_COUNTRIES_VH', element : 'land1' }}]
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 110 }]
+      tu.lic_plate_country                                                   as LicPlateCountry,
+
+      @EndUserText.label: 'TU Arrival Timestamp'
+      tu.tu_arrival_tstmp                                                    as TuArrivalTstmp,
+
+      @EndUserText.label: 'Time Since Checkin'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Filtered direclty in the DPC_EXT class because it is CAST field
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Sorted direclty in the DPC_EXT class because it is CAST field
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }, importance: #HIGH}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 110 }]
+      cast( ''  as abap.char(15))                                            as TuArrival,
+
+      @EndUserText.label: 'Time Last YT Conf.'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Filtered direclty in the DPC_EXT class because it is CAST field
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_YARDTU_CDS_CALC' //Sorted direclty in the DPC_EXT class because it is CAST field
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' }, importance: #HIGH}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 110 }]
+      cast( ''  as abap.char(15))                                            as LastConf,
+
+      @UI.lineItem: [{ position: 130, cssDefault: { width: '10rem' }}]
+      tu.archiving_status                                                    as ArchivingStatus,
+
+      @UI.lineItem: [{ position: 140, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 120 }]
+      tu.created_by                                                          as CreatedBy,
+
+      @UI.hidden: true
+      tu.created_on                                                          as CreatedOn,
+
+      @UI.lineItem: [{ position: 150, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 130 }]
+      @EndUserText.label: 'Created on'
+      cast(substring(cast(tu.created_on as abap.char(32)),1,8) as abap.dats) as CreatedOnConv,
+
+      @UI.lineItem: [{ position: 160, cssDefault: { width: '10rem' }}]
+      tu.changed_by                                                          as ChangedBy,
+
+      @UI.hidden: true
+      tu.changed_on                                                          as ChangedOn,
+
+      @UI.lineItem: [{ position: 170, cssDefault: { width: '10rem' }}]
+      @EndUserText.label: 'Changed on'
+      cast(substring(cast(tu.changed_on as abap.char(32)),1,8) as abap.dats) as ChangedOnConv,
+
+
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 140 }]
+      tu.tu_num_ext_ewm                                                      as TuNumExtEwm,
+
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 150 }]
+      tu.tu_num_ewm                                                          as TuNumEwm,
+      
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_YARDTU_CDS_CALC'
+      @UI.lineItem: [{ position: 180, cssDefault: { width: '10rem' }}]
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 160 }]
+      @EndUserText.label: 'Useful Information'
+      cast( ''  as abap.char(75))                                             as GeneralMessage,      
+
+      _prod,
+      _headers,
+      _tasks,
+      _references,
+      _deliveries,
+      _yardnos
+
+}
