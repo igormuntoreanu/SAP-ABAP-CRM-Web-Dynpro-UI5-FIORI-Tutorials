@@ -1,0 +1,122 @@
+onButtonPastePress: function (oEvent) {
+                var that = this;
+                // Check if the Clipboard API is supported
+                if (navigator.clipboard) {
+                    // Use the Clipboard API to access the clipboard contents
+                    navigator.clipboard.readText().then(function (text) {
+                        // 'text' variable contains the copied value
+                        var lines = text.trim().split('\r\n');
+                        var array = [];
+
+                        // Iterate over each line
+                        lines.forEach(function (line) {
+                            var columns = line.split('\t');
+
+                            // Create an object with properties 'Material', 'Quantity', and 'Storage Location'
+                            var obj = {
+                                Material: columns[0],
+                                Quantity: columns[1],
+                                SourceStorageLocation: columns[2]
+                            };
+
+                            // Push the object to the array
+                            array.push(obj);
+                        });
+
+                        if (array) {
+                            var oTable = that.getView().byId("ItemsTable");
+                            var aItems = oTable.getItems();
+                            var tableData = oTable.getModel("table").getData();
+                            for (var i = 0; i < array.length; i++) {
+                                //Check if Line exits in the UI5 Table
+                                if (!aItems[i]) { // if not then create a new line
+                                    that.onAddLine();
+                                    aItems = oTable.getItems();
+                                    tableData = oTable.getModel("table").getData();
+                                    //Assign values of the spreadsheet to the UI5 Table
+                                    if (array[i].Material) {
+                                        tableData.TableLines[i].Material = array[i].Material;
+                                    }
+                                    if (array[i].Quantity) {
+                                        tableData.TableLines[i].Quantity = parseInt(array[i].Quantity);
+                                    }
+                                    if (array[i].SourceStorageLocation) {
+                                        tableData.TableLines[i].SourceStorageLocation = array[i].SourceStorageLocation;
+                                    }
+
+                                    oTable.getModel("table").setData(tableData);
+
+                                    //Catch current line focus through 
+                                    aItems[i].mAggregations.cells[0].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[1].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[2].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[3].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+
+                                } else {
+                                    aItems = oTable.getItems();
+                                    tableData = oTable.getModel("table").getData();
+                                    //Assign values of the spreadsheet to the UI5 Table
+                                    if (array[i].Material) {
+                                        /* aItems[i].mAggregations.cells[0].setValue(oEvent.mParameters.data[i][0]); */
+                                        tableData.TableLines[i].Material = array[i].Material;
+                                    }
+                                    if (array[i].Quantity) {
+                                        /* aItems[i].mAggregations.cells[1].setValue(oEvent.mParameters.data[i][1]); */
+                                        tableData.TableLines[i].Quantity = parseInt(array[i].Quantity);
+                                    }
+                                    if (array[i].SourceStorageLocation) {
+                                        /* aItems[i].mAggregations.cells[2].setValue(oEvent.mParameters.data[i][2]); */
+                                        tableData.TableLines[i].SourceStorageLocation = array[i].SourceStorageLocation;
+                                    }
+
+                                    oTable.getModel("table").setData(tableData);
+
+                                    //Catch current line focus through 
+                                    aItems[i].mAggregations.cells[0].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[1].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[2].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[3].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+
+                                }
+                            }
+                        }
+                    }).catch(function () {
+                        MessageBox.information("Failed to load copied values. Clear your Browser cache and try again");
+                    });
+                } else {
+                    MessageBox.information("Function not supported in your Browser");
+                }
+
+            },
