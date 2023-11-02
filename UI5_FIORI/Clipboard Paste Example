@@ -1,3 +1,7 @@
+The following string 'T16464\t1\t44A\r\nT16464\t1\t44A\r\n' was copied from the excel. It has 2 lines and 3 columns: "Material", "Quantity", 
+and "Storage Location". 
+How do I convert this string to a Array containing these 3 properties Material, Quantity and Storage Location ?
+
 onButtonPastePress: function (oEvent) {
                 var that = this;
                 // Check if the Clipboard API is supported
