@@ -1,0 +1,7 @@
+Example of a call:
+GET CheckYRSet('1234')?sap-client=240&direction=I&numbertype=jdgvNo&registrationNumber=1234&yardNo=NXY1&scacForEmptyTrailer=undefined&trailerForEmptyTrailer=undefined&tuType=undefined
+
+--
+DATA lt_uri_query_parameter TYPE  /iwbep/if_mgw_core_srv_runtime=>parameter_values_t.
+
+lt_uri_query_parameter = me->mr_request_details->t_uri_query_parameter.
