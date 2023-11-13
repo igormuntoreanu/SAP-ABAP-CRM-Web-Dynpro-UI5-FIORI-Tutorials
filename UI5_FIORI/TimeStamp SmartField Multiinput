@@ -1,0 +1,104 @@
+        onInitSmartFilterBarExtension: function (oEvent) {
+            var oStatusError = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ListReport.view.ListReport::ShuttlingLoadingSet--listReportFilter-filterItemControl_BASIC-IvOnlyErrors");
+            var oStatusErrorHeader = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ListReport.view.ListReport::ShuttlingLoadingSet--listReportFilter-filterItem-___INTERNAL_-IvOnlyErrors");
+            oStatusErrorHeader.setText('Error')
+            var oStatus = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ListReport.view.ListReport::ShuttlingLoadingSet--listReportFilter-filterItemControl_BASIC-Status");
+
+            if (oStatus) {
+                var tokenArray = [];
+                const oLoading = new sap.m.Token({
+                    key: 'LOADING',
+                    text: 'LOADING'
+                });
+                const oCreated = new sap.m.Token({
+                    key: 'CREATED',
+                    text: 'CREATED'
+                });
+                const oTransit = new sap.m.Token({
+                    key: 'TRANSIT',
+                    text: 'TRANSIT'
+                });
+                const oUnloading = new sap.m.Token({
+                    key: 'UNLOADING',
+                    text: 'UNLOADING'
+                });
+                const oCompleted = new sap.m.Token({
+                    key: 'COMPLETED',
+                    text: 'COMPLETED'
+                });
+                const oError = new sap.m.Token({
+                    key: true,
+                    text: 'yes'
+                });
+                debugger;
+                switch (window.location.hash) {
+                    case "#globalshuttlingloading-tile":
+                        var currentDate = new Date();
+                        // Get the current date and time:
+                        currentDate.setDate(currentDate.getDate() - 24); // Subtract 10 days from the current date
+                        // Create a formatter instance
+                        var formatter = sap.ui.core.format.DateFormat.getDateInstance({
+                            pattern: "MMM dd, yyyy, hh:mm:ss a"
+                            //pattern: "YYYY-MM-dd"
+                        });
+                        // Format the date using the formatter
+                        var formattedDate = formatter.format(currentDate);
+                        var CreationTimeStamp = this.getView().byId("globalshuttlingloading::sap.suite.ui.generic.template.ListReport.view.ListReport::ShuttlingLoadingSet--listReportFilter-filterItemControl_BASIC-CreationTstamp");
+                        var tokenArrayFilter = [];
+
+                        let oDateFilter = new sap.m.Token({
+                            text: ">=" + formattedDate,
+                            key: FilterOperator.GE + " " + formattedDate
+                        });
+
+                        // JSON to declare the values we want in actual filter
+                        var valueComp = {
+                            "exclude": false,
+                            "keyField": "CreationTstamp",
+                            "operation": FilterOperator.GE,
+                            "tokenText": ">=" + formattedDate, //Concatenate >= sign to date
+                            "value1": formattedDate,  // Actual date value
+                            "value2": null
+                        }
+
+                        // add the above defined values to CustomData
+                        var customData = new sap.ui.core.CustomData("data", {
+                            key: "range",
+                            value: valueComp
+                        }); // JSON declared above
+                        oDateFilter.addCustomData(customData); // Add custom data to token
+
+                        tokenArray.push(oLoading);
+                        tokenArray.push(oCreated);
+                        tokenArrayFilter.push(oDateFilter);
+                        oStatus.setTokens(tokenArray);
+                        CreationTimeStamp.setTokens(tokenArrayFilter);
+                        break;
+                    case "#ZLA0_GLOBAL_SHUTTLING_LOADING-loadingcreated":
+                        tokenArray.push(oLoading);
+                        tokenArray.push(oCreated);
+                        oStatus.setTokens(tokenArray);
+                        break;
+                    case "#ZLA0_GLOBAL_SHUTTLING_LOADING-transit":
+                        tokenArray.push(oTransit);
+                        oStatus.setTokens(tokenArray);
+                        break;
+                    case "#ZLA0_GLOBAL_SHUTTLING_LOADING-unloading":
+                        tokenArray.push(oUnloading);
+                        oStatus.setTokens(tokenArray);
+                        break;
+                    case "#ZLA0_GLOBAL_SHUTTLING_LOADING-historydisplay":
+                        tokenArray.push(oCompleted);
+                        oStatus.setTokens(tokenArray);
+                        break;
+                    case "#ZLA0_GLOBAL_SHUTTLING_LOADING-totalerrors":
+                        tokenArray.push(oError);
+                        oStatusError.setTokens(tokenArray);     // pushes the value "yes" into SelectionField "IvOnlyErrors"
+                        oStatusError.setVisible(false);         // Hides the Selection Field "IvOnlyErrors"
+                        oStatusErrorHeader.setVisible(false);   // Hides the Header of Selection Field "IvOnlyErrors"
+                        break;
+                    default:
+                        break;
+                }
+            }
+        },
