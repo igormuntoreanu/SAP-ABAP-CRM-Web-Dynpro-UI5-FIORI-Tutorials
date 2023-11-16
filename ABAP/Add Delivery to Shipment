@@ -1,0 +1,46 @@
+*&---------------------------------------------------------------------*
+*&      Form  F_DEL_TO_SHIP_RETRIGGER
+*&---------------------------------------------------------------------*
+FORM f_del_to_ship_retrigger.
+
+  DATA: ls_headeraction   TYPE bapishipmentheaderaction,
+        ls_headerdata     TYPE bapishipmentheader,
+        lt_itemdata       TYPE TABLE OF bapishipmentitem,
+        lt_itemdataaction TYPE TABLE OF bapishipmentitemaction,
+        ls_itemdata       TYPE bapishipmentitem,
+        ls_itemdataaction TYPE bapishipmentitemaction,
+        lt_return         TYPE TABLE OF bapiret2.
+
+
+  IF it_vttp_retrigger IS NOT INITIAL.
+    LOOP AT it_ship_cr ASSIGNING FIELD-SYMBOL(<fs_ship>) WHERE tknum IS NOT INITIAL.
+
+      ls_headerdata-shipment_num = <fs_ship>-tknum.
+
+      ls_itemdata-delivery = <fs_ship>-vbeln.
+      APPEND ls_itemdata TO lt_itemdata.
+
+      ls_itemdataaction-delivery  = 'A'. "add
+      ls_itemdataaction-itenerary = 'A'. "add
+      APPEND ls_itemdataaction TO lt_itemdataaction.
+
+      CALL FUNCTION 'BAPI_SHIPMENT_CHANGE'
+        EXPORTING
+          headerdata       = ls_headerdata
+          headerdataaction = ls_headeraction
+        TABLES
+          itemdata         = lt_itemdata
+          itemdataaction   = lt_itemdataaction
+          return           = lt_return.
+
+      DATA(ls_return) = VALUE #( lt_return[ 1 ] OPTIONAL ).
+      IF ls_return-type NE 'E'.
+        CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+          EXPORTING
+            wait = abap_true.
+      ENDIF.
+      MOVE-CORRESPONDING ls_return TO <fs_ship>.
+      REFRESH: lt_itemdata, lt_itemdataaction.
+    ENDLOOP.
+  ENDIF.
+ENDFORM.
