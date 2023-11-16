@@ -1,0 +1,17 @@
+        CALL FUNCTION 'AD_REPEAT_MESSAGE_OUTPUT'
+          EXPORTING
+            kappl         = 'V7' "Transport
+            objky         = <fs_ship>-tknum
+            nacha         = '6' "EDI
+          EXCEPTIONS
+            error_occured = 1
+            OTHERS        = 2.
+        IF sy-subrc <> 0.
+          MESSAGE ID '00' TYPE 'E'  NUMBER 001
+            WITH 'Failed repeating output for Transport ' <fs_ship>-tknum INTO DATA(lv_text).
+          <fs_ship>-id = '00'.
+          <fs_ship>-message = lv_text.
+          <fs_ship>-message_v1 = 'Failed repeating output for Transport '.
+          <fs_ship>-message_v2 = <fs_ship>-tknum.
+          <fs_ship>-type = 'E'.
+        ENDIF.
