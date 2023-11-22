@@ -1,0 +1,3 @@
+For this we use datetime. Ex: (IP_TIMESTAMP_FR=datetime'2015-11-04T20:54:25.415')
+Example URI:
+http://XXXXXXX-1.corp.XXXX.com:XXXX/test/test2/donottransport/teg1/cv_zvg3a.xsodata/InputParams(IP_TIMESTAMP_FR=datetime'2015-11-04T20:54:25.415')/Results?
