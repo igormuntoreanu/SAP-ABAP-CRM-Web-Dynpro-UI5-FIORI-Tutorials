@@ -1,0 +1,30 @@
+Manual implementation:
+
+  CALL FUNCTION 'Z_LELO_F4IF_STORAGE_BIN' DESTINATION lv_rfcdest
+    EXPORTING
+      iv_whse_id            = lv_whse_id
+    IMPORTING
+      et_storloc            = lt_storloc
+    EXCEPTIONS
+      communication_failure = 1
+      system_failure        = 2
+      OTHERS                = 3.
+
+  IF sy-subrc IS NOT INITIAL.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    RETURN.
+  ENDIF.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield     = 'STOR_BIN'
+      dynpprog     = sy-repid
+      dynpnr       = sy-dynnr
+      dynprofield  = lv_dynprofield
+      window_title = 'Choose Storage Bin'(037)
+      value_org    = 'S'
+    TABLES
+      value_tab    = lt_storloc
+      return_tab   = lt_return
+    EXCEPTIONS
+      OTHERS       = 0.
