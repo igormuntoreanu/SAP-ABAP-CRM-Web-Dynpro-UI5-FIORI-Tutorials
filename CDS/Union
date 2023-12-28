@@ -77,3 +77,25 @@ union select from ZYARD_TU_YTS_1
       start_tmstmp_act,
       duration_act
 }
+______________________________________________________________________
+
+Example 2:
+define view entity ZYL_PRODUCT_VH
+  as select distinct from mara as a
+    left outer join       makt as b on a.matnr = b.matnr
+{
+  key a.matnr,
+      b.maktx
+}
+where
+  b.spras = $session.system_language
+
+union select distinct from /sapyl/tu_prod as a
+{
+  key a.matnr,
+      max(a.maktx) as maktx //max + group by = Delete Adjacent Duplicates from
+}
+where
+  a.matnr <> ''
+group by
+  matnr
