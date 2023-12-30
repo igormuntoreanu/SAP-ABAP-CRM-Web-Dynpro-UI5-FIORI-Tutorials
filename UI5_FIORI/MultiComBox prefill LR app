@@ -1,0 +1,35 @@
+onBeforeRebindTableExtension: function (oEvent) {
+            var oBindingParams = oEvent.getParameter("bindingParams");
+            oBindingParams.parameters = oBindingParams.parameters || {};
+            var oSmartTable = oEvent.getSource();
+            var oSmartFilterBar = this.byId(oSmartTable.getSmartFilterId());
+
+            var that = this;
+            if (!that.YardNoPushed) { //Do it just once
+                const oModel = this.getOwnerComponent().getModel();
+                oModel.read("/UserYardNumberSet('')", {
+                    success: function (oData, oResponse) {
+                        if (oData.Yard) {
+                            //Push Key to SmartFilterBar Control
+                            oCustomControl = oSmartFilterBar.getControlByKey("YardNo");
+                            oBindingParams.filters.push(new Filter("YardNo", "EQ", oData.Yard));
+                            var keys = [];
+                            keys.push(oData.Yard);
+                            //Push Key to MultiComboBox
+                            oCustomControl.setSelectedKeys(keys)
+                            var filterData = oSmartFilterBar.getFilterData();
+                            filterData["YardNo"] = { // here your value help field
+                                "items": [{
+                                    key: oData.Yard // Pass the key here
+                                }]
+                            };
+                            //Push Key to FilterData
+                            oSmartFilterBar.setFilterData(filterData);
+                            that.YardNoPushed = true;
+                            //Fire Go Button Again (Use it only if the Page is always preloaded)
+                            sap.ui.getCore().byId("yardtu::sap.suite.ui.generic.template.ListReport.view.ListReport::ZYARD_FIORI_TUS_CDS--listReportFilter-btnGo").firePress();
+                        }
+                    }
+                })
+            }
+        }
