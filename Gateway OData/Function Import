@@ -51,3 +51,20 @@ ENDMETHOD.
 Here Alunoid is the paramenter defined.
 
 /sap/opu/odata/SAP/Z20PP_GRT_SRV/CrossCheck?SalesOrderId='AAA'&ProjectIdExt='BB'&WbsElementIdExt='CC'
+
+
+4) UI5
+this.getView().getModel().callFunction("/CheckOut", {
+                    method: "POST",
+                    urlParameters: {
+                        TransportationUnit: tuNumExt
+                    },
+                    success: function (oData, response) {
+                        // Handle the successful response
+                        MessageBox.success(JSON.parse(response.headers["sap-message"]).message);
+                    },
+                    error: function (oError) {
+                        // Handle any errors
+                        MessageBox.error(JSON.parse(oError["responseText"]).error.innererror.errordetails[0].message);
+                    }
+                });
