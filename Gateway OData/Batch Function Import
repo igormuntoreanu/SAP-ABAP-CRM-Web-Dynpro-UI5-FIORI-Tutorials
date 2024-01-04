@@ -1,0 +1,280 @@
+var oTable = this.getView().byId("ItemsTable");
+                if (oTable) {
+                    var aItems = oTable.getItems();
+
+                    this.getView().getModel().setDeferredGroups(["content"]);
+                    for (var i = 0; i < aItems.length; i++) {
+                        if (aItems[i].mAggregations.cells[0].getValue() !== "" &&
+                            aItems[i].mAggregations.cells[1].getValue() !== "" &&
+                            aItems[i].mAggregations.cells[2].getValue() !== "") {
+                            //Access item properties and Update the cell values
+                            var quantity = parseInt(aItems[i].mAggregations.cells[1].getValue());
+                            this.getView().getModel().callFunction("/Save", {
+                                groupId: "content",
+                                /* groupId: "batchFunctionImport", */
+                                /* changeSetId: i, */
+                                method: "POST",
+                                urlParameters: {
+                                    StatusProfile: this.getView().byId("idStatusProfileText").getText(), //this.getView().byId("idStatusProfileSHSetSelect").getSelectedKey(),
+                                    StorageBin: this.getView().byId("idCurrentLocationText").getText(), //this.getView().byId("idStorageBinSHSetComboBox").getSelectedKey(),
+                                    MovementType: this.getView().byId("idMovementTypeText").getText(),
+                                    TrailerID: this.getView().byId("idTrailerIDText").getText(),
+                                    Plant: this.getView().byId("idPlantText").getText(),
+                                    CurrentLocation: this.getView().byId("idCurrentLocationText").getText(),
+                                    Yard: this.getView().byId("idYardText").getText(),
+                                    DestStorageLocation: this.getView().byId("idDestStorageLocationText").getText(),
+                                    MoveToParkLot: false, //parkingLotBoolean, */
+                                    ParkingLot: "", //this.getView().byId("idStorageBinSHSetParkingLotComboBox").getSelectedKey(), */
+                                    Material: aItems[i].mAggregations.cells[0].getValue(),
+                                    Quantity: quantity,
+                                    SourceStorageLocation: aItems[i].mAggregations.cells[2].getValue(),
+                                    ServiceAgent: this.YLMove.ServiceAgent,
+                                    TuNum: this.YLMove.TuNum,
+                                    MaterialDocument: "",
+                                    YardTask: "",
+                                    Line: i
+                                }
+                            });
+                        }
+                    }
+
+                    //Submitting the function import batch call
+                    this.getView().getModel().submitChanges({
+                        groupId: "content", //Same as the batch group id used previously
+                        success: function (oEvent) {
+                            //Error
+                            var response = oEvent.__batchResponses[0].response;
+                            if (response) {
+                                var jsonString = response.body.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                                var parsedObject = JSON.parse(jsonString);
+
+                                var additionalMessages = parsedObject.error.innererror.errordetails;
+                                if (additionalMessages && additionalMessages.length > 0) {
+                                    MessageBox.error(additionalMessages[0].message);
+                                } else {
+                                    additionalMessages = parsedObject.error.message.value;
+                                    if (additionalMessages) {
+                                        MessageBox.error(additionalMessages);
+                                    }
+                                }
+                                //Success
+                            } else {
+                                response = oEvent.__batchResponses[0].__changeResponses[0];
+                                if (response) {
+                                    jsonString = response.body.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                                    parsedObject = JSON.parse(jsonString);
+                                    if (!parsedObject.d.YardTask) {
+                                        MessageBox.success("Material Document created: " + parsedObject.d.MaterialDocument);
+                                    } else {
+                                        MessageBox.success("Material Document created: " + parsedObject.d.MaterialDocument + ". Yard Task created: " + parsedObject.d.YardTask);
+                                    }
+                                    this._setVisible(false);
+                                } else {
+                                    MessageBox.error("Technical issue raised");
+                                }
+                            }
+
+                        }.bind(this),
+                        error: function (oError) {
+                            const jsonString = oEvent.__batchResponses[0].response.body.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                            const parsedObject = JSON.parse(jsonString);
+
+                            let additionalMessages = parsedObject.error.innererror.errordetails;
+                            if (additionalMessages && additionalMessages.length > 0) {
+                                MessageBox.error(additionalMessages[0].message);
+                            }
+                        }.bind(this)
+                    });
+___________________________________________________________________________
+OData:
+EntityType: YLMove
+TuNoExt	1	Edm.String	0	0	20		0	0	0	0	1		@SL\QLabel Editor@		TUNOEXT	@HO\QABAP Type Editor@	
+StatusProfile	1	Edm.String	0	0	30		0	0	0	0	1		@SL\QLabel Editor@		STATUSPROFILE	@HO\QABAP Type Editor@	
+StorageBin	1	Edm.String	0	0	18		0	0	0	0	1		@SL\QLabel Editor@		STORAGEBIN	@HO\QABAP Type Editor@	
+MovementType	1	Edm.String	0	0	3		0	0	0	0	0		@SL\QLabel Editor@		MOVEMENTTYPE	@HO\QABAP Type Editor@	
+TrailerID	1	Edm.String	0	0	20		0	0	0	0	0		@SL\QLabel Editor@		TRAILERID	@HO\QABAP Type Editor@	
+Plant	1	Edm.String	0	0	4		0	0	0	0	0		@SL\QLabel Editor@		PLANT	@HO\QABAP Type Editor@	
+CurrentLocation	1	Edm.String	0	0	18		0	0	0	0	0		@SL\QLabel Editor@		CURRENTLOCATION	@HO\QABAP Type Editor@	
+Yard	1	Edm.String	0	0	4		0	0	0	0	0		@SL\QLabel Editor@		YARD	@HO\QABAP Type Editor@	
+DestStorageLocation	1	Edm.String	0	0	4		0	0	0	0	0		@SL\QLabel Editor@		DESTSTORAGELOCATION	@HO\QABAP Type Editor@	
+MoveToParkLot	0	Edm.Boolean	0	0	0		0	0	0	1	0		@SL\QLabel Editor@		MOVETOPARKLOT	@HO\QABAP Type Editor@	
+ParkingLot	1	Edm.String	0	0	18		0	0	0	0	0		@SL\QLabel Editor@		PARKINGLOT	@HO\QABAP Type Editor@	
+Material	1	Edm.String	0	0	18		0	0	0	0	0		@SL\QLabel Editor@		MATERIAL	@HO\QABAP Type Editor@	
+Quantity	0	Edm.Decimal	25	3	0		0	0	0	1	0		@SL\QLabel Editor@		QUANTITY	@HO\QABAP Type Editor@	
+SourceStorageLocation	1	Edm.String	0	0	4		0	0	0	0	0		@SL\QLabel Editor@		SOURCESTORAGELOCATION	@HO\QABAP Type Editor@	
+ServiceAgent	1	Edm.String	0	0	10		0	0	0	0	0		@SL\QLabel Editor@		SERVICEAGENT	@HO\QABAP Type Editor@	
+TuNum	1	Edm.String	0	0	18		0	0	0	0	0		@SL\QLabel Editor@		TUNUM	@HO\QABAP Type Editor@	
+YardTask	0	Edm.String	0	0	20		0	0	0	1	0		@SL\QLabel Editor@		YARDTASK	@HO\QABAP Type Editor@	
+MaterialDocument	0	Edm.String	0	0	10		0	0	0	1	0		@SL\QLabel Editor@		MATERIALDOCUMENT	@HO\QABAP Type Editor@	
+TuComment	0	Edm.String	0	0	150		0	0	0	0	0		@SL\QLabel Editor@		TUCOMMENT	@HO\QABAP Type Editor@	
+Line	1	Edm.Int16	0	0	0		0	0	0	0	0		@SL\QLabel Editor@		LINE	@HO\QABAP Type Editor@	
+
+Function Import: Save
+Save	Entity Type	YLMove	0..1		POST	YLMove	Save	@SL\QLabel Editor@
+
+___________________________________________________________________________
+
+  METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_begin.
+    cv_defer_mode = abap_true.
+  ENDMETHOD.
+
+  METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_end.
+    COMMIT WORK.
+  ENDMETHOD.
+
+  METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_process.
+*  CD	Create Deep Entity
+*  CE	Create Entity
+*  CM	Create Stream
+*  DE	Delete Entity
+*  DM	Delete Stream
+*  EA	Execute Action
+*  XE	Expand Entity
+*  XS	Expand Entity Set
+*  GE	Get Entity
+*  GS	Get Entity Set
+*  GD	Get Entity Set Delta
+*  GM	Get Stream
+*  PE	Patch Entity
+*  UE	Update Entity
+*  UM	Update Stream
+*  HB	Changeset Begin
+*  HE	Changeset End
+*  HP	Changeset Process
+*  IC	Get Is Conditional Implemented
+
+    TYPES: BEGIN OF ty_ylmove_shutitm,
+             packed_mat          TYPE matnr_long,
+             packed_mat_descr    TYPE maktx,
+             qty_on_shuttle_item TYPE vemng,
+             open_qty            TYPE int4,
+             unit_pq             TYPE meins,
+             avail_qty           TYPE vemng,
+             storloc_src         TYPE lgort_d,
+             storloc_dst         TYPE umlgo,
+             mvmt_type           TYPE bwart,
+             item_guid           TYPE c LENGTH 32,
+             scol                TYPE lvc_t_scol,
+             styl                TYPE lvc_t_styl,
+             shuttle_list        TYPE c LENGTH 10,
+           END OF ty_ylmove_shutitm,
+
+           BEGIN OF ty_matdoc,
+             mjahr TYPE mjahr,
+             mblnr TYPE mblnr,
+           END OF ty_matdoc.
+
+    DATA: lt_item   TYPE TABLE OF ty_ylmove_shutitm,
+          ls_item   TYPE ty_ylmove_shutitm,
+          lt_matdoc TYPE TABLE OF ty_matdoc,
+          ls_matdoc TYPE ty_matdoc.
+
+    DATA: lo_action_context     TYPE REF TO /iwbep/if_mgw_req_func_import,
+          lo_entry_provider     TYPE REF TO /iwbep/cl_mgw_entry_raw_prv,
+          ls_changeset_response TYPE LINE OF /iwbep/if_mgw_appl_types=>ty_t_changeset_response.
+
+    DATA: ls_move TYPE zcl_zyl_ylmove_mpc=>ts_ylmove,
+          lt_move TYPE TABLE OF zcl_zyl_ylmove_mpc=>ts_ylmove.
+
+    DATA: lv_mblnr    TYPE bapi2017_gm_head_ret-mat_doc,
+          lv_yardtask TYPE char20,
+          lt_return   TYPE bapiret2_t.
+
+    LOOP AT it_changeset_request ASSIGNING FIELD-SYMBOL(<fs_changeset_request>) WHERE operation_type = 'EA'.
+      lo_action_context ?= <fs_changeset_request>-request_context.
+
+      " Get action parameters
+      lo_action_context->get_converted_parameters(
+        IMPORTING
+          es_parameter_values = ls_move ).
+
+      APPEND ls_move TO lt_move.
+
+      ls_item-unit_pq = 'ST'.
+      ls_item-storloc_dst = ls_move-deststoragelocation.
+      ls_item-packed_mat = ls_move-material.
+      ls_item-open_qty  = ls_move-quantity.
+      ls_item-storloc_src = ls_move-sourcestoragelocation.
+      APPEND ls_item TO lt_item.
+
+      CLEAR ls_item.
+      CLEAR ls_move.
+
+    ENDLOOP.
+
+    DATA(lv_yard) = VALUE #( lt_move[ 1 ]-yard  OPTIONAL ).
+
+    DATA(lv_destination) = zyl_cl_tools=>get_ecc_rfc_dest_from_yardno( iv_yard = lv_yard )."get_destination( ).
+
+    CALL FUNCTION '/DEEREAG/YLMOVE_OPERATION' DESTINATION lv_destination
+      EXPORTING
+        iv_status_profile = VALUE #( lt_move[ 1 ]-statusprofile OPTIONAL )
+        iv_storage_bin    = VALUE #( lt_move[ 1 ]-storagebin OPTIONAL )
+        iv_trailer_id     = VALUE #( lt_move[ 1 ]-trailerid OPTIONAL )
+        iv_service_agent  = VALUE #( lt_move[ 1 ]-serviceagent OPTIONAL )
+        iv_tu_num         = VALUE #( lt_move[ 1 ]-tunoext OPTIONAL )
+        iv_operation      = CONV char10( 'LOAD' )
+        iv_comment        = VALUE #( lt_move[ 1 ]-tucomment OPTIONAL )
+        it_item           = lt_item
+      IMPORTING
+        et_matdoc         = lt_matdoc
+        et_return         = lt_return.
+
+    lv_mblnr = VALUE #( lt_matdoc[ 1 ]-mblnr OPTIONAL ).
+*    CALL FUNCTION '/DEEREAG/YLMOVE_CREATE' DESTINATION lv_destination
+*      EXPORTING
+*        it_ylmove             = lt_move
+*      IMPORTING
+*        et_return             = lt_return
+*        ev_mblnr              = lv_mblnr
+*        ev_yard_task          = lv_yardtask
+*      EXCEPTIONS
+*        communication_failure = 1
+*        system_failure        = 2
+*        OTHERS                = 3.
+    IF ( sy-subrc <> 0 OR lt_return IS NOT INITIAL ) AND lv_mblnr IS INITIAL.
+      IF lt_return IS INITIAL.
+        mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = 'RFC error. Contact technical team' ).
+      ELSE.
+        mo_context->get_message_container( )->add_messages_from_bapi( EXPORTING it_bapi_messages = lt_return ). "bapiret2_t
+      ENDIF.
+
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+    ELSE.
+
+      IF lv_mblnr IS INITIAL.
+        mo_context->get_message_container( )->add_message_text_only( EXPORTING iv_msg_type = 'E' iv_msg_text = 'Material Document not created' ).
+        RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+      ENDIF.
+
+      LOOP AT it_changeset_request ASSIGNING <fs_changeset_request> WHERE operation_type = 'EA'.
+        READ TABLE lt_move INTO ls_move INDEX sy-tabix.
+        IF sy-subrc = 0.
+          copy_data_to_ref(
+                EXPORTING
+                  is_data = ls_move
+                CHANGING
+                  cr_data = ls_changeset_response-entity_data ).
+
+          ls_changeset_response-operation_no = <fs_changeset_request>-operation_no.
+
+          ASSIGN ls_changeset_response-entity_data->* TO FIELD-SYMBOL(<fs_move_structure>).
+          IF sy-subrc = 0.
+            ASSIGN COMPONENT 'MaterialDocument' OF STRUCTURE <fs_move_structure> TO FIELD-SYMBOL(<fs_materialdocument>).
+            IF sy-subrc = 0.
+              <fs_materialdocument> = lv_mblnr.
+            ENDIF.
+*            ASSIGN COMPONENT 'YardTask' OF STRUCTURE <fs_move_structure> TO FIELD-SYMBOL(<fs_yardtask>).
+*            IF sy-subrc = 0.
+*              <fs_yardtask> = lv_yardtask.
+*            ENDIF.
+          ENDIF.
+
+          APPEND ls_changeset_response TO ct_changeset_response.
+          CLEAR ls_changeset_response.
+        ENDIF.
+      ENDLOOP.
+
+    ENDIF.
+
+  ENDMETHOD.
