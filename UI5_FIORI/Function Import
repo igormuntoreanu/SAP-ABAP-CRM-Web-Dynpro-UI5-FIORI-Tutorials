@@ -1,0 +1,61 @@
+this.getView().getModel().callFunction("/CheckOut", {
+                    method: "POST",
+                    urlParameters: {
+                        TransportationUnit: tuNumExt
+                    },
+                    success: function (oData, response) {
+                        // Handle the successful response
+                        MessageBox.success(JSON.parse(response.headers["sap-message"]).message);
+                    },
+                    error: function (oError) {
+                        // Handle any errors
+                        MessageBox.error(JSON.parse(oError["responseText"]).error.innererror.errordetails[0].message);
+                    }
+                });
+
+________________________
+OData:
+Entity Type: TuCheckOut
+TransportationUnit	1	Edm.String	0	0	20		0	0	0	0	0	TU	@SL\QLabel Editor@		IV_TU	@HO\QABAP Type Editor@	
+Function IMport: CheckOut
+CheckOut	Entity Type	TuCheckOut	0..1		POST	TuCheckOut	Check-out	@SL\QLabel Editor@
+
+________________________
+METHOD /iwbep/if_mgw_appl_srv_runtime~execute_action.
+
+  DATA: lt_return TYPE bapiret2_t,
+        ls_tu     TYPE zcl_zyard_fiori_tus_cd_mpc=>ts_tucheckout.
+
+  CASE iv_action_name.
+    WHEN 'CheckOut'.
+      READ TABLE it_parameter INTO DATA(ls_parameter) WITH KEY name = 'TransportationUnit'.
+      IF sy-subrc = 0.
+        CALL FUNCTION 'Z_YL_TU_CHECKOUT'
+          EXPORTING
+            iv_tu     = CONV /scwm/de_tu_num_ext( ls_parameter-value )
+          IMPORTING
+            et_return = lt_return.
+
+        READ TABLE lt_return WITH KEY type = 'E' TRANSPORTING NO FIELDS.
+        IF sy-subrc <> 0. "Success
+          ls_tu-iv_tu = CONV /scwm/de_tu_num_ext( ls_parameter-value ).
+          copy_data_to_ref( EXPORTING is_data = ls_tu
+                            CHANGING cr_data = er_data ).
+
+          mo_context->get_message_container( )->add_messages_from_bapi(
+            EXPORTING
+              it_bapi_messages           = lt_return
+               iv_add_to_response_header = abap_true
+          ).
+        ELSE.
+          mo_context->get_message_container( )->add_messages_from_bapi(
+            EXPORTING
+              it_bapi_messages           = lt_return
+               iv_add_to_response_header = abap_false
+          ).
+          RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+        ENDIF.
+      ENDIF.
+    WHEN OTHERS.
+  ENDCASE.
+ENDMETHOD.
