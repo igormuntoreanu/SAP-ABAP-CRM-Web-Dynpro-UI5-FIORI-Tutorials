@@ -1,0 +1,442 @@
+FUNCTION z_yl_tu_checkout.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_TU) TYPE  /SCWM/DE_TU_NUM_EXT
+*"  EXPORTING
+*"     VALUE(ET_RETURN) TYPE  BAPIRET2_T
+*"----------------------------------------------------------------------
+
+  DATA: lt_sel      TYPE /bobf/t_frw_query_selparam,
+        lt_data     TYPE /sapyl/t_yard_tu_root_c,
+        lt_data_act TYPE /sapyl/t_yard_tu_sr_act_c,
+        lt_data_yo  TYPE /sapyl/t_yard_order_root_c,
+        ls_bapiret2 TYPE bapiret2.
+
+*  " Via TU ACT - does not work
+*  " Service Manager Instance
+*  DATA(lo_smgr) = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( /sapyl/if_yard_tu_c=>sc_bo_key
+*  ).
+*  " Fill selection
+*  APPEND VALUE #( attribute_name = /sapyl/if_yard_tu_c=>sc_node_attribute-root-tu_num_ext
+*                  sign           = 'I'
+*                  option         = 'EQ'
+*                  low = CONV #( iv_tu ) ) TO lt_sel.
+*  " Get the keys
+*  lo_smgr->query( EXPORTING iv_query_key            = /sapyl/if_yard_tu_c=>sc_query-root-select_by_elements
+*                            it_selection_parameters = lt_sel
+*                  IMPORTING eo_message              = DATA(lo_msg)
+*                            et_key                  = DATA(lt_key) ).
+*  " Validate errors
+*  IF lo_msg->check( ) = abap_true OR lt_key IS INITIAL.
+*    "Send Message TU Invalid
+*    IF lo_msg IS BOUND.
+*      lo_msg->get_messages( IMPORTING et_message = DATA(lt_messages) ).
+*
+*      "Convert BOPF Messages to BAPIRET2
+*      /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+*         EXPORTING
+*          it_message              = lt_messages  " Message Table
+*        CHANGING
+*          ct_bapiret2             = et_return ). " Error Messages
+*    ENDIF.
+*    RETURN.
+*  ENDIF.
+*
+*  " Read data
+*  lo_smgr->retrieve( EXPORTING iv_node_key = /sapyl/if_yard_tu_c=>sc_node-root
+*                               it_key = lt_key
+*                     IMPORTING eo_message = lo_msg
+*                               et_data    = lt_data ).
+*
+*  IF lo_msg IS BOUND.
+*    lo_msg->get_messages( IMPORTING et_message = lt_messages ).
+*
+*    "Convert BOPF Messages to BAPIRET2
+*    /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+*       EXPORTING
+*        it_message              = lt_messages  " Message Table
+*      CHANGING
+*        ct_bapiret2             = et_return ). " Error Messages
+*  ENDIF.
+*
+*  lo_smgr->retrieve_by_association( EXPORTING iv_node_key    = /sapyl/if_yard_tu_c=>sc_node-root
+*                                              it_key         = lt_key
+*                                              iv_association = /sapyl/if_yard_tu_c=>sc_association-root-sr_act
+*                                              iv_fill_data   = abap_true
+*                                    IMPORTING eo_message = lo_msg
+*                                              et_data    = lt_data_act ).
+*  IF lo_msg IS BOUND.
+*    lo_msg->get_messages( IMPORTING et_message = lt_messages ).
+*
+*    "Convert BOPF Messages to BAPIRET2
+*    /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+*       EXPORTING
+*        it_message              = lt_messages  " Message Table
+*      CHANGING
+*        ct_bapiret2             = et_return ). " Error Messages
+*  ENDIF.
+*
+*  DATA: ls_parameter TYPE /sapyl/s_ytu_a_root_check_out.
+*
+*  GET TIME STAMP FIELD ls_parameter-end_actual.
+*  ls_parameter-check_point = 'OBNG'. "?? Confirm how to
+*  ls_parameter-direction = '2'. "Outbound
+*
+*  CLEAR lt_data_act.
+*  TRY.
+*      lo_smgr->do_action(
+*        EXPORTING
+*          iv_act_key              = /sapyl/if_yard_tu_c=>sc_action-sr_act-act_sr_act_checkout " Action
+*          it_key                  = lt_key " Key Table
+*          is_parameters           = REF #( ls_parameter ) " Action
+*        IMPORTING
+*          eo_change               = DATA(lo_change)  " Interface of Change Object
+*          eo_message              = DATA(lo_message) " Interface of Message Object
+*          et_failed_key           = DATA(lo_failed)  " Key Table
+*          et_failed_action_key    = DATA(lt_falied_actions) " Key Table
+*          ev_static_action_failed = DATA(lv_action_failed)
+*          et_data                 = lt_data_act
+*          et_data_link            = DATA(lt_data_link)
+*      ).
+*    CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+*
+*  ENDTRY.
+*
+*  IF lo_message IS BOUND.
+*    lo_message->get_messages( IMPORTING et_message = lt_messages ).
+*
+*    "Convert BOPF Messages to BAPIRET2
+*    /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+*       EXPORTING
+*        it_message              = lt_messages  " Message Table
+*      CHANGING
+*        ct_bapiret2             = et_return ). " Error Messages
+*  ENDIF.
+
+  "Via YO
+  "Check existance of internal YO - if does not exist then create outbound YO it - if exists, activate outbound YO.
+  "Perform Check-out
+
+  " Get Transaction Manager
+  DATA(lo_tmgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+  " Service Manager Instance
+  DATA(lo_smgr) = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( /sapyl/if_yard_order_c=>sc_bo_key ).
+
+  SELECT *
+    FROM zyard_yo_hdr
+    INTO TABLE @DATA(lt_yos)
+    WHERE tunumber = @iv_tu.
+  IF sy-subrc = 0.
+    SORT lt_yos BY yardorderno DESCENDING.
+  ENDIF.
+
+****** 1) Check if Check-out was already made ******
+  READ TABLE lt_yos WITH KEY direction = 'O' statusorder = '05' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    "Check-out already done before in the past
+    ls_bapiret2-id = 'ZTU_FINDER_APP'.
+    ls_bapiret2-number = 0.
+    ls_bapiret2-type = 'S'.
+    ls_bapiret2-message_v1 = iv_tu.
+    MESSAGE ID  ls_bapiret2-id TYPE ls_bapiret2-type  NUMBER ls_bapiret2-number
+        WITH ls_bapiret2-message_v1 INTO ls_bapiret2-message.
+    APPEND ls_bapiret2 TO et_return.
+
+    EXIT.
+  ENDIF.
+
+****** 2) Check if Check-in was already made ******
+  READ TABLE lt_yos WITH KEY direction = 'I' statusorder = '05' TRANSPORTING NO FIELDS.
+  IF sy-subrc <> 0.
+    "Check-in not yet made
+    ls_bapiret2-id = 'ZTU_FINDER_APP'.
+    ls_bapiret2-number = 4.
+    ls_bapiret2-type = 'E'.
+    ls_bapiret2-message_v1 = iv_tu.
+    MESSAGE ID  ls_bapiret2-id TYPE ls_bapiret2-type  NUMBER ls_bapiret2-number
+        WITH ls_bapiret2-message_v1 INTO ls_bapiret2-message.
+    APPEND ls_bapiret2 TO et_return.
+
+    EXIT.
+  ENDIF.
+
+****** 3) Check if YO Outbound exists for given TU, if not, create it. ******
+  READ TABLE lt_yos WITH KEY direction = 'O' TRANSPORTING NO FIELDS.
+  IF sy-subrc <> 0.
+    "Create YO Outbound
+    READ TABLE lt_yos INTO DATA(ls_yo) WITH KEY direction = 'I'.
+    IF sy-subrc = 0.
+      " Fill selection
+      APPEND VALUE #( attribute_name = /sapyl/if_yard_order_c=>sc_node_attribute-root-yard_order_no
+                      sign           = 'I'
+                      option         = 'EQ'
+                      low = CONV #( ls_yo-yardorderno ) ) TO lt_sel.
+      " Get the keys
+      lo_smgr->query( EXPORTING iv_query_key            = /sapyl/if_yard_order_c=>sc_query-root-select_by_elements
+                                it_selection_parameters = lt_sel
+                      IMPORTING eo_message              = DATA(lo_msg)
+                                et_key                  = DATA(lt_key) ).
+
+      " Create YO Outbound
+      TRY.
+          lo_smgr->do_action(
+            EXPORTING
+              iv_act_key              = /sapyl/if_yard_order_c=>sc_action-root-act_root_copy2opposite_yo "Create Opposite YO
+              it_key                  = lt_key " Key Table
+            IMPORTING
+              eo_change               = DATA(lo_change)  " Interface of Change Object
+              eo_message              = lo_msg " Interface of Message Object
+              et_failed_key           = DATA(lt_failed)  " Key Table
+              et_failed_action_key    = DATA(lt_falied_actions) " Key Table
+              ev_static_action_failed = DATA(lv_action_failed)
+              et_data                 = lt_data_yo
+              et_data_link            = DATA(lt_data_link)
+          ).
+        CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+      ENDTRY.
+
+      "Save and Commit
+      IF lt_failed IS INITIAL.
+        lo_tmgr->save( IMPORTING ev_rejected = DATA(lv_reject)
+                                 et_rejecting_bo_key = DATA(lt_keys) ).
+        "Select CDS again after YO Creation
+        SELECT *
+        FROM zyard_yo_hdr
+        INTO TABLE @lt_yos
+        WHERE tunumber = @iv_tu.
+        IF sy-subrc = 0.
+          SORT lt_yos BY yardorderno DESCENDING.
+          "Outbound YO &1 created
+          ls_bapiret2-id = 'ZTU_FINDER_APP'.
+          ls_bapiret2-number = 2.
+          ls_bapiret2-type = 'S'.
+          ls_bapiret2-message_v1 = VALUE #( lt_yos[ direction = 'O' ]-yardorderno OPTIONAL ).
+          MESSAGE ID  ls_bapiret2-id TYPE ls_bapiret2-type  NUMBER ls_bapiret2-number
+              WITH ls_bapiret2-message_v1 INTO ls_bapiret2-message.
+          APPEND ls_bapiret2 TO et_return.
+        ENDIF.
+      ENDIF.
+
+      IF lv_reject = abap_true.
+        lo_tmgr->cleanup( ).
+      ENDIF.
+
+      IF lo_msg IS BOUND.
+        lo_msg->get_messages( IMPORTING et_message = DATA(lt_messages) ).
+
+        "Convert BOPF Messages to BAPIRET2
+        /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+           EXPORTING
+            it_message              = lt_messages  " Message Table
+          CHANGING
+            ct_bapiret2             = et_return ). " Error Messages
+      ENDIF.
+
+      REFRESH: lt_sel.
+    ENDIF.
+  ENDIF.
+
+****** 4) Activate YO Outbound ******
+  READ TABLE lt_yos INTO ls_yo WITH KEY direction = 'O'.
+  IF sy-subrc = 0 AND ls_yo-statusorder = '01'.
+    " Fill selection
+    APPEND VALUE #( attribute_name = /sapyl/if_yard_order_c=>sc_node_attribute-root-yard_order_no
+                    sign           = 'I'
+                    option         = 'EQ'
+                    low = CONV #( ls_yo-yardorderno ) ) TO lt_sel.
+    " Get the keys
+    lo_smgr->query( EXPORTING iv_query_key            = /sapyl/if_yard_order_c=>sc_query-root-select_by_elements
+                              it_selection_parameters = lt_sel
+                    IMPORTING eo_message              = lo_msg
+                              et_key                  = lt_key ).
+
+    " Activate YO Outbound
+    TRY.
+        lo_smgr->do_action(
+          EXPORTING
+            iv_act_key              = /sapyl/if_yard_order_c=>sc_action-root-act_root_activate "Activate YO
+            it_key                  = lt_key " Key Table
+          IMPORTING
+            eo_change               = lo_change  " Interface of Change Object
+            eo_message              = lo_msg " Interface of Message Object
+            et_failed_key           = lt_failed  " Key Table
+            et_failed_action_key    = lt_falied_actions " Key Table
+            ev_static_action_failed = lv_action_failed
+            et_data                 = lt_data_yo
+            et_data_link            = lt_data_link
+        ).
+      CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+    ENDTRY.
+
+    "Save and Commit
+    IF lt_failed IS INITIAL.
+      lo_tmgr->save( IMPORTING ev_rejected = lv_reject
+                               et_rejecting_bo_key = lt_keys ).
+      "Select CDS again after YO Activation
+      SELECT *
+      FROM zyard_yo_hdr
+      INTO TABLE @lt_yos
+      WHERE tunumber = @iv_tu.
+      IF sy-subrc = 0.
+        SORT lt_yos BY yardorderno DESCENDING.
+        "Outbound YO &1 activated
+        ls_bapiret2-id = 'ZTU_FINDER_APP'.
+        ls_bapiret2-number = 3.
+        ls_bapiret2-type = 'S'.
+        ls_bapiret2-message_v1 = VALUE #( lt_yos[ direction = 'O' ]-yardorderno OPTIONAL ).
+        MESSAGE ID  ls_bapiret2-id TYPE ls_bapiret2-type  NUMBER ls_bapiret2-number
+            WITH ls_bapiret2-message_v1 INTO ls_bapiret2-message.
+        APPEND ls_bapiret2 TO et_return.
+      ENDIF.
+    ENDIF.
+
+    IF lv_reject = abap_true.
+      lo_tmgr->cleanup( ).
+    ENDIF.
+
+    IF lo_msg IS BOUND.
+      lo_msg->get_messages( IMPORTING et_message = lt_messages ).
+
+      "Convert BOPF Messages to BAPIRET2
+      /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+         EXPORTING
+          it_message              = lt_messages  " Message Table
+        CHANGING
+          ct_bapiret2             = et_return ). " Error Messages
+    ENDIF.
+
+    REFRESH: lt_sel.
+  ENDIF.
+
+****** 5) Set Internal YO to completed ******
+  LOOP AT lt_yos ASSIGNING FIELD-SYMBOL(<fs_yos>) WHERE direction = 'P' AND statusorder <> '05'. "P=Internal 05=Completed
+    " Fill selection
+    APPEND VALUE #( attribute_name = /sapyl/if_yard_order_c=>sc_node_attribute-root-yard_order_no
+                    sign           = 'I'
+                    option         = 'EQ'
+                    low = CONV #( <fs_yos>-yardorderno ) ) TO lt_sel.
+    " Get the keys
+    lo_smgr->query( EXPORTING iv_query_key            = /sapyl/if_yard_order_c=>sc_query-root-select_by_elements
+                              it_selection_parameters = lt_sel
+                    IMPORTING eo_message              = lo_msg
+                              et_key                  = lt_key ).
+
+    " Set internal YO to completed
+    TRY.
+        lo_smgr->do_action(
+          EXPORTING
+            iv_act_key              = /sapyl/if_yard_order_c=>sc_action-root-act_root_yo_complete " Root Check-out
+            it_key                  = lt_key " Key Table
+          IMPORTING
+            eo_change               = lo_change  " Interface of Change Object
+            eo_message              = lo_msg " Interface of Message Object
+            et_failed_key           = lt_failed  " Key Table
+            et_failed_action_key    = lt_falied_actions " Key Table
+            ev_static_action_failed = lv_action_failed
+            et_data                 = lt_data_yo
+            et_data_link            = lt_data_link
+        ).
+      CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+    ENDTRY.
+
+    "Save and Commit
+    IF lt_failed IS INITIAL.
+      lo_tmgr->save( IMPORTING ev_rejected = lv_reject
+                               et_rejecting_bo_key = lt_keys ).
+      "Internal YO &1 set to completed
+      ls_bapiret2-id = 'ZTU_FINDER_APP'.
+      ls_bapiret2-number = 1.
+      ls_bapiret2-type = 'S'.
+      ls_bapiret2-message_v1 = <fs_yos>-yardorderno.
+      MESSAGE ID  ls_bapiret2-id TYPE ls_bapiret2-type  NUMBER ls_bapiret2-number
+          WITH ls_bapiret2-message_v1 INTO ls_bapiret2-message.
+      APPEND ls_bapiret2 TO et_return.
+    ENDIF.
+
+    IF lv_reject = abap_true.
+      lo_tmgr->cleanup( ).
+    ENDIF.
+
+    IF lo_msg IS BOUND.
+      lo_msg->get_messages( IMPORTING et_message = lt_messages ).
+
+      "Convert BOPF Messages to BAPIRET2
+      /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+         EXPORTING
+          it_message              = lt_messages  " Message Table
+        CHANGING
+          ct_bapiret2             = et_return ). " Error Messages
+    ENDIF.
+
+    REFRESH: lt_sel.
+  ENDLOOP.
+
+****** 6) Check-out YO out. ******
+  LOOP AT lt_yos ASSIGNING <fs_yos> WHERE direction = 'O' AND statusorder <> '05'. "P=Internal 05=Completed
+    " Fill selection
+    APPEND VALUE #( attribute_name = /sapyl/if_yard_order_c=>sc_node_attribute-root-yard_order_no
+                    sign           = 'I'
+                    option         = 'EQ'
+                    low = CONV #( <fs_yos>-yardorderno ) ) TO lt_sel.
+    " Get the keys
+    lo_smgr->query( EXPORTING iv_query_key            = /sapyl/if_yard_order_c=>sc_query-root-select_by_elements
+                              it_selection_parameters = lt_sel
+                    IMPORTING eo_message              = lo_msg
+                              et_key                  = lt_key ).
+
+    " Do Check-out
+    TRY.
+        lo_smgr->do_action(
+          EXPORTING
+            iv_act_key              = /sapyl/if_yard_order_c=>sc_action-root-act_root_checkout " Root Check-out
+            it_key                  = lt_key " Key Table
+          IMPORTING
+            eo_change               = lo_change  " Interface of Change Object
+            eo_message              = lo_msg " Interface of Message Object
+            et_failed_key           = lt_failed  " Key Table
+            et_failed_action_key    = lt_falied_actions " Key Table
+            ev_static_action_failed = lv_action_failed
+            et_data                 = lt_data_yo
+            et_data_link            = lt_data_link
+        ).
+      CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+    ENDTRY.
+
+    "Save and Commit
+    IF lt_failed IS INITIAL.
+      lo_tmgr->save( IMPORTING ev_rejected = lv_reject
+                               et_rejecting_bo_key = lt_keys ).
+
+      "Check-out Successfully
+      ls_bapiret2-id = '/SAPYL/YARD_TU'.
+      ls_bapiret2-number = 5.
+      ls_bapiret2-type = 'S'.
+      ls_bapiret2-message_v1 = iv_tu.
+      MESSAGE ID  ls_bapiret2-id TYPE ls_bapiret2-type  NUMBER ls_bapiret2-number
+          WITH ls_bapiret2-message_v1 INTO ls_bapiret2-message.
+      "Inserting at the first Line -> Reason: UI5 App will receive the first Success message
+      INSERT ls_bapiret2 INTO et_return INDEX 1.
+    ENDIF.
+
+    IF lv_reject = abap_true.
+      lo_tmgr->cleanup( ).
+    ENDIF.
+
+    IF lo_msg IS BOUND.
+      lo_msg->get_messages( IMPORTING et_message = lt_messages ).
+
+      "Convert BOPF Messages to BAPIRET2
+      /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+         EXPORTING
+          it_message              = lt_messages  " Message Table
+        CHANGING
+          ct_bapiret2             = et_return ). " Error Messages
+    ENDIF.
+
+    REFRESH: lt_sel.
+  ENDLOOP.
+
+  DELETE et_return WHERE type = 'W'. "Delete warning messages
+
+ENDFUNCTION.
