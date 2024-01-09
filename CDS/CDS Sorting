@@ -1,0 +1,47 @@
+Through Table Functions:
+
+_________________________
+define table function zji_tf_sorting
+
+
+returns { 
+ mandt: mandt;
+ ebeln: ebeln;
+ ebelp: ebelp;
+ matnr: matnr;
+ maktx: maktx;
+}
+implemented by method zji_sort=>get_po_desc;
+______________________________
+
+CLASS ZJI_SORT DEFINITION.
+PUBLIC SECTION.
+INTERFACES if_amdp_marker_hdb.
+CLASS-METHODS ge_po_desc FOR TABLE FUNCTION zji_tf_sorting.
+PROTECTED SECTION.
+ENDCLASS.
+
+CLASS ZJI_SORT IMPLEMENTATION.
+method get_po_desc BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT OPTIONS READ-ONLY USING ekpo makt.
+
+return select ekpo.mandt, ebeln, ebelp, ekpo.matnr, maktx from ekpo
+	left outer join makt on ekpo.matnr = makt.matnr
+	order by ebelp desc;
+endmethod
+######################################################
+
+Through CDS Basic:
+
+define view zji_sort2 as select from ekpo {
+ key ebeln,
+ max(ebelp) as ebelp
+} group by ebeln
+
+define view zji_sort3 as select from zji_sort2 left outer join ekpo
+on zji_sort2.ebeln = ekpo.ebeln and zji_sort2.ebelp = ekpo.ebelp
+{
+key ekpo.ebeln,
+    ekpo.ebelp,
+    matnr
+
+}
