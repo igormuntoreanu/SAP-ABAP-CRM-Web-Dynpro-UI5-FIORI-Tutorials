@@ -1,0 +1,31 @@
+if (hasActiveYT) {
+                    // Create a new dialog
+                    var oDialog = new Dialog({
+                        title: "Confirmation",
+                        type: "Message",
+                        content: new Text({
+                            text: "Active Yard Tasks Available for TU. Do you really want to checkout? Active Yard Tasks will be confirmed"
+                        }),
+                        beginButton: new Button({
+                            text: "Confirm",
+                            press: function () {
+                                oDialog.close();
+                                that._checkOut(yardNo, tuNumExt);
+                            }
+                        }),
+                        endButton: new Button({
+                            text: "Cancel",
+                            press: function () {
+                                oDialog.close();
+                            }
+                        }),
+                        afterClose: function () {
+                            oDialog.destroy();
+                        }
+                    });
+
+                    oDialog.open();
+
+                } else {
+                    this._checkOut(yardNo, tuNumExt);
+                }
