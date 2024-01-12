@@ -1,0 +1,62 @@
+onInitSmartFilterBarExtension: function (oEvent) {
+            var oFilterItems = oEvent.oSource.getAllFilterItems();
+            for (let index = 0; index < oFilterItems.length; index++) {
+                var item = oFilterItems[index];
+                if (item.mProperties.name !== "YardNo" &&
+                    item.mProperties.name !== "TuNumExt" &&
+                    item.mProperties.name !== "StorBin" &&
+                    item.mProperties.name !== "FilterProduct" &&
+                    item.mProperties.name !== "FilterDelivery" &&
+                    item.mProperties.name !== "Message" &&
+                    item.mProperties.name !== "TuType" &&
+                    item.mProperties.name !== "LicPlate" &&
+                    item.mProperties.name !== "TuEmptyCustom" &&
+                    item.mProperties.name !== "hasActiveYTCustom"
+                ) {
+                    item.setVisible(false);
+                }
+            }
+
+            var that = this;
+            var oSmartFilterBar = oEvent.getSource();
+            const variantId = oSmartFilterBar.getCurrentVariantId();
+            if (variantId == '') { //Standard -> Set Current User YardNo
+                that._applyUserYardNo(that, oSmartFilterBar);
+            }
+            oSmartFilterBar.attachAfterVariantLoad(function (oEvent) {
+                that._applyUserYardNo(that, oSmartFilterBar);
+            })
+        },
+
+
+ _applyUserYardNo: function (that, oSmartFilterBar) {
+            const oModel = that.getOwnerComponent().getModel();
+            const variantId = oSmartFilterBar.getCurrentVariantId();
+            if (variantId == '') {
+                //Custom Fields need to be cleared manually
+                that.byId("hasActiveYTCustom").setSelectedKey("");
+                that.byId("TuEmptyCustom").setSelectedKey("");
+                oModel.read("/UserYardNumberSet('')", {
+                    success: function (oData, oResponse) {
+                        if (oData.Yard) {
+                            //Push Key to SmartFilterBar Control
+                            var oCustomControl = oSmartFilterBar.getControlByKey("YardNo");
+                            let keys = [];
+                            keys.push(oData.Yard);
+                            //Push Key to MultiComboBox
+                            oCustomControl.setSelectedKeys(keys)
+                            let filterData = oSmartFilterBar.getFilterData();
+                            filterData["YardNo"] = { // here your value help field
+                                "items": [{
+                                    key: oData.Yard // Pass the key here
+                                }]
+                            };
+                            //Push Key to FilterData
+                            oSmartFilterBar.setFilterData(filterData);
+                            //Fire Go Button Again (Use it only if the Page is always preloaded)
+                            that.getView().byId("yardtu::sap.suite.ui.generic.template.ListReport.view.ListReport::ZYARD_FIORI_TUS_CDS--listReportFilter-btnGo").firePress();
+                        }
+                    }
+                })
+            }
+        }
