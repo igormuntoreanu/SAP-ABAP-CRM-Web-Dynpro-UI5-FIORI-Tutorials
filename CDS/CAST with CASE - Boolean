@@ -1,0 +1,44 @@
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Planned and Activated TUs'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+define view entity zyard_tus_pa_join
+  as select from zyard_tus_all_join
+
+{
+  key   DbKeyTu,
+        DbKeyAct,
+        yard_no,
+        tu_num_ext,
+        tu_num,
+        sr_status,
+        cast ( case sr_status when '01' then 'X' else '' end as flag preserving type )   as IsCheckedIn,
+        cast ( case when sr_status = '03' then 'X' else '' end as flag preserving type ) as IsCheckedOut,
+        stor_bin,
+        stor_section,
+        stor_type,
+        tu_empty,
+        tu_arrival_tstmp,
+        mtr,
+        pmat,
+        tu_type,
+        lic_plate,
+        lic_plate_country,
+        archiving_status,
+        created_by,
+        created_on,
+        changed_by,
+        changed_on,
+        yl_comment,
+        tu_num_ext_ewm,
+        tu_num_ewm
+}
+//where
+//     sr_status is null
+//  or sr_status = '01'
+//  or sr_status = '02'
