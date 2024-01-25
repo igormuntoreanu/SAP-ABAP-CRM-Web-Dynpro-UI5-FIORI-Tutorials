@@ -1,0 +1,67 @@
+  METHOD zyl_if_alerting~reprocess_alert.
+    alert_guid = iv_alert_guid.
+
+    get_alert( ).
+    get_alert_parameters( ).
+
+    CHECK alert_from_db_full IS NOT INITIAL.
+    CHECK alert_parameters_from_db IS NOT INITIAL.
+
+    to_update_alert = alert_from_db.
+    to_update_alert-reprocess_counter += 1.
+    update_alert( ).
+*    CATCH zyl_cx_alerting_error.
+
+
+    DATA: lv_fm_name TYPE tfdir-funcname,
+          ls_ptab    TYPE abap_func_parmbind,
+          lt_ptab    TYPE abap_func_parmbind_tab,
+          ls_etab    TYPE abap_func_excpbind,
+          lt_etab    TYPE abap_func_excpbind_tab.
+    FIELD-SYMBOLS: <lv_value> TYPE any.
+    lv_fm_name = alert_from_db_full-funcname.
+
+    CHECK lv_fm_name IS NOT INITIAL.
+
+    SELECT * FROM fupararef INTO TABLE @DATA(lt_fupararef) WHERE funcname = @alert_from_db_full-funcname.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    LOOP AT lt_fupararef ASSIGNING FIELD-SYMBOL(<ls_fupararef>).
+      CLEAR: ls_ptab, ls_etab.
+      CASE <ls_fupararef>-paramtype.
+        WHEN 'I'.
+          ls_ptab-kind = abap_func_exporting.
+        WHEN 'E'.
+          ls_ptab-kind = abap_func_importing.
+        WHEN 'T'.
+          ls_ptab-kind = abap_func_tables.
+        WHEN 'I'.
+          ls_ptab-kind = abap_func_changing.
+        WHEN 'X'.
+          ls_etab-name = <ls_fupararef>-parameter.
+          ls_etab-value = <ls_fupararef>-pposition.
+          INSERT ls_etab INTO TABLE lt_etab.
+          CONTINUE.
+      ENDCASE.
+      ls_ptab-name = <ls_fupararef>-parameter.
+
+      CREATE DATA ls_ptab-value TYPE (<ls_fupararef>-structure).
+
+      ASSIGN ls_ptab-value->* TO <lv_value>.
+
+      READ TABLE alert_parameters_from_db ASSIGNING FIELD-SYMBOL(<ls_alert_parameter>) WITH KEY para_name = <ls_fupararef>-parameter.
+      IF sy-subrc = 0.
+        <lv_value> = <ls_alert_parameter>-para_value.
+      ENDIF.
+      INSERT ls_ptab INTO TABLE lt_ptab.
+
+    ENDLOOP.
+
+    "call function
+    CALL FUNCTION lv_fm_name
+      PARAMETER-TABLE lt_ptab
+      EXCEPTION-TABLE lt_etab.
+
+  ENDMETHOD.
