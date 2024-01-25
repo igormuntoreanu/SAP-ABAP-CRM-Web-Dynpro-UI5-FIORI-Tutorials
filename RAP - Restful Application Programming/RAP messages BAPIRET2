@@ -1,0 +1,155 @@
+Messages in RAP converting BAPI to RAP messages:
+____________________________________________________________________________________________________________________________________________________
+CLASS lhc_zyl_i_alerts DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+
+    METHODS reprocess FOR MODIFY
+      IMPORTING it_key_for_action FOR ACTION zyl_i_alerts~reprocess REQUEST it_requested_fields RESULT et_action_result.
+
+
+ENDCLASS.
+  METHOD reprocess.
+    DATA(lo_alerts) = NEW zyl_cl_alerting(  ).
+    LOOP AT it_key_for_action ASSIGNING FIELD-SYMBOL(<fs_key>).
+      TRY.
+          DATA(lt_return) = lo_alerts->zyl_if_alerting~reprocess_alert( iv_alert_guid = <fs_key>-alertguid ).
+          APPEND VALUE #(
+           %cid = <fs_key>-%cid_ref
+           alertguid = <fs_key>-alertguid
+           %msg = lo_alerts->map_bapi_to_behv_message( is_message_bapi = VALUE #( lt_return[ 1 ] OPTIONAL )  )
+*           %element-field1 = if_abap_behv=>mk-on
+*           %element-field2 = if_abap_behv=>mk-on
+*           %element-_association = if_abap_behv=>mk-on
+*           %state_area = 'state_area'
+*           %path = VALUE #( <root>-%is_draft = <child>-%is_draft
+*           <root>-<key> = <child>-<parent_key_in_child_entity> )
+          ) TO reported-zyl_i_alerts.
+
+        CATCH zyl_cx_alerting_error.
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+
+____________________________________________________________________________________________________________________________________________________
+class ZYL_CL_ALERTING definition
+  public
+  final
+  create public .
+
+public section.
+
+  interfaces ZYL_IF_ALERTING .
+  interfaces IF_RAP_PLMI_BAPI_MSG_CONVERT .
+
+methods MAP_BAPI_TO_BEHV_MESSAGE
+    importing
+      !IS_MESSAGE_BAPI type BAPIRET2
+    returning
+      value(RO_MESSAGE_BEHV) type ref to IF_ABAP_BEHV_MESSAGE .
+
+CLASS ZYL_CL_ALERTING IMPLEMENTATION.
+
+METHOD map_bapi_to_behv_message.
+
+  CLEAR: ro_message_behv.
+
+*--------------------------------------------------------------------*
+* Map message
+*--------------------------------------------------------------------*
+  CREATE OBJECT ro_message_behv TYPE lx_t100
+    EXPORTING
+      severity = me->if_rap_plmi_bapi_msg_convert~convert_msgty_to_behv_severity( iv_message_type = is_message_bapi-type )
+      msgid    = is_message_bapi-id
+      msgno    = is_message_bapi-number
+      msgv1    = is_message_bapi-message_v1
+      msgv2    = is_message_bapi-message_v2
+      msgv3    = is_message_bapi-message_v3
+      msgv4    = is_message_bapi-message_v4.
+
+
+ENDMETHOD.
+
+
+METHOD if_rap_plmi_bapi_msg_convert~convert_msgty_to_behv_severity.
+
+  CLEAR: rv_severity_behv.
+
+  CASE iv_message_type.
+    WHEN 'A' OR 'E'.
+      rv_severity_behv = if_abap_behv_message=>severity-error.
+    WHEN 'W'.
+      rv_severity_behv = if_abap_behv_message=>severity-warning.
+    WHEN 'I'.
+      rv_severity_behv = if_abap_behv_message=>severity-information.
+    WHEN 'S'.
+      rv_severity_behv = if_abap_behv_message=>severity-success.
+    WHEN OTHERS.
+      " Not valid - set error
+      rv_severity_behv = if_abap_behv_message=>severity-error.
+  ENDCASE.
+
+ENDMETHOD.
+ENDCLASS.
+____________________________________________________________________________________________________________________________________________________
+*"* use this source file for the definition and implementation of
+*"* local helper classes, interface definitions and type
+*"* declarations
+
+*"* use this source file for the definition and implementation of
+*"* local helper classes, interface definitions and type
+*"* declarations
+CLASS lx_t100 DEFINITION FINAL INHERITING FROM cx_static_check.
+  PUBLIC SECTION.
+    " Die Typen der konkreten Messages müssen IF_ABAP_BEHV_MESSAGE inkludieren, welches das T100-Interface inkludiert.
+    INTERFACES if_abap_behv_message.
+
+    ##NEEDED
+    DATA msgv1 TYPE symsgv.
+    ##NEEDED
+    DATA msgv2 TYPE symsgv.
+    ##NEEDED
+    DATA msgv3 TYPE symsgv.
+    ##NEEDED
+    DATA msgv4 TYPE symsgv.
+
+    METHODS constructor
+      IMPORTING
+        !msgid    TYPE symsgid
+        !msgno    TYPE symsgno
+        !severity TYPE if_abap_behv_message~t_severity
+        !msgv1    TYPE csequence OPTIONAL
+        !msgv2    TYPE csequence OPTIONAL
+        !msgv3    TYPE csequence OPTIONAL
+        !msgv4    TYPE csequence OPTIONAL
+        !previous LIKE previous OPTIONAL.
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+CLASS lx_t100 IMPLEMENTATION.
+
+  METHOD constructor.
+    CALL METHOD super->constructor
+      EXPORTING
+        previous = previous.
+    CLEAR me->textid.
+    if_abap_behv_message~m_severity = severity.
+    me->msgv1 = msgv1 .
+    me->msgv2 = msgv2 .
+    me->msgv3 = msgv3 .
+    me->msgv4 = msgv4 .
+    IF msgid IS INITIAL.
+      if_t100_message~t100key = if_t100_message=>default_textid.
+    ELSE.
+      if_t100_message~t100key = VALUE #( msgid = msgid
+                                         msgno = msgno
+                                         attr1 = 'MSGV1'
+                                         attr2 = 'MSGV2'
+                                         attr3 = 'MSGV3'
+                                         attr4 = 'MSGV4' ).
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+
+
