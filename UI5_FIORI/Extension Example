@@ -1,3 +1,6 @@
+Go to the SHOW PAGE MAP ( Right click on WEBAPP), from there you can add the extension automatically
+_____________________________________
+
 manifest.json:
 
 	"sap.ui5": {
