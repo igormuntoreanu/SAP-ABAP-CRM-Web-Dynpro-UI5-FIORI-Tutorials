@@ -1,0 +1,8 @@
+Create a RFC in SE37 and during the call mark as below:
+
+    CALL FUNCTION 'Z_YL_REPROCESS_ALERT' DESTINATION 'NONE'  "IN BACKGROUND TASK AS SEPARATE UNIT
+      EXPORTING
+        iv_func_name       = lv_fm_name
+        it_alert_params_db = alert_parameters_from_db
+      IMPORTING
+        et_return          = rt_bapiret.
