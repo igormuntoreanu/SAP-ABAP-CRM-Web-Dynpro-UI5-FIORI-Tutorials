@@ -1,0 +1,46 @@
+// Set Token to DropDown MultiInput Field at Fiori List Report
+
+sap.ui.define(['sap/ui/core/mvc/ControllerExtension'], function (ControllerExtension) {
+	'use strict';
+
+	return ControllerExtension.extend('alertingkpi.ext.controller.ListReportExt', {
+		// this section allows to extend lifecycle hooks or hooks provided by Fiori elements
+		override: {
+			/**
+			 * Called when a controller is instantiated and its View controls (if available) are already created.
+			 * Can be used to modify the View before it is displayed, to bind event handlers and do other one-time initialization.
+			 * @memberOf alertingkpi.ext.controller.ListReportExt
+			 */
+			onInit: function () {
+				// you can access the Fiori elements extensionAPI via this.base.getExtensionAPI
+				var oModel = this.base.getExtensionAPI().getModel();
+				var oButton = this.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::table::ZYL_C_ALERTS::LineItem::DataFieldForAction::com.sap.gateway.srvd.zyl_sd_alerts.v0001.reprocess::com.sap.gateway.srvd.zyl_sd_alerts.v0001.ZYL_C_ALERTSType");
+				if (oButton) {
+					oButton.setType("Emphasized");
+				}
+				this.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS::FilterField::YardNo").setMultipleLines(true);
+			},
+
+			onAfterRendering: function (oEvent) {
+				var that = this;
+				const pageVariant = this.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::PageVariantManagement");
+				//Load Local Yard for Standard Variant
+				if (pageVariant && (pageVariant.getStandardVariantKey() == pageVariant.getCurrentVariantKey())) {
+					const oModel = that.base.getExtensionAPI().getModel();
+					var yardNoFilter = that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS::FilterField::YardNo");
+					var oList = oModel.bindList("/ZYL_C_LOCAL_YARD");
+					oList.requestContexts().then(function (aContexts) {
+						const yardNo = aContexts[0].getObject().YardNo;
+						if (yardNo) {
+							yardNoFilter.setConditions([{ path: "YardNo", operator: "EQ", values: [yardNo] }]);
+							//Remove the = from the Token. Necessary for preselection of the Value in the Dropdown
+							var multiInput = yardNoFilter.getAggregation("_content");
+							multiInput[0].getTokens()[0].setText(yardNo);
+							that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS-btnSearch").firePress();						
+						}
+					});
+				}
+			}
+		}
+	});
+});
