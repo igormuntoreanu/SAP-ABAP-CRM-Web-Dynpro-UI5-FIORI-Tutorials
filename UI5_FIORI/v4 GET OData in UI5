@@ -1,0 +1,12 @@
+          const oModel = that.base.getExtensionAPI().getModel();
+          var oList = oModel.bindList("/ZYL_C_LOCAL_YARD");
+					oList.requestContexts().then(function (aContexts) {
+						const yardNo = aContexts[0].getObject().YardNo;
+						if (yardNo) {
+							//yardNoFilter.setConditions([{ path: "YardNo", operator: "EQ", values: [yardNo] }])
+							that.base.getExtensionAPI().setFilterValues("YardNo", "EQ", yardNo);
+							//that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS").fireSearch();
+							that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS-btnSearch").firePress();						
+							//Remove the = from the Token. Necessary for preselection of the Value in the Dropdown
+						}
+					});
