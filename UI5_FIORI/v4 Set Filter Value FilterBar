@@ -1,0 +1,32 @@
+//Set Value Filter for non Dropdown Fields
+
+onInit: function () {
+				// you can access the Fiori elements extensionAPI via this.base.getExtensionAPI
+				var oModel = this.base.getExtensionAPI().getModel();
+				var oButton = this.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::table::ZYL_C_ALERTS::LineItem::DataFieldForAction::com.sap.gateway.srvd.zyl_sd_alerts.v0001.reprocess::com.sap.gateway.srvd.zyl_sd_alerts.v0001.ZYL_C_ALERTSType");
+				if (oButton) {
+					oButton.setType("Emphasized");
+				}
+			},
+
+			onAfterRendering: function (oEvent) {
+				var that = this;
+				const pageVariant = this.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::PageVariantManagement");
+				//Load Local Yard for Standard Variant
+				if (pageVariant && (pageVariant.getStandardVariantKey() == pageVariant.getCurrentVariantKey())) {
+					//that.applyUserYardNo(that);
+					const oModel = that.base.getExtensionAPI().getModel();
+					var yardNoFilter = that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS::FilterField::YardNo");
+					var oList = oModel.bindList("/ZYL_C_LOCAL_YARD");
+					oList.requestContexts().then(function (aContexts) {
+						const yardNo = aContexts[0].getObject().YardNo;
+						if (yardNo) {
+							//yardNoFilter.setConditions([{ path: "YardNo", operator: "EQ", values: [yardNo] }])
+							that.base.getExtensionAPI().setFilterValues("YardNo", "EQ", yardNo);
+							//that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS").fireSearch();
+							that.getView().byId("alertingkpi::ZYL_C_ALERTSList--fe::FilterBar::ZYL_C_ALERTS-btnSearch").firePress();						
+							//Remove the = from the Token. Necessary for preselection of the Value in the Dropdown
+						}
+					});
+				}
+			}
