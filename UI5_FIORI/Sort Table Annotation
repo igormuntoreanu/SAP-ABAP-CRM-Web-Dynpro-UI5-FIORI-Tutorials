@@ -1,0 +1,98 @@
+@Metadata.layer:
+#CORE
+
+@UI.headerInfo: {
+    typeName: 'Alerts',
+    typeNamePlural: 'Alerts',
+    title: {
+        type: #STANDARD,
+        label: 'Alert',
+        value: 'Reference'
+    }
+}
+// Order Table by CreatedOn Descending
+@UI.presentationVariant: [{
+    text: 'TesteIgor',
+    sortOrder: [{
+        by: 'CreatedOn',
+        direction: #DESC
+    }],
+    visualizations: [{
+        type: #AS_LINEITEM
+    }]
+}]
+
+annotate view ZYL_C_ALERTS with
+{
+  @UI.facet: [{ purpose: #STANDARD,
+                     type: #COLLECTION,
+                     id: 'ALERTID',
+                     label: 'Alert Details'
+                   },
+                   { purpose: #STANDARD,
+                     type: #FIELDGROUP_REFERENCE,
+                     targetQualifier: 'ALERTDETAILS',
+                     parentId: 'ALERTID',
+                     position: 10
+                   }]
+
+  @UI.selectionField: [{ position: 10 }]
+  @UI.lineItem: [{ position: 10, cssDefault: { width: '4rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 20 }]
+  @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_YARDNO_VH', element : 'YardNo' }}]
+  YardNo;
+  @UI.selectionField: [{ position: 20 }]
+  @UI.lineItem: [{ position: 20, cssDefault: { width: '11rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 30 }]
+  Reference;
+  @UI.selectionField: [{ position: 30 }]
+  @UI.lineItem: [{ position: 30, cssDefault: { width: '5rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 40 }]
+  Reftype;
+  @UI.selectionField: [{ position: 40 }]
+  @UI.lineItem: [{ position: 40, cssDefault: { width: '9rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 50 }]
+  @UI.textArrangement: #TEXT_ONLY
+  @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_I_ALERT_SOURCE', element : 'Value' }}]
+  AlertSource;
+  @UI.selectionField: [{ position: 50 }]
+  @UI.lineItem: [{ position: 50, cssDefault: { width: '6rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 60 }]
+  @UI.textArrangement: #TEXT_ONLY
+  @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_I_ALERT_STATUS', element : 'Value' }}]
+  AlertStatus;
+  @UI.selectionField: [{ position: 60 }]
+  @UI.lineItem: [{ position: 60, cssDefault: { width: '12rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 70 }]
+  AlertComment;
+  @UI.selectionField: [{ position: 70 }]
+  @UI.lineItem: [{ position: 80 }]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 80 }]
+  UserReserved;
+  @UI.selectionField: [{ position: 80 }]
+  @UI.lineItem: [{ position: 90 }]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 90 }]
+  Funcname;
+  @UI.lineItem: [{ position: 100 }]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 100 }]
+  ReprocessCounter;
+  @UI.selectionField: [{ position: 90 }]
+  @UI.lineItem: [{ position: 110 }]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 110 }]
+  CreatedBy;
+  @UI.selectionField: [{ position: 100 }]
+  @UI.lineItem: [{ position: 70, cssDefault: { width: '8rem' }}]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 120 }]
+  CreatedOn;
+  @UI.lineItem: [{ position: 120 }]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 130 }]
+  ChangedBy;
+  @UI.lineItem: [{ position: 130 }]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 140 }]
+  ChangedOn;
+  @UI.lineItem: [{ position: 140 }, { type: #FOR_ACTION, dataAction: 'reprocess', label: 'Reprocess' } ]
+  @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 150 }]
+  AlertGuid;
+  @UI.lineItem: [{ position: 150 }]
+  ParamYardNo;
+}
