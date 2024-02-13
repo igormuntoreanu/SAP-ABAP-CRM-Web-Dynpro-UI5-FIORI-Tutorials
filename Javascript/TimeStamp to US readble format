@@ -1,0 +1,13 @@
+if (createdOn) { //Build Readble Date from TimeStamp i.e "20240212135849"
+                const timestamp = createdOn;
+                const year = timestamp.slice(0, 4);
+                const month = timestamp.slice(4, 6);
+                const day = timestamp.slice(6, 8);
+                const hours = timestamp.slice(8, 10);
+                const minutes = timestamp.slice(10, 12);
+                const seconds = timestamp.slice(12, 14);
+
+                const date = new Date(`${year}-${month}-${day}T${hours}:${minutes}:${seconds}`);
+
+                var readableDate = date.toLocaleString('en-US'); //i.e '2/12/2024, 1:58:49 PM'
+            }
