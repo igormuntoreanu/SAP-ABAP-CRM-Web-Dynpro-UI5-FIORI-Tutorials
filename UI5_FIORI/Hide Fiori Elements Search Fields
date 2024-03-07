@@ -16,3 +16,8 @@ onInitSmartFilterBarExtension: function (oEvent) {
 
             }
         },
+
+//// or for ValueHelps for example:
+// Remove Filters manually:
+oValueHelp.getFilterBar().getFilterGroupItems()[0]
+oValueHelp.getFilterBar().removeFilterGroupItem(oValueHelp.getFilterBar().getFilterGroupItems()[0])
