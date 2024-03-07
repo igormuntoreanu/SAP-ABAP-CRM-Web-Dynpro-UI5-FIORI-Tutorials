@@ -1,0 +1,38 @@
+//Handle TuNumber
+                let smartFilterBar = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar");
+                if (smartFilterBar) {
+                    smartFilterBar.attachInitialized(function (oEvent) {
+                        //Check URL to catch TuNumber (when navigating from TuFinder App)
+                        let queryString = window.location.hash;
+                        let urlParams = new URLSearchParams(queryString);
+                        let tuNumExt = urlParams.get('#ZYL_YLMOVE-LoadTrailer?TuNumExt');
+                        let tuInputField = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext");
+                        let goButton = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-btnGo");
+                        if (tuInputField && tuNumExt) {
+                            tuInputField.setValue(tuNumExt);
+                            if (goButton) {
+                                goButton.firePress();
+                            }
+                        }
+                        tuInputField.attachValueHelpRequest(function (oEvent) {
+                            debugger;
+                            setTimeout(() => {
+                                debugger;
+                                var oValueHelp = sap.ui.getCore().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext-valueHelpDialog")
+                                if (oValueHelp) {
+                                    oValueHelp.attachOk(function (oEvent) {
+                                        debugger;
+                                        var aTokens = oEvent.getParameter("tokens");
+                                        //Get only the Key
+                                        var oSelectedToken = aTokens[0];
+                                        //Get clicked Line Information
+                                        var selectedItemToken = oEvent.getSource()._oSelectedItems.getSelectedItemsTokenArray();
+                                        var customData = selectedItemToken[0].getAggregation("customData")[0];
+                                        var line = customData.mProperties.value;
+                                        debugger;
+                                    })
+                                }
+                            }, 1000);
+                        }.bind(this))
+                    }.bind(this))
+                }
