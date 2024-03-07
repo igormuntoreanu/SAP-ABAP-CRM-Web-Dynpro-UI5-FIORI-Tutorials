@@ -19,5 +19,21 @@ onInitSmartFilterBarExtension: function (oEvent) {
 
 //// or for ValueHelps for example:
 // Remove Filters manually:
-oValueHelp.getFilterBar().getFilterGroupItems()[0]
-oValueHelp.getFilterBar().removeFilterGroupItem(oValueHelp.getFilterBar().getFilterGroupItems()[0])
+_removeFilters: function (oValueHelp) {
+                var filterItems = oValueHelp.getFilterBar().getFilterGroupItems();
+                if (Array.isArray(filterItems)) {
+                    filterItems.forEach(filterItem => {
+                        if (filterItem.mProperties.name !== 'YardNo' &&
+                            filterItem.mProperties.name !== 'TuNumExt' &&
+                            filterItem.mProperties.name !== 'TuNTuType' &&
+                            filterItem.mProperties.name !== 'CarrierBp' &&
+                            filterItem.mProperties.name !== 'StorBin' &&
+                            filterItem.mProperties.name !== 'FilterProduct' &&
+                            filterItem.mProperties.name !== 'LicPlate' &&
+                            filterItem.mProperties.name !== 'Message')
+                        {
+                            oValueHelp.getFilterBar().removeFilterGroupItem(filterItem);
+                        }
+                    });
+                }
+            }
