@@ -32,7 +32,8 @@ _removeFilters: function (oValueHelp) {
                             filterItem.mProperties.name !== 'LicPlate' &&
                             filterItem.mProperties.name !== 'Message')
                         {
-                            oValueHelp.getFilterBar().removeFilterGroupItem(filterItem);
+                            /* oValueHelp.getFilterBar().removeFilterGroupItem(filterItem); */ //This causes duplicatedID error
+                            filterItem.setVisible(false)
                         }
                     });
                 }
