@@ -1,4 +1,170 @@
+// This will handle the ValueHelp created by the CDS View
+<mvc:View controllerName="ylmove.controller.Master"
+    xmlns:mvc="sap.ui.core.mvc" displayBlock="true"
+    xmlns="sap.m"
+    xmlns:f="sap.f"
+    xmlns:form="sap.ui.layout.form"
+    xmlns:smartFilterBar="sap.ui.comp.smartfilterbar"
+    xmlns:core="sap.ui.core">
+    <f:DynamicPage id="idDynamicPage" fitContent="true">
+        <f:header>
+            <f:DynamicPageHeader id="idDynamicPageHeader">
+                <smartFilterBar:SmartFilterBar id="idSmartFilterBar"
+                    entitySet="ZYL_TU_MOVE"
+                    useToolbar="false"
+                    showFilterConfiguration="false"
+                    search=".onSmartFilterBarSearch">
+                    <smartFilterBar:controlConfiguration>
+                        <smartFilterBar:ControlConfiguration id="idTuNumExtControlConfiguration"
+                            key="tunumext"
+                            visibleInAdvancedArea="true"
+                            filterType="single"
+                        >
+                        </smartFilterBar:ControlConfiguration>
+                    </smartFilterBar:controlConfiguration>
+                </smartFilterBar:SmartFilterBar>
+            </f:DynamicPageHeader>
+        </f:header>
+        <f:content>
+            <VBox id="idVBox" class="sapUiSmallMargin">
+                <form:SimpleForm id="idTrailerSimpleForm" editable="true" visible="false"
+                    layout="ColumnLayout" title="Movement Details" labelSpanXL="4" labelSpanL="4"
+                    labelSpanM="12" labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0"
+                    emptySpanL="0" emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2"
+                    columnsM="1" singleContainerFullSize="false">
+                    <form:content>
+                        <Label text="Movement Type" visible="false" />
+                        <Text id="idMovementTypeText" text="{MovementType}" visible="false" />
+                        <Label text="Trailer ID" />
+                        <Text id="idTrailerIDText" text="{TrailerID}" />
+                        <Label text="Plant" />
+                        <Text id="idPlantText" text="{Plant}" />
+                        <Label text="Storage Type" />
+                        <Text id="idStorageTypeText" text="{StorageType}" />
+                        <Label text="Curr. Location" />
+                        <Text id="idCurrentLocationText" text="{CurrentLocation}" />
+                        <Label text="Yard" />
+                        <Text id="idYardText" text="{Yard}" />
+                        <Label text="Dest.SLoc." />
+                        <Text id="idDestStorageLocationText" text="{DestStorageLocation}" />
+                        <Label text="Status Profile" visible="false" />
+                        <Text id="idStatusProfileText" text="{StatusProfile}" visible="false" />
+                    </form:content>
+                </form:SimpleForm>
+                <form:SimpleForm id="idTrailerTableSimpleForm" visible="false" editable="true"
+                    layout="GridLayout" labelSpanXL="4" labelSpanL="4" labelSpanM="12"
+                    labelSpanS="12" adjustLabelSpan="false" emptySpanXL="0" emptySpanL="0"
+                    emptySpanM="0" emptySpanS="0" columnsXL="2" columnsL="2" columnsM="1"
+                    singleContainerFullSize="false">
+                    <Table id="ItemsTable" growing="true" growingThreshold="100"
+                        items="{ path: 'table>/TableLines' }">
+                        <headerToolbar>
+                            <OverflowToolbar id="idOverflowToolbar">
+                                <Title text="Materials" level="H2" />
+                                <ToolbarSpacer />
+                                <Button id="addLineButton" icon="sap-icon://add"
+                                    tooltip="Add line to the table" press=".onAddLine" />
+                                <Button id="deleteLineButton" icon="sap-icon://less"
+                                    tooltip="Remove line from the table" press=".onDeleteLine" />
+                                <Button id="idPasteButton" icon="sap-icon://paste"
+                                    tooltip="Paste values from spreadsheet"
+                                    press=".onButtonPastePress" />
+                                <Button id="saveButton" text="Save" tooltip="Save and Load Trailer"
+                                    press=".onSave" type="Emphasized" />
+                                <Button id="cancelButton" text="Reset" tooltip="Erase the table"
+                                    press=".onReset" />
+                            </OverflowToolbar>
+                        </headerToolbar>
+                        <columns>
+                            <Column>
+                                <Text text="Material" />
+                            </Column>
+                            <Column>
+                                <Text text="Quantity" />
+                            </Column>
+                            <Column>
+                                <Text text="Src. SLoc." />
+                            </Column>
+                            <Column>
+                                <Text text="Dest.SLoc." />
+                            </Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem vAlign="Middle" type="Inactive">
+                                <cells>
+                                    <Input value="{table>Material}" maxLength="18" />
+                                    <Input value="{table>Quantity}" type="Number" maxLength="17" />
+                                    <Input value="{table>SourceStorageLocation}" maxLength="4" />
+                                    <Input value="{table>DestStorageLocation}" maxLength="4"
+                                        enabled="false" />
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </form:SimpleForm>
+            </VBox>
+        </f:content>
+    </f:DynamicPage>
+</mvc:View>
+
+//JS Code to manipulate things like filters, columns and so on
 //Handle TuNumber
+sap.ui.define([
+    "sap/ui/core/mvc/Controller",
+    "sap/ui/core/Fragment",
+    "sap/ui/model/json/JSONModel",
+    "sap/ui/model/FilterType",
+    "sap/ui/model/Filter",
+    "sap/ui/model/FilterOperator",
+    "sap/m/MessagePopover",
+    "sap/m/MessageItem",
+    "sap/m/MessageBox",
+    "sap/m/Dialog",
+    "sap/m/Button",
+    "sap/m/Text"
+],
+    /**
+     * @param {typeof sap.ui.core.mvc.Controller} Controller
+     */
+    function (Controller,
+        Fragment,
+        JSONModel,
+        FilterType,
+        Filter,
+        FilterOperator,
+        MessagePopover,
+        MessageItem,
+        MessageBox,
+        Dialog,
+        Button,
+        Text) {
+        "use strict";
+
+        return Controller.extend("ylmove.controller.Master", {
+            onInit: function () {
+                this.getOwnerComponent().getModel().attachRequestFailed(function (oEvent) {
+                    if (oEvent.getParameters().url.includes("ZYL_TU_MOVE_VH/")) {
+                        this._setVisible(false);
+                    }
+                }.bind(this));
+            },
+
+            onAfterRendering: function () {
+
+                var that = this;
+
+                //Attach Press, check if state is red, then clear screen
+                let goButton = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-btnGo");
+                if (goButton) {
+                    goButton.attachPress(function (oEvent) {
+                        const tuInput = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext");
+                        if (tuInput && tuInput.getValueState() == 'Error') {
+                            this._setVisible(false);
+                        }
+                    }.bind(this));
+                }
+
+                //Handle TuNumber
                 let smartFilterBar = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar");
                 if (smartFilterBar) {
                     smartFilterBar.attachInitialized(function (oEvent) {
@@ -15,24 +181,982 @@
                             }
                         }
                         tuInputField.attachValueHelpRequest(function (oEvent) {
-                            debugger;
                             setTimeout(() => {
-                                debugger;
-                                var oValueHelp = sap.ui.getCore().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext-valueHelpDialog")
+                                var oValueHelp = that.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext-valueHelpDialog")
+                                var error = false;
                                 if (oValueHelp) {
+                                    that._applyUserYardNo(that, oValueHelp);
+                                    that._removeFilters(oValueHelp);
+                                    that._removeTableColumns(oValueHelp);
                                     oValueHelp.attachOk(function (oEvent) {
-                                        debugger;
-                                        var aTokens = oEvent.getParameter("tokens");
-                                        //Get only the Key
-                                        var oSelectedToken = aTokens[0];
                                         //Get clicked Line Information
                                         var selectedItemToken = oEvent.getSource()._oSelectedItems.getSelectedItemsTokenArray();
                                         var customData = selectedItemToken[0].getAggregation("customData")[0];
                                         var line = customData.mProperties.value;
-                                        debugger;
-                                    })
+                                        that.selectedLineFromVH = line;
+                                        if (line.isTrailerBlocked || line.hasActiveYT || !(line.isShuttle) || line.hasImDelTrailers) {
+                                            error = true;
+                                            var i18nResourceBundle = that.getView().getModel("i18n").getResourceBundle();
+                                            if (line.isTrailerBlocked) {
+                                                var errorMsg = i18nResourceBundle.getText("msgTrailerBlocked");
+                                            }
+                                            if (line.hasActiveYT) {
+                                                var errorMsg = i18nResourceBundle.getText("msgActiveYardTask");
+                                            }
+                                            if (!line.isShuttle) {
+                                                if (!line.TuEmpty) {
+                                                    errorMsg = i18nResourceBundle.getText("msgShuttleNotRelevant");
+                                                } else {
+                                                    error = false;
+                                                }
+                                            }
+                                            if (line.hasImDelTrailers) {
+                                                errorMsg = i18nResourceBundle.getText("msgIMDeliveryTrailer");
+                                            }
+                                            if (error) {
+                                                MessageBox.warning(errorMsg);
+                                            }
+
+                                        } else {
+                                            error = false;
+                                        }
+                                    });
                                 }
                             }, 1000);
                         }.bind(this))
                     }.bind(this))
                 }
+
+                var oTable = this.getView().byId("ItemsTable");
+                oTable.setTooltip("Click on the header of this table and copy and paste values from Excel");
+                var aItems = oTable.getItems();
+                for (var i = 0; i < aItems.length; i++) {
+                    //Catch current line focus through 
+                    aItems[i].mAggregations.cells[0].addEventDelegate({
+                        onfocusin: function (oEvent) {
+                            that._catchLineFocus(oEvent, that)
+                        }
+                    })
+                    aItems[i].mAggregations.cells[1].addEventDelegate({
+                        onfocusin: function (oEvent) {
+                            that._catchLineFocus(oEvent, that)
+                        }
+                    })
+                    aItems[i].mAggregations.cells[2].addEventDelegate({
+                        onfocusin: function (oEvent) {
+                            that._catchLineFocus(oEvent, that)
+                        }
+                    })
+                    aItems[i].mAggregations.cells[3].addEventDelegate({
+                        onfocusin: function (oEvent) {
+                            that._catchLineFocus(oEvent, that)
+                        }
+                    })
+                }
+                //Copy and Paste from external Source
+                this.getView().byId("ItemsTable").attachPaste(function (oEvent) {
+                    var oTable = this.getView().byId("ItemsTable");
+                    var aItems = oTable.getItems();
+                    var tableData = oTable.getModel("table").getData();
+                    for (var i = 0; i < oEvent.mParameters.data.length; i++) {
+                        //Check if Line exits in the UI5 Table
+                        if (!aItems[i]) { // if not then create a new line
+                            this.onAddLine();
+                            aItems = oTable.getItems();
+                            tableData = oTable.getModel("table").getData();
+                            //Assign values of the spreadsheet to the UI5 Table
+                            if (oEvent.mParameters.data[i][0]) {
+                                /* aItems[i].mAggregations.cells[0].setValue(oEvent.mParameters.data[i][0]); */
+                                tableData.TableLines[i].Material = oEvent.mParameters.data[i][0];
+                            }
+                            if (oEvent.mParameters.data[i][1]) {
+                                /* aItems[i].mAggregations.cells[1].setValue(oEvent.mParameters.data[i][1]); */
+                                tableData.TableLines[i].Quantity = parseInt(oEvent.mParameters.data[i][1]);
+                            }
+                            if (oEvent.mParameters.data[i][2]) {
+                                tableData.TableLines[i].SourceStorageLocation = oEvent.mParameters.data[i][2];
+                                /* aItems[i].mAggregations.cells[2].setValue(oEvent.mParameters.data[i][2]); */
+                            }
+
+                            oTable.getModel("table").setData(tableData);
+
+                            //Catch current line focus through 
+                            aItems[i].mAggregations.cells[0].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+                            aItems[i].mAggregations.cells[1].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+                            aItems[i].mAggregations.cells[2].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+                            aItems[i].mAggregations.cells[3].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+
+                        } else {
+                            aItems = oTable.getItems();
+                            tableData = oTable.getModel("table").getData();
+                            //Assign values of the spreadsheet to the UI5 Table
+                            if (oEvent.mParameters.data[i][0]) {
+                                /* aItems[i].mAggregations.cells[0].setValue(oEvent.mParameters.data[i][0]); */
+                                tableData.TableLines[i].Material = oEvent.mParameters.data[i][0];
+                            }
+                            if (oEvent.mParameters.data[i][1]) {
+                                /* aItems[i].mAggregations.cells[1].setValue(oEvent.mParameters.data[i][1]); */
+                                tableData.TableLines[i].Quantity = parseInt(oEvent.mParameters.data[i][1]);
+                            }
+                            if (oEvent.mParameters.data[i][2]) {
+                                /* aItems[i].mAggregations.cells[2].setValue(oEvent.mParameters.data[i][2]); */
+                                tableData.TableLines[i].SourceStorageLocation = oEvent.mParameters.data[i][2];
+                            }
+
+                            oTable.getModel("table").setData(tableData);
+
+                            //Catch current line focus through 
+                            aItems[i].mAggregations.cells[0].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+                            aItems[i].mAggregations.cells[1].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+                            aItems[i].mAggregations.cells[2].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+                            aItems[i].mAggregations.cells[3].addEventDelegate({
+                                onfocusin: function (oEvent) {
+                                    that._catchLineFocus(oEvent, that)
+                                }
+                            })
+
+                        }
+                    }
+                }.bind(this));
+
+            },
+            onSmartFilterBarSearch: function (oEvent) {
+                const oTu = this.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext");
+                if (oTu && oTu.getValue()) {
+                    const tu = oTu.getValue();
+                    /* this.getView().byId("idParkingLotSelect").setEnabled(true); */
+                    this._setBusy(true);
+                    //Get Data From EntitySet YLMove
+
+                    const oFilters = [new Filter("TuNoExt", FilterOperator.EQ, tu)];
+                    if (this.selectedLineFromVH && this.selectedLineFromVH.YardNo) {
+                        oFilters.push(new Filter("Yard", FilterOperator.EQ, this.selectedLineFromVH.YardNo));
+                    }
+
+                    this._getYLMove(this.getOwnerComponent().getModel(), oFilters).then(function (oData) {
+                        if (oData.results.length > 0) {
+                            if (oData.results[0].hasActiveYT || !(oData.results[0].isShuttle) || oData.results[0].isTrailerBlocked || oData.results[0].hasImDelTrailers) {
+                                var error = true;
+                                var i18nResourceBundle = this.getView().getModel("i18n").getResourceBundle();
+                                if (oData.results[0].isTrailerBlocked) {
+                                    var errorMsg = i18nResourceBundle.getText("msgTrailerBlocked");
+                                }
+                                if (oData.results[0].hasActiveYT) {
+                                    var errorMsg = i18nResourceBundle.getText("msgActiveYardTask");
+                                }
+                                if (!oData.results[0].isShuttle) {
+                                    if (!oData.results[0].TuEmpty) {
+                                        errorMsg = i18nResourceBundle.getText("msgShuttleNotRelevant");
+                                    } else {
+                                        error = false;
+                                    }
+                                }
+                                if (oData.results[0].hasImDelTrailers) {
+                                    errorMsg = i18nResourceBundle.getText("msgIMDeliveryTrailer");
+                                }
+                                if (error) {
+                                    MessageBox.warning(errorMsg);
+                                }
+                            }
+
+                            if (!error) {
+
+                                this._setVisible(true);
+                                this.YLMove = oData.results[0];
+                                this.getView().byId("idMovementTypeText").setText(oData.results[0].MovementType);
+                                this.getView().byId("idTrailerIDText").setText(oData.results[0].TrailerID);
+                                this.getView().byId("idPlantText").setText(oData.results[0].Plant);
+                                this.getView().byId("idStorageTypeText").setText(oData.results[0].StorageType);
+                                this.getView().byId("idCurrentLocationText").setText(oData.results[0].CurrentLocation);
+                                this.getView().byId("idYardText").setText(oData.results[0].Yard);
+                                this.getView().byId("idDestStorageLocationText").setText(oData.results[0].DestStorageLocation);
+                                this.getView().byId("idStatusProfileText").setText(oData.results[0].StatusProfile);
+
+                                //Set Destination to the table Items
+                                var oTable = this.getView().byId("ItemsTable");
+                                if (oTable) {
+                                    var aItems = oTable.getItems();
+                                    for (var i = 0; i < aItems.length; i++) {
+                                        //Access item properties and Update the cell values
+                                        aItems[i].mAggregations.cells[3].setValue(this.getView().byId("idDestStorageLocationText").getText());
+                                    }
+                                }
+                            }
+                        }
+
+                    }.bind(this));
+                } else {
+                    this._setVisible(false);
+                }
+            },
+
+            onSelectParkingLotChange: function (oEvent) {
+                var sKey = oEvent.getParameters().selectedItem.getKey();
+                if (sKey == "Yes") {
+                    this.getView().byId("idStorageBinSHSetParkingLotComboBox").setEnabled(true);
+                    //Get idStorageBinSHSetParkingLotComboBox and Filter with isPark
+                    var sKeyStatusProfile = this.getView().byId("idStatusProfileText").getText();
+                    var oParkingLotList = this.getView().byId("idStorageBinSHSetParkingLotComboBox");
+                    if (oParkingLotList) {
+                        oParkingLotList.setEnabled(true);
+                        oParkingLotList.setValue();
+
+                        var oBinding = oParkingLotList.getBinding("items");
+                        var aFilters = [];
+                        aFilters.push(new Filter("StatusProfile", FilterOperator.EQ, sKeyStatusProfile));
+                        aFilters.push(new Filter("isPark", FilterOperator.EQ, true));
+                        oBinding.filter(aFilters, FilterType);
+                    }
+                } else {
+                    this.getView().byId("idStorageBinSHSetParkingLotComboBox").setEnabled(false);
+                    this.getView().byId("idStorageBinSHSetParkingLotComboBox").setValue("");
+                }
+            },
+
+            onAddLine: function () {
+                var oTable = this.getView().byId("ItemsTable");
+                var tableData = oTable.getModel("table").getData();
+                var emptyLine =
+                {
+                    "Material": "",
+                    "Quantity": "",
+                    "SourceStorageLocation": "",
+                    "DestStorageLocation": ""
+                };
+                tableData.TableLines.push(emptyLine);
+                oTable.getModel("table").setData(tableData);
+                var aItems = oTable.getItems();
+                var i = aItems.length - 1;
+                aItems[i].mAggregations.cells[3].setValue(this.getView().byId("idDestStorageLocationText").getText());
+                var that = this;
+                //Catch current line focus through 
+                aItems[i].mAggregations.cells[0].addEventDelegate({
+                    onfocusin: function (oEvent) {
+                        that._catchLineFocus(oEvent, that)
+                    }
+                })
+                aItems[i].mAggregations.cells[1].addEventDelegate({
+                    onfocusin: function (oEvent) {
+                        that._catchLineFocus(oEvent, that)
+                    }
+                })
+                aItems[i].mAggregations.cells[2].addEventDelegate({
+                    onfocusin: function (oEvent) {
+                        that._catchLineFocus(oEvent, that)
+                    }
+                })
+                aItems[i].mAggregations.cells[3].addEventDelegate({
+                    onfocusin: function (oEvent) {
+                        that._catchLineFocus(oEvent, that)
+                    }
+                })
+            },
+
+            onDeleteLine: function (oEvent) {
+                var oTable = this.getView().byId("ItemsTable");
+                var tableData = oTable.getModel("table").getData();
+                if (this.currentTableLine == undefined || this.currentTableLine == tableData.TableLines.length) {
+                    this.currentTableLine = tableData.TableLines.length - 1;
+                }
+
+                if (this.currentTableLine >= 0 && tableData.TableLines.length >= 0) {
+                    tableData.TableLines.splice(this.currentTableLine, 1);
+                    oTable.getModel("table").setData(tableData);
+                }
+            },
+
+            onSave: function (oEvent) {
+                //Check if Table is filled correctly
+                let hasError = this._checkTable();
+                //Send POST to Backend
+                if (hasError) {
+                    //this.fillMessagePopoverError("Please fill all marked mandatory fields");
+                    MessageBox.error("Please fill all marked mandatory fields");
+                    return;
+                }
+                var oTable = this.getView().byId("ItemsTable");
+                if (oTable) {
+                    var aItems = oTable.getItems();
+
+                    this.getView().getModel().setDeferredGroups(["content"]);
+                    for (var i = 0; i < aItems.length; i++) {
+                        if (aItems[i].mAggregations.cells[0].getValue() !== "" &&
+                            aItems[i].mAggregations.cells[1].getValue() !== "" &&
+                            aItems[i].mAggregations.cells[2].getValue() !== "") {
+
+                            //To Uppercase
+                            aItems[i].mAggregations.cells[0].setValue(aItems[i].mAggregations.cells[0].getValue().toUpperCase());
+                            aItems[i].mAggregations.cells[1].setValue(aItems[i].mAggregations.cells[1].getValue().toUpperCase());
+                            aItems[i].mAggregations.cells[2].setValue(aItems[i].mAggregations.cells[2].getValue().toUpperCase());
+
+                            //Access item properties and Update the cell values
+                            var quantity = parseInt(aItems[i].mAggregations.cells[1].getValue());
+                            this.getView().getModel().callFunction("/Save", {
+                                groupId: "content",
+                                /* groupId: "batchFunctionImport", */
+                                /* changeSetId: i, */
+                                method: "POST",
+                                urlParameters: {
+                                    StatusProfile: this.getView().byId("idStatusProfileText").getText(), //this.getView().byId("idStatusProfileSHSetSelect").getSelectedKey(),
+                                    StorageBin: this.getView().byId("idCurrentLocationText").getText(), //this.getView().byId("idStorageBinSHSetComboBox").getSelectedKey(),
+                                    MovementType: this.getView().byId("idMovementTypeText").getText(),
+                                    TrailerID: this.getView().byId("idTrailerIDText").getText(),
+                                    Plant: this.getView().byId("idPlantText").getText(),
+                                    CurrentLocation: this.getView().byId("idCurrentLocationText").getText(),
+                                    Yard: this.getView().byId("idYardText").getText(),
+                                    DestStorageLocation: this.getView().byId("idDestStorageLocationText").getText(),
+                                    MoveToParkLot: false, //parkingLotBoolean, */
+                                    ParkingLot: "", //this.getView().byId("idStorageBinSHSetParkingLotComboBox").getSelectedKey(), */
+                                    Material: aItems[i].mAggregations.cells[0].getValue(),
+                                    Quantity: quantity,
+                                    SourceStorageLocation: aItems[i].mAggregations.cells[2].getValue(),
+                                    ServiceAgent: this.YLMove.ServiceAgent,
+                                    TuNum: this.YLMove.TuNum,
+                                    TuNoExt: this.byId("idSmartFilterBar").getFilters()[0].oValue1,
+                                    MaterialDocument: "",
+                                    YardTask: "",
+                                    Line: i
+                                }
+                            });
+                        }
+                    }
+
+                    //Submitting the function import batch call
+                    this.getView().getModel().submitChanges({
+                        groupId: "content", //Same as the batch group id used previously
+                        success: function (oEvent) {
+                            //Error
+                            var response = oEvent.__batchResponses[0].response;
+                            if (response) {
+                                var jsonString = response.body.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                                var parsedObject = JSON.parse(jsonString);
+
+                                var additionalMessages = parsedObject.error.innererror.errordetails;
+                                if (additionalMessages && additionalMessages.length > 0) {
+                                    MessageBox.error(additionalMessages[0].message);
+                                } else {
+                                    additionalMessages = parsedObject.error.message.value;
+                                    if (additionalMessages) {
+                                        MessageBox.error(additionalMessages);
+                                    }
+                                }
+                                //Success
+                            } else {
+                                response = oEvent.__batchResponses[0].__changeResponses[0];
+                                if (response) {
+                                    jsonString = response.body.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                                    parsedObject = JSON.parse(jsonString);
+                                    this.openSaveSuccessfulDialog(parsedObject.d.MaterialDocument);
+                                    this._setVisible(false);
+                                    this.onReset();
+                                } else {
+                                    MessageBox.error("Technical issue raised");
+                                }
+                            }
+
+                        }.bind(this),
+                        error: function (oError) {
+                            const jsonString = oEvent.__batchResponses[0].response.body.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                            const parsedObject = JSON.parse(jsonString);
+
+                            let additionalMessages = parsedObject.error.innererror.errordetails;
+                            if (additionalMessages && additionalMessages.length > 0) {
+                                MessageBox.error(additionalMessages[0].message);
+                            }
+                        }.bind(this)
+                    });
+                }
+            },
+
+            onButtonPastePress: function (oEvent) {
+                var that = this;
+                // Check if the Clipboard API is supported
+                if (navigator.clipboard) {
+                    // Use the Clipboard API to access the clipboard contents
+                    navigator.clipboard.readText().then(function (text) {
+                        // 'text' variable contains the copied value
+                        var lines = text.trim().split('\r\n');
+                        var array = [];
+
+                        // Iterate over each line
+                        lines.forEach(function (line) {
+                            var columns = line.split('\t');
+
+                            // Create an object with properties 'Material', 'Quantity', and 'Storage Location'
+                            var obj = {
+                                Material: columns[0],
+                                Quantity: columns[1],
+                                SourceStorageLocation: columns[2]
+                            };
+
+                            // Push the object to the array
+                            array.push(obj);
+                        });
+
+                        if (array) {
+                            var oTable = that.getView().byId("ItemsTable");
+                            var aItems = oTable.getItems();
+                            var tableData = oTable.getModel("table").getData();
+                            for (var i = 0; i < array.length; i++) {
+                                //Check if Line exits in the UI5 Table
+                                if (!aItems[i]) { // if not then create a new line
+                                    that.onAddLine();
+                                    aItems = oTable.getItems();
+                                    tableData = oTable.getModel("table").getData();
+                                    //Assign values of the spreadsheet to the UI5 Table
+                                    if (array[i].Material) {
+                                        tableData.TableLines[i].Material = array[i].Material;
+                                    }
+                                    if (array[i].Quantity) {
+                                        tableData.TableLines[i].Quantity = parseInt(array[i].Quantity);
+                                    }
+                                    if (array[i].SourceStorageLocation) {
+                                        tableData.TableLines[i].SourceStorageLocation = array[i].SourceStorageLocation;
+                                    }
+
+                                    oTable.getModel("table").setData(tableData);
+
+                                    //Catch current line focus through 
+                                    aItems[i].mAggregations.cells[0].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[1].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[2].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[3].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+
+                                } else {
+                                    aItems = oTable.getItems();
+                                    tableData = oTable.getModel("table").getData();
+                                    //Assign values of the spreadsheet to the UI5 Table
+                                    if (array[i].Material) {
+                                        /* aItems[i].mAggregations.cells[0].setValue(oEvent.mParameters.data[i][0]); */
+                                        tableData.TableLines[i].Material = array[i].Material;
+                                    }
+                                    if (array[i].Quantity) {
+                                        /* aItems[i].mAggregations.cells[1].setValue(oEvent.mParameters.data[i][1]); */
+                                        tableData.TableLines[i].Quantity = parseInt(array[i].Quantity);
+                                    }
+                                    if (array[i].SourceStorageLocation) {
+                                        /* aItems[i].mAggregations.cells[2].setValue(oEvent.mParameters.data[i][2]); */
+                                        tableData.TableLines[i].SourceStorageLocation = array[i].SourceStorageLocation;
+                                    }
+
+                                    oTable.getModel("table").setData(tableData);
+
+                                    //Catch current line focus through 
+                                    aItems[i].mAggregations.cells[0].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[1].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[2].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+                                    aItems[i].mAggregations.cells[3].addEventDelegate({
+                                        onfocusin: function (oEvent) {
+                                            that._catchLineFocus(oEvent, that)
+                                        }
+                                    })
+
+                                }
+                            }
+                        }
+                    }).catch(function () {
+                        MessageBox.information("Failed to load copied values. Clear your Browser cache and try again");
+                    });
+                } else {
+                    MessageBox.information("Function not supported in your Browser");
+                }
+
+            },
+
+            onReset: function (oEvent) {
+                //Clear Table
+                // get the path to the JSON file
+                var sPath = jQuery.sap.getModulePath("ylmove", "/model/table.json");
+                var oModel = new JSONModel(sPath);
+                oModel.attachRequestCompleted(function (oEvent) {
+                    var tableData = oEvent.getSource().getData();
+                    for (let index = 0; index < tableData.TableLines.length; index++) {
+                        tableData.TableLines[index].DestStorageLocation = this.getView().byId("idDestStorageLocationText").getText();
+                    }
+                    this.getView().byId("ItemsTable").getModel("table").setData(tableData);
+                    this._checkTable();
+                }.bind(this));
+
+                //this.clearMessagePopover();
+            },
+
+            openSaveSuccessfulDialog: function (MaterialDocument) {
+                let i18nResourceBundle = this.getView().getModel("i18n").getResourceBundle();
+                let title = i18nResourceBundle.getText("titleSaveSuccessfulDialog", MaterialDocument);
+                let contentText = i18nResourceBundle.getText("msgSaveSuccessfulDialog");
+                let titleLength = title.length + 20;
+                let contentTextLength = contentText.length;
+                let additionalSpaceCount = 0;
+                if (titleLength > contentTextLength) {
+                    additionalSpaceCount = titleLength - contentTextLength;
+                }
+                if (additionalSpaceCount > 0) {
+                    for (let i = 0; i < additionalSpaceCount; i++) {
+                        contentText = contentText + "\u0020";
+                    }
+                }
+                let contentTextControl = new Text({ text: contentText, renderWhitespace: true });
+
+                if (!this.oSaveSuccessfulDialog) {
+                    let beginButtonText = i18nResourceBundle.getText("buttonYes");
+                    let endButtonText = i18nResourceBundle.getText("buttonCancel");
+
+                    this.oSaveSuccessfulDialog = new Dialog({
+                        type: "Message",
+                        title: title,
+                        state: "Success",
+                        content: contentTextControl,
+                        beginButton: new Button({
+                            type: "Emphasized",
+                            text: beginButtonText,
+                            press: function () {
+                                this.oSaveSuccessfulDialog.close();
+                                this.onMoveTU();
+                            }.bind(this)
+                        }),
+                        endButton: new Button({
+                            text: endButtonText,
+                            press: function () {
+                                this.oSaveSuccessfulDialog.close();
+                            }.bind(this)
+                        })
+                    });
+                }
+
+                this.oSaveSuccessfulDialog.setTitle(title);
+                this.oSaveSuccessfulDialog.removeAllContent();
+                this.oSaveSuccessfulDialog.addContent(contentTextControl);
+                this.oSaveSuccessfulDialog.open();
+            },
+
+            onMoveTU: function (oEvent) {
+                let aFilter = [];
+                let pgmidFilter = new Filter("Pgmid", FilterOperator.EQ, "ZYARD_TU");
+                aFilter.push(pgmidFilter);
+                let enhidFilter = new Filter("EnhId", FilterOperator.EQ, "LGTY");
+                aFilter.push(enhidFilter);
+                let lgnumFilter = new Filter("Lgnum", FilterOperator.EQ, this.byId("idYardText").getText());
+                var StorageType = this.byId("idStorageTypeText").getText();
+                aFilter.push(lgnumFilter);
+                this.getView().getModel().read("/EnhancementValuesSet", {
+                    filters: aFilter,
+                    success: function (oEvent) {
+                        if (oEvent.results && oEvent.results.length > 0) {
+                            let result = oEvent.results[0];
+                            sap.ushell.Container.getServiceAsync("CrossApplicationNavigation").then(function (oService) {
+                                let tuNumExt = this.byId("idSmartFilterBar").getFilters()[0].oValue1;
+                                let yardNo = this.byId("idYardText").getText();
+                                oService.toExternal({
+                                    target: {
+                                        semanticObject: "YardTask",
+                                        action: "adhocext"
+                                    },
+                                    params: {
+                                        "TuNumExt": tuNumExt,
+                                        "YardNo": yardNo,
+                                        "YardTaskActivityType": StorageType === "DOOR" ? result.Key3 : result.Key2 //result.Key3
+                                    }
+                                });
+                            }.bind(this));
+                        }
+                    }.bind(this),
+                    error: function () {
+                        console.log("EnhancementValuesSet read for Move out of door failed.");
+                    }
+                });
+            },
+
+            handleMessagePopoverPress: function (oEvent) {
+                this.oMessagePopover.toggle(oEvent.getSource());
+            },
+
+            // Display the button type according to the message with the highest severity
+            // The priority of the message types are as follows: Error > Warning > Success > Info
+            buttonTypeFormatter: function () {
+                var sHighestSeverityIcon;
+                var aMessages = this.getView().getModel("messagesModel").oData;
+
+                aMessages.forEach(function (sMessage) {
+                    switch (sMessage.type) {
+                        case "Error":
+                            sHighestSeverityIcon = "Negative";
+                            break;
+                        case "Warning":
+                            sHighestSeverityIcon = sHighestSeverityIcon !== "Negative" ? "Critical" : sHighestSeverityIcon;
+                            break;
+                        case "Success":
+                            sHighestSeverityIcon = sHighestSeverityIcon !== "Negative" && sHighestSeverityIcon !== "Critical" ? "Success" : sHighestSeverityIcon;
+                            break;
+                        default:
+                            sHighestSeverityIcon = !sHighestSeverityIcon ? "Neutral" : sHighestSeverityIcon;
+                            break;
+                    }
+                });
+
+                return sHighestSeverityIcon;
+            },
+
+            // Display the number of messages with the highest severity
+            highestSeverityMessages: function () {
+                var sHighestSeverityIconType = this.buttonTypeFormatter();
+                var sHighestSeverityMessageType;
+
+                switch (sHighestSeverityIconType) {
+                    case "Negative":
+                        sHighestSeverityMessageType = "Error";
+                        break;
+                    case "Critical":
+                        sHighestSeverityMessageType = "Warning";
+                        break;
+                    case "Success":
+                        sHighestSeverityMessageType = "Success";
+                        break;
+                    default:
+                        sHighestSeverityMessageType = !sHighestSeverityMessageType ? "Information" : sHighestSeverityMessageType;
+                        break;
+                }
+
+                return this.getView().getModel("messagesModel").oData.reduce(function (iNumberOfMessages, oMessageItem) {
+                    return oMessageItem.type === sHighestSeverityMessageType ? ++iNumberOfMessages : iNumberOfMessages;
+                }, 0);
+            },
+
+            // Set the button icon according to the message with the highest severity
+            buttonIconFormatter: function () {
+                var sIcon;
+                var aMessages = this.getView().getModel("messagesModel").oData;
+                aMessages.forEach(function (sMessage) {
+                    switch (sMessage.type) {
+                        case "Error":
+                            sIcon = "sap-icon://error";
+                            break;
+                        case "Warning":
+                            sIcon = sIcon !== "sap-icon://error" ? "sap-icon://alert" : sIcon;
+                            break;
+                        case "Success":
+                            sIcon = sIcon !== "sap-icon://error" && sIcon !== "sap-icon://alert" ? "sap-icon://sys-enter-2" : sIcon;
+                            break;
+                        default:
+                            sIcon = !sIcon ? "sap-icon://information" : sIcon;
+                            break;
+                    }
+                });
+
+                return sIcon;
+            },
+
+            convertMessageType: function (sapMessageType) {
+                switch (sapMessageType) {
+                    case "success":
+                        return "Success";
+                    case "info":
+                        return "Information";
+                    case "warning":
+                        return "Warning";
+                    case "error":
+                        return "Error";
+                    case "abort":
+                        return "Error";
+                }
+            },
+
+            clearMessagePopover: function () {
+                this.getView().getModel("messagesModel").setData([]);
+                this.getView().getModel("localData").setProperty("/messagePopoverVisibility", false);
+            },
+
+            fillMessagePopoverErrors: function (sapMessage) {
+
+                const jsonString = sapMessage.responseText.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                const parsedObject = JSON.parse(jsonString);
+
+                let messages = [];
+                let successCounter = 1;
+                let infoCounter = 1;
+                let warningCounter = 1;
+                let errorCounter = 1;
+                let abortCounter = 1;
+
+                let additionalMessages = parsedObject.error.innererror.errordetails;
+                if (additionalMessages && additionalMessages.length > 0) {
+                    for (const message of additionalMessages) {
+                        let additionalMessage = {
+                            type: this.convertMessageType(message.severity),
+                            title: "Error",
+                            activeTitle: "Error",
+                            description: message.message,
+                            subtitle: message.message
+                        }
+                        switch (message.severity) {
+                            case 'success':
+                                additionalMessage.counter = successCounter;
+                                successCounter++;
+                                break;
+                            case 'info':
+                                additionalMessage.counter = infoCounter;
+                                infoCounter++;
+                                break;
+                            case 'warning':
+                                additionalMessage.counter = warningCounter;
+                                warningCounter++;
+                            case 'error':
+                                additionalMessage.counter = errorCounter;
+                                errorCounter++;
+                                break;
+                            case 'abort':
+                                additionalMessage.counter = abortCounter;
+                                abortCounter++;
+                                break;
+                        }
+                        messages.push(additionalMessage);
+                    }
+                    this.getView().getModel("messagesModel").setData(messages);
+                    this.getView().getModel("localData").setProperty("/messagePopoverVisibility", true);
+                }
+            },
+
+            fillMessagePopoverError: function (sapMessage) {
+
+                let messages = [];
+                let successCounter = 1;
+
+                let additionalMessage = {
+                    type: "Error",
+                    title: "Error",
+                    activeTitle: "Error",
+                    description: sapMessage,
+                    subtitle: sapMessage
+                }
+                additionalMessage.counter = successCounter;
+                messages.push(additionalMessage);
+
+                this.getView().getModel("messagesModel").setData(messages);
+                this.getView().getModel("localData").setProperty("/messagePopoverVisibility", true);
+            },
+
+            fillMessagePopoverSuccess: function (sapMessage) {
+
+                let messages = [];
+                let successCounter = 1;
+
+                let additionalMessage = {
+                    type: "Success",
+                    title: "Success",
+                    activeTitle: "Success",
+                    description: "Material Document created: " + sapMessage.MaterialDocument,
+                    subtitle: "Material Document created: " + sapMessage.MaterialDocument
+                }
+                additionalMessage.counter = successCounter;
+                messages.push(additionalMessage);
+
+                this.getView().getModel("messagesModel").setData(messages);
+                this.getView().getModel("localData").setProperty("/messagePopoverVisibility", true);
+            },
+
+            _checkTable: function () {
+                var oTable = this.getView().byId("ItemsTable");
+                if (oTable) {
+                    var aItems = oTable.getItems();
+                    //Check for Errors in the Table
+                    var hasError = false;
+                    for (var i = 0; i < aItems.length; i++) {
+                        //Access item properties and Update the cell values
+                        aItems[i].mAggregations.cells[0].getValue() == "" ? aItems[i].mAggregations.cells[0].setValueState("Error") : aItems[i].mAggregations.cells[0].setValueState("None");
+                        aItems[i].mAggregations.cells[1].getValue() == "" ? aItems[i].mAggregations.cells[1].setValueState("Error") : aItems[i].mAggregations.cells[1].setValueState("None");
+                        aItems[i].mAggregations.cells[2].getValue() == "" ? aItems[i].mAggregations.cells[2].setValueState("Error") : aItems[i].mAggregations.cells[2].setValueState("None");
+
+                        if ((aItems[i].mAggregations.cells[0].getValue() == "" &&
+                            aItems[i].mAggregations.cells[1].getValue() == "" &&
+                            aItems[i].mAggregations.cells[2].getValue() == "") ||
+                            (aItems[i].mAggregations.cells[0].getValue() !== "" &&
+                                aItems[i].mAggregations.cells[1].getValue() !== "" &&
+                                aItems[i].mAggregations.cells[2].getValue() !== "")) {
+                            aItems[i].mAggregations.cells[0].setValueState("None");
+                            aItems[i].mAggregations.cells[1].setValueState("None");
+                            aItems[i].mAggregations.cells[2].setValueState("None");
+                        } else {
+                            hasError = true;
+                        }
+                    }
+                    return hasError;
+                }
+            },
+
+            _getYLMove: function (oModel, oFilters) {
+                var that = this;
+                return new Promise(function (resolve, reject) {
+                    oModel.read("/YLMoveSet", {
+                        filters: oFilters,
+                        success: function (oData, oResponse) {
+                            that._setBusy(false);
+                            resolve(oData);
+                        },
+                        error: function (oError) {
+                            that._setBusy(false);
+                            const jsonString = oError.responseText.match(/\{.*\}/s)[0]; // extract the JSON object from the string
+                            const parsedObject = JSON.parse(jsonString);
+                            const errorMessage = parsedObject.error.innererror.errordetails[0].message;
+                            that._clearSimpleForm();
+                            MessageBox.error(errorMessage);
+                            //that.fillMessagePopoverError(errorMessage);
+                        }
+                    });
+                });
+            },
+            _setBusy: function (bBoolean) {
+                this.getView().byId("idTrailerSimpleForm").setBusy(bBoolean);
+                /* this.getView().byId("idParkingLotSimpleForm").setBusy(bBoolean); */
+                this.getView().byId("idTrailerTableSimpleForm").setBusy(bBoolean);
+            },
+
+            _setVisible: function (bBoolean) {
+                this.getView().byId("idTrailerSimpleForm").setVisible(bBoolean);
+                /* this.getView().byId("idParkingLotSimpleForm").setVisible(bBoolean); */
+                this.getView().byId("idTrailerTableSimpleForm").setVisible(bBoolean);
+            },
+            _clearSimpleForm: function () {
+                this.getView().byId("idMovementTypeText").setText();
+                this.getView().byId("idTrailerIDText").setText();
+                this.getView().byId("idPlantText").setText();
+                this.getView().byId("idCurrentLocationText").setText();
+                this.getView().byId("idYardText").setText();
+                this.getView().byId("idDestStorageLocationText").setText();
+
+                this._setVisible(false);
+            },
+
+            _catchLineFocus: function (oEvent, that) {
+                var oItems = that.getView().byId("ItemsTable").getItems();
+                for (let i = 0; i < oItems.length; i++) {
+                    if (oItems[i].mAggregations.cells[0].sId == oEvent.srcControl.sId) {
+                        that.currentTableLine = i;
+                        break;
+                    }
+                    if (oItems[i].mAggregations.cells[1].sId == oEvent.srcControl.sId) {
+                        that.currentTableLine = i;
+                        break;
+                    }
+                    if (oItems[i].mAggregations.cells[2].sId == oEvent.srcControl.sId) {
+                        that.currentTableLine = i;
+                        break;
+                    }
+                    if (oItems[i].mAggregations.cells[3].sId == oEvent.srcControl.sId) {
+                        that.currentTableLine = i;
+                        break;
+                    }
+                }
+            },
+            _applyUserYardNo: function (that, oValueHelp) {
+                var oSmartFilterBar = oValueHelp.getFilterBar();
+                var oModel = that.getOwnerComponent().getModel();
+                oModel.read("/UserYardNumberSet('')", {
+                    success: function (oData, oResponse) {
+                        if (oData.Yard) {
+                            //Push Key to SmartFilterBar Control
+                            var oCustomControl = oSmartFilterBar.getControlByKey("YardNo");
+                            let keys = [];
+                            keys.push(oData.Yard);
+                            //Push Key to MultiComboBox
+                            oCustomControl.setSelectedKeys(keys)
+                            let filterData = oSmartFilterBar.getFilterData();
+                            filterData["YardNo"] = { // here your value help field
+                                "items": [{
+                                    key: oData.Yard // Pass the key here
+                                }]
+                            };
+                            //Push Key to FilterData
+                            oSmartFilterBar.setFilterData(filterData);
+                            let goButton = that.getView().byId("application-ZYL_YLMOVE-LoadTrailer-component---Master--idSmartFilterBar-filterItemControl_BASIC-tunumext-valueHelpDialog-smartFilterBar-btnGo");
+                            if (goButton) {
+                                goButton.firePress();
+                            }
+                        }
+                    }
+                })
+            },
+            _removeFilters: function (oValueHelp) {
+                var filterItems = oValueHelp.getFilterBar().getFilterGroupItems();
+                if (Array.isArray(filterItems)) {
+                    filterItems.forEach(filterItem => {
+                        if (filterItem.mProperties.name !== 'YardNo' &&
+                            filterItem.mProperties.name !== 'TuNumExt' &&
+                            filterItem.mProperties.name !== 'TuNTuType' &&
+                            filterItem.mProperties.name !== 'CarrierBp' &&
+                            filterItem.mProperties.name !== 'StorBin' &&
+                            filterItem.mProperties.name !== 'FilterProduct' &&
+                            filterItem.mProperties.name !== 'LicPlate' &&
+                            filterItem.mProperties.name !== 'Message') {
+                            /* oValueHelp.getFilterBar().removeFilterGroupItem(filterItem); */ //This causes duplicatedID error
+                            filterItem.setVisible(false)
+                        }
+                    });
+                }
+            },
+            _removeTableColumns: function (oValueHelp) {
+                var oColumns = oValueHelp.getTable().getColumns();
+                oColumns.forEach(oColumn => {
+                    var index = oColumn.getIndex();
+                    var template = oColumn.getBindingContext("columns").getModel().getData().cols[index].template;
+                    if (template == "FilterProduct") {
+                        oColumn.setVisible(false);
+                    }
+                });
+            }
+        });
+    });
