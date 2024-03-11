@@ -1,0 +1,45 @@
+onAfterRendering: function (oEvent) {
+            this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+
+                this._transformTextToLink(oEvent);
+}.bind(this));
+        },              
+
+_transformTextToLink: function (oEvent) {
+            var oText = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::Field-text");
+            var oGroupElement = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::GroupElement");
+            if (oText && oGroupElement) {
+                var sText = oText.getText();
+                var sTuGuid = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/DbKeyTu");
+                var sTu = sTuGuid.replace(/-/g, '').toUpperCase();
+                var sTarget = sTu; // Set the href value for the link
+                var that = this;
+                var oLinkControl = new sap.m.Link({
+                    text: sText,
+                    target: sTarget,
+                    press: function () {
+                        //#YardTransportationUnit-change?change_mode=&key=0D6FA5371A3B1EDE91FDAEF55B8DC60F&sap-app-origin-hint=&sap-wd-configid=%252FSAPYL%252FWDCA_YTU&skip_initial_screen=X&wdconfigurationid=%252FSAPYL%252FWDCA_YTU
+                        var vNavigationParameters = {
+                            "change_mode": '',
+                            "key": sTarget,
+                            "sap-wd-configid": "%252FSAPYL%252FWDCA_YTU",
+                            "skip_initial_screen": 'X',
+                            "wdconfigurationid": "%252FSAPYL%252FWDCA_YTU"
+                        };
+                        that.oNavigationHandler.navigate("YardTransportationUnit", "change", vNavigationParameters, {});
+                    }
+                });
+                // Now, you can replace the original sap.m.Text control with the newly created sap.m.Link control
+                oGroupElement.removeElement("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::Field")
+                var oTextGroup = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::Field");
+                if (oTextGroup) {
+                    oTextGroup.destroy();
+                    oTextGroup = null;
+                }
+                oGroupElement.addElement(oLinkControl);
+                var oLabel = oGroupElement.getAggregation("_label");
+                if (oLabel) {
+                    oLabel.setText("TU");
+                }
+            }
+        }
