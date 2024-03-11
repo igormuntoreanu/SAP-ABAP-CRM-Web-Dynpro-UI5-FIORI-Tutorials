@@ -1,0 +1,2 @@
+var oTable = this.getView().byId("YOURID");
+oTable.getBinding("items").refresh();
