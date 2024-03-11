@@ -1,0 +1,169 @@
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TU Move'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+define view entity ZYL_TU_MOVE
+  as select distinct from /sapyl/tu_sr_act as t1
+    left outer join       /sapyl/yard_tu   as t2 on t1.parent_key = t2.db_key
+    left outer join       /sapyl/yo_item   as t3 on t3.tu_sr_act_key = t1.db_key
+    left outer join       /sapyl/yo_hdr    as t4 on t3.parent_key = t4.db_key
+    inner join            /sapyl/yo_prod   as t5 on t5.parent_key = t3.db_key
+{
+
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_TU_MOVE_VH', element : 'TuNumExt' }}]
+      @UI.selectionField: [{ position: 20 }]
+      @EndUserText.label: 'Transportation Unit'
+  key t2.tu_num_ext as tunumext
+}
+where
+  t1.sr_status = '02'
+-----------------------------------------------------------------------------------------------------------------------
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TU YLMove Fiori App VH'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+
+@Search.searchable: true
+/*+[hideWarning] { "IDS" : [ "CARDINALITY_CHECK" ]  } */
+define view entity ZYL_TU_MOVE_VH
+  //as select distinct from zyard_tus_join as tu
+  as select distinct from ZYL_TUS_JOIN_WITH_LOCAL_YARDNO as tu
+  association [0..*] to ZYL_SCMB_ESDUS         as _yardnos       on $projection.YardNo = _yardnos.YardNo //ZYL_YARDNO_VH as _yardnos on $projection.YardNo = _yardnos.YardNo
+  association [0..1] to ZYL_TU_TYPE_VH         as _tutypes       on $projection.TuType = _tutypes.TuType
+  association [0..1] to ZYL_LOADING_CARRIER_VH as _carriers      on $projection.CarrierBp = _carriers.lifnr
+  association [0..1] to ZYL_STORAGE_BIN_VH     as _bins          on $projection.StorBin = _bins.lgpla
+  association [0..*] to ZYL_PRODUCT_VH         as _products      on $projection.FilterProduct = _products.matnr
+  association [0..*] to ZYL_LICENSE_PLATE_VH   as _licenseplates on $projection.LicPlate = _licenseplates.lic_plate
+{
+      @UI.hidden: true
+  key tu.DbKeyTu                                   as DbKeyTu,
+      @UI.hidden: true
+      tu.DbKeyAct                                  as DbKeyAct,
+
+      @UI.selectionField: [{ position: 30 }]
+      @Consumption.valueHelp: '_yardnos'
+      @UI.lineItem: [{ position: 40}]
+      @Search: { defaultSearchElement: true, ranking: #LOW, fuzzinessThreshold: 0.7 }
+      @EndUserText.label: 'Yard No.(User-Parameterized)'
+      tu.yard_no                                   as YardNo,
+
+      @UI.selectionField: [{ position: 10 }]
+      @UI.lineItem: [{ position: 10}]
+      @Search: { defaultSearchElement: true, ranking: #HIGH, fuzzinessThreshold: 0.7 }
+      tu.tu_num_ext                                as TuNumExt,
+
+      @UI.selectionField: [{ position: 20 }]
+      @Consumption.valueHelp: '_tutypes'
+      @UI.lineItem: [{ position: 20 }]
+      tu.tu_type                                   as TuType,
+      @UI.selectionField: [{ position: 50 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_LOADING_CARRIER_VH', element : 'lifnr' }}]
+      @UI.lineItem: [{ position: 70}]
+      //Carrier is bugggyyyyy somehow for Searching it
+      //@Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 0.7  }
+      @EndUserText.label: 'Carrier'
+      tu.carrier_bp                                as CarrierBp,
+
+      @UI.hidden: true
+      tu.tu_num                                    as TuNum,
+
+      @UI.selectionField: [{ position: 40 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_STORAGE_BIN_VH', element : 'lgpla' }}]
+      @UI.lineItem: [{ position: 50}]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 0.7  }
+      tu.stor_bin                                  as StorBin,
+
+      @UI.lineItem: [{ position: 60}]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 1  }
+      tu.stor_type                                 as StorType,
+
+      @UI.hidden: true
+      tu.pmat                                      as Pmat,
+
+      @UI.selectionField: [{ position: 70 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_PRODUCT_VH', element : 'matnr' }}]
+      @UI.lineItem: [{ position: 130 }]
+      @Consumption.valueHelp: '_products'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC' //Filtered direclty in the DPC_EXT class because it is CAST field
+      @EndUserText.label: 'Product'
+      cast( ''  as abap.char(40))                  as FilterProduct,
+
+      @UI.selectionField: [{ position: 60 }]
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_LICENSE_PLATE_VH', element : 'lic_plate' }}]
+      @UI.lineItem: [{ position: 30 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 0.7  }
+      tu.lic_plate                                 as LicPlate,
+
+      @UI.selectionField: [{ position: 80 }]
+      @UI.lineItem: [{ position: 90, cssDefault: { width: '20rem' }}]
+      @EndUserText.label: 'Message/Comment TU'
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 0.7  }
+      tu.yl_comment                                as Message,
+
+      @UI.lineItem: [{ position: 80, cssDefault: { width: '20rem' }}]
+      @EndUserText.label: 'Products'
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      cast( ''  as abap.char(110))                 as Product,
+
+      @UI.hidden: true
+      tu.created_on                                as CreatedOn,
+
+      @UI.lineItem: [{ position: 110, cssDefault: { width: '10rem' } }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @EndUserText.label: 'is TU empty?'
+      cast( ''  as zyl_is_tu_empty )               as TuEmpty,
+
+      @UI.lineItem: [{ position: 120, cssDefault: { width: '10rem' } }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @EndUserText.label: 'has Active Yard Task?'
+      cast( ''  as zyl_has_active_yard_task )      as hasActiveYT,
+
+      @UI.lineItem: [{ position: 130, cssDefault: { width: '10rem' } }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @EndUserText.label: 'is a YLMove Shuttle?'
+      cast( ''  as zyl_is_ylmove_shuttle )         as isShuttle,
+      @UI.lineItem: [{ position: 140, cssDefault: { width: '10rem' } }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @EndUserText.label: 'is Trailer Blocked?'
+      cast ( '' as zyl_is_trailer_blocked)         as isTrailerBlocked,
+      @UI.lineItem: [{ position: 150, cssDefault: { width: '10rem' } }]
+      @ObjectModel.virtualElement: true
+      @ObjectModel.virtualElementCalculatedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.filter.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @ObjectModel.sort.transformedBy: 'ABAP:ZCL_LOADTRAILER_CDS_CALC'
+      @EndUserText.label: 'has IM Delivery Trailers?'
+      cast( '' as zyl_has_im_deliveries_trailers ) as hasImDelTrailers,
+
+      _yardnos,
+      _tutypes,
+      _carriers,
+      _bins,
+      _products,
+      _licenseplates
+
+}
