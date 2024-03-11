@@ -1,0 +1,14 @@
+// UI5 to ABAP
+var sUi5Guid = "0d6fa537-1a3b-1eee-b4b2-b9861d0e1796";
+
+// Remove the hyphens from the UI5 format GUID
+var sAbapGuid = sUi5Guid.replace(/-/g, '').toUpperCase();
+
+--------------------------------------------
+// ABAP to UI5
+var sAbapGuid = "0D6FA5371A3B1EEEB4B2B9861D0E1796";
+
+// Insert hyphens to convert the ABAP format GUID to UI5 format
+var sUi5Guid = sAbapGuid.toLowerCase().replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5");
+
+// sUi5Guid will now contain the GUID in the UI5 format "0d6fa537-1a3b-1eee-b4b2-b9861d0e1796"
