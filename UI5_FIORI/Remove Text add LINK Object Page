@@ -6,10 +6,9 @@ onAfterRendering: function (oEvent) {
         },              
 
 _transformTextToLink: function (oEvent) {
-            var oText = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::Field-text");
             var oGroupElement = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::GroupElement");
-            if (oText && oGroupElement) {
-                var sText = oText.getText();
+            if (oGroupElement) {
+                var sText = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/TuNumExt");
                 var sTuGuid = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/DbKeyTu");
                 var sTu = sTuGuid.replace(/-/g, '').toUpperCase();
                 var sTarget = sTu; // Set the href value for the link
