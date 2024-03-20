@@ -1,0 +1,122 @@
+Check the additionalBinding!!!
+/////////////////////////////////////////////////////////////////////////////////////////////
+@AbapCatalog.sqlViewName: 'ZEWM_SQL_TIL_RNG'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'CDS View for TIL Range Definition'
+@ObjectModel.usageType:{
+    serviceQuality: #D,
+    sizeCategory: #M,
+    dataClass: #MIXED}
+@ObjectModel.updateEnabled: true
+@VDM.viewType:#CONSUMPTION
+@Metadata.allowExtensions:true
+
+define view ZEWM_CDS_TIL_RANGE
+  as select from    /scwm/t301 
+    left outer join zewm_til_range on  /scwm/t301.lgnum = zewm_til_range.lgnum
+                                   and /scwm/t301.lgtyp = zewm_til_range.lgtyp  
+  association [0..1] to I_EWM_WarehouseNumberVH as _lgnum on $projection.lgnum = _lgnum.EWMWarehouse
+  association [0..*] to I_EWM_StorageTypeVH as _lgtyp on $projection.lgtyp = _lgtyp.EWMStorageType
+{
+      @ObjectModel.readOnly: true
+      @Consumption.filter: {
+        selectionType    : #SINGLE,
+        multipleSelections : false,
+        mandatory        : true }
+      @UI.selectionField : [{ position: 10 }]
+      @Consumption.valueHelpDefinition: [{ entity:{ name: 'I_EWM_WarehouseNumberVH', element:'EWMWarehouse' } }]
+  key /scwm/t301.lgnum,
+
+      @ObjectModel.readOnly: true
+      @Consumption.filter: {
+         selectionType    : #RANGE,
+         multipleSelections : true,
+         mandatory        : false }
+      @Consumption.valueHelpDefinition: [{ entity : { name: 'I_EWM_StorageTypeVH', element : 'EWMStorageType'},
+                   additionalBinding  : [{ localElement: 'lgnum', element: 'EWMWarehouse', usage: #FILTER_AND_RESULT }] }]
+      @UI.selectionField: [{ position: 20 }]
+      @UI.lineItem: [{ position: 20 }]
+  key /scwm/t301.lgtyp,
+  
+      @UI.lineItem: [{ position: 30 }]
+      zewm_til_range.aisle,
+      
+      @UI.lineItem: [{ position: 40 }]
+      zewm_til_range.stack,
+     
+      @UI.lineItem: [{ position: 50 }]
+      @ObjectModel.readOnly: true
+      zewm_til_range.changed_by,
+      
+      @UI.lineItem: [{ position: 60 }]
+      @ObjectModel.readOnly: true
+      zewm_til_range.changed_on,
+      _lgnum,
+      _lgtyp
+}
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Warehouse Number'
+@VDM.viewType:#COMPOSITE 
+@ObjectModel.representativeKey: 'EWMWarehouse'
+@ObjectModel.dataCategory:#VALUE_HELP
+@Analytics.internalName:#LOCAL 
+@ObjectModel.usageType: {serviceQuality: #B,
+                         dataClass: #CUSTOMIZING,
+                         sizeCategory: #M}
+@ObjectModel.supportedCapabilities: [ #VALUE_HELP_PROVIDER ]
+@Metadata.ignorePropagatedAnnotations:true
+@Search.searchable: true
+
+define view entity I_EWM_WarehouseNumberVH
+  with parameters     
+    @Environment.systemField: #SYSTEM_LANGUAGE
+    @Consumption.hidden
+    P_Language                 : /scwm/lang
+  as select from I_EWM_WarehouseNumber_2
+{
+      @ObjectModel.text.association: '_Text'
+      @Search.defaultSearchElement: true
+      @Search.ranking: #HIGH
+  key EWMWarehouse,
+  TimeZoneID,
+  TimeZoneText,  
+  _Text[ 1:Language = $parameters.P_Language ].EWMWarehouseDescription,
+  _Text
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Storage Type'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.supportedCapabilities: [#SEARCHABLE_ENTITY,
+                                     #SQL_DATA_SOURCE,
+                                     #VALUE_HELP_PROVIDER]
+@ObjectModel.usageType:{
+  serviceQuality: #B,
+  sizeCategory: #S,
+  dataClass: #CUSTOMIZING
+}
+@ObjectModel.dataCategory:#VALUE_HELP
+@VDM.viewType: #COMPOSITE
+@ObjectModel.representativeKey: 'EWMStorageType'
+@Search.searchable: true
+
+define view entity I_EWM_StorageTypeVH
+  as select from I_EWM_StorageType_2
+{
+  key EWMWarehouse,
+      @Search:{
+        defaultSearchElement: true,
+        fuzzinessThreshold: 0.8,
+        ranking: #HIGH }
+      @ObjectModel.text.association: '_Text'
+  key EWMStorageType,
+      /* Associations */
+      _Text
+
+}
