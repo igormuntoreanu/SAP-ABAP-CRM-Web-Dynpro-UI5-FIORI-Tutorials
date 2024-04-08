@@ -1,0 +1,19 @@
+      DO 10 TIMES. "Make Sure that the Equipment is unlocked
+        CALL FUNCTION 'ENQUEUE_EIEQUI'
+          EXPORTING
+            equnr          = ev_equnr
+          EXCEPTIONS
+            foreign_lock   = 1
+            system_failure = 2
+            OTHERS         = 3.
+        IF sy-subrc = 0.
+          CALL FUNCTION 'DEQUEUE_EIEQUI'
+            EXPORTING
+              mode_equi = 'E'
+              mandt     = sy-mandt
+              equnr     = ev_equnr.
+          EXIT.
+        ELSE.
+          WAIT UP TO 1 SECONDS.
+        ENDIF.
+      ENDDO.
