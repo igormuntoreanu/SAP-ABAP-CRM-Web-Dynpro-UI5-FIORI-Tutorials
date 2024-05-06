@@ -1,0 +1,234 @@
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'TUs Yard Tasks'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+define view entity ZYARD_TU_YTS
+  as select distinct from /sapyl/yt_hdr    as YardTaskHeader
+    inner join            /sapyl/yt_item   as YardTaskItem    on YardTaskHeader.db_key = YardTaskItem.parent_key
+    inner join            zyard_yo_hdr     as YardOrderHeader on YardTaskItem.order_item_keysrc = YardOrderHeader.DbKeyItem
+    left outer join       /sapyl/tu_sr_act as TuAct           on YardOrderHeader.TuSrActKey = TuAct.db_key
+    left outer join       /sapyl/yard_tu   as Tu              on TuAct.parent_key = Tu.db_key
+    left outer join       /sapyl/acttypet  as ActiveType      on  ActiveType.yard_no       = YardTaskHeader.yard_no
+                                                              and ActiveType.activity_type = YardTaskHeader.activity_type
+
+{
+  key YardTaskHeader.db_key       as YtDbkey,
+  key YardTaskItem.db_key         as YtItemDbKey,
+  key YardOrderHeader.DbKeyHeader as YoDbKeyHeader,
+  key YardOrderHeader.DbKeyItem   as YoDbKeyItem,
+  key TuAct.db_key                as ActKey,
+  key Tu.db_key                   as TuKey,
+      Tu.tu_num_ext,
+      YardTaskHeader.yard_no,
+      YardTaskHeader.yard_task_no,
+      YardTaskHeader.yard_order_keysrc,
+      YardTaskHeader.activity_category,
+      case when YardTaskHeader.activity_category = '01' then 'Non-Movement'
+      when YardTaskHeader.activity_category = '02' then 'Movement'
+      when YardTaskHeader.activity_category = '03' then 'Loading/Unloading'
+      when YardTaskHeader.activity_category = '04' then 'Inspection'
+      else ''
+      end                         as activity_category_desc,
+      YardTaskHeader.activity_type,
+      ActiveType.activity_type_text,
+      YardTaskHeader.lifecycle_status,
+      case when YardTaskHeader.lifecycle_status = '00' then 'Created'
+      when YardTaskHeader.lifecycle_status = '01' then 'Pending'
+      when YardTaskHeader.lifecycle_status = '02' then 'Active'
+      when YardTaskHeader.lifecycle_status = '03' then 'In Process'
+      when YardTaskHeader.lifecycle_status = '04' then 'Confirmed'
+      when YardTaskHeader.lifecycle_status = '05' then 'Cancelled'
+      else ''
+      end                         as LIFECYCLE_STATUS_DESC,
+      YardTaskHeader.driver_type,
+      YardTaskHeader.tanum,
+      YardTaskHeader.who,
+      YardTaskHeader.stor_typesrc,
+      YardTaskHeader.stor_sectionsrc,
+      YardTaskHeader.stor_binsrc,
+      YardTaskHeader.stor_typedst,
+      YardTaskHeader.stor_sectiondst,
+      YardTaskHeader.stor_bindst,
+      YardTaskHeader.confirmed_by,
+      YardTaskHeader.confirmed_on,
+      tstmp_to_dats( YardTaskHeader.confirmed_on, //tstmp_current_utctimestamp(),
+                   abap_user_timezone( $session.user, $session.client,'NULL' ),
+                   $session.client,
+                   'NULL' )       as ConfirmedOnDate,
+      YardTaskHeader.start_tmstmp_plan,
+      tstmp_to_dats( YardTaskHeader.start_tmstmp_plan, //tstmp_current_utctimestamp(),
+             abap_user_timezone( $session.user, $session.client,'NULL' ),
+             $session.client,
+             'NULL' )             as StartDatePlan,
+      @Semantics.quantity.unitOfMeasure : 'time_unit'
+      YardTaskHeader.duration_plan,
+      YardTaskHeader.time_unit,
+      YardTaskHeader.start_tmstmp_act,
+      tstmp_to_dats( YardTaskHeader.start_tmstmp_act, //tstmp_current_utctimestamp(),
+             abap_user_timezone( $session.user, $session.client,'NULL' ),
+             $session.client,
+             'NULL' )             as StartDateAct,
+      @Semantics.quantity.unitOfMeasure : 'time_unit'
+      YardTaskHeader.duration_act,
+      YardTaskHeader.created_on
+}
+where
+  ActiveType.spras = $session.system_language
+
+___________________________________________________________________________________________________________________________________________________________
+
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'CDS Merging all Selects of Yard Tasks'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+define view entity ZYARD_TU_YTS_FINAL
+  as select distinct from ZYARD_TU_YTS
+{
+      @UI.hidden
+  key YtDbkey,
+      @UI.hidden
+  key YtItemDbKey,
+      @UI.hidden
+  key TuKey,
+      tu_num_ext,
+      @UI.lineItem: [{ position: 10, importance: #HIGH }]
+      yard_no,
+      //      @UI.lineItem: [{ position: 20, importance: #HIGH }]
+      @UI.hidden //Object is a Link built with Custom Field at Fiori extension
+      yard_task_no,
+      yard_order_keysrc,
+      activity_category,
+      @EndUserText.label: 'Activity Cat. Desc.'
+      activity_category_desc,
+      activity_type,
+      @UI.lineItem: [{ position: 20, importance: #HIGH }]
+      @EndUserText.label: 'Activity Type Desc.'
+      activity_type_text,
+      lifecycle_status,
+      @UI.lineItem: [{ position: 30, importance: #HIGH }]
+      @EndUserText.label: 'Status'
+      LIFECYCLE_STATUS_DESC,
+      driver_type,
+      tanum,
+      who,
+      @EndUserText.label: 'Storage Type Source'
+      stor_typesrc,
+      @EndUserText.label: 'Storage Section Source'
+      stor_sectionsrc,
+      @UI.lineItem: [{ position: 40}]
+      @EndUserText.label: 'Storage Bin Source'
+      stor_binsrc,
+      @EndUserText.label: 'Storage Type Dest.'
+      stor_typedst,
+      @EndUserText.label: 'Storage Section Dest.'
+      stor_sectiondst,
+      @UI.lineItem: [{ position: 50}]
+      @EndUserText.label: 'Storage Bin Dest.'
+      stor_bindst,
+      @UI.lineItem: [{ position: 60}]
+      @Semantics.dateTime: true
+      created_on,
+      @UI.lineItem: [{ position: 70}]
+      @Semantics.dateTime: true
+      start_tmstmp_plan,
+      @UI.lineItem: [{ position: 80}]
+      @Semantics.dateTime: true
+      start_tmstmp_act,
+      @UI.lineItem: [{ position: 90}]
+      @Semantics.dateTime: true
+      confirmed_on,
+      confirmed_by,
+      //      @EndUserText.label: 'Confirmed Date'
+      //      ConfirmedOnDate,
+      //      @EndUserText.label: 'Planned Start Date'
+      //      StartDatePlan,
+      @Semantics.quantity.unitOfMeasure : 'time_unit'
+      duration_plan,
+      time_unit,
+      //      @EndUserText.label: 'Actual Start Date'
+      //      StartDateAct,
+      @Semantics.quantity.unitOfMeasure : 'time_unit'
+      duration_act
+}
+union select from ZYARD_TU_YTS_1
+{
+  key YtDbkey,
+  key YtItemDbKey,
+  key TuKey,
+      tu_no_ext as tu_num_ext,
+      yard_no,
+      yard_task_no,
+      yard_order_keysrc,
+      activity_category,
+      activity_category_desc,
+      activity_type,
+      activity_type_text,
+      lifecycle_status,
+      LIFECYCLE_STATUS_DESC,
+      driver_type,
+      tanum,
+      who,
+      stor_typesrc,
+      stor_sectionsrc,
+      stor_binsrc,
+      stor_typedst,
+      stor_sectiondst,
+      stor_bindst,
+      created_on,
+      start_tmstmp_plan,
+      start_tmstmp_act,
+      confirmed_on,
+      confirmed_by,
+      //      ConfirmedOnDate,
+      //      StartDatePlan,
+      duration_plan,
+      time_unit,
+      //      StartDateAct,
+      duration_act
+}
+union select distinct from ZYARD_TU_YTS_2
+{
+  key YtDbkey,
+  key YtItemDbKey,
+  key TuKey,
+      tu_num_ext,
+      yard_no,
+      yard_task_no,
+      yard_order_keysrc,
+      activity_category,
+      activity_category_desc,
+      activity_type,
+      activity_type_text,
+      lifecycle_status,
+      LIFECYCLE_STATUS_DESC,
+      driver_type,
+      tanum,
+      who,
+      stor_typesrc,
+      stor_sectionsrc,
+      stor_binsrc,
+      stor_typedst,
+      stor_sectiondst,
+      stor_bindst,
+      created_on,
+      start_tmstmp_plan,
+      start_tmstmp_act,
+      confirmed_on,
+      confirmed_by,
+      //      ConfirmedOnDate,
+      //      StartDatePlan,
+      duration_plan,
+      time_unit,
+      //      StartDateAct,
+      duration_act
+}
