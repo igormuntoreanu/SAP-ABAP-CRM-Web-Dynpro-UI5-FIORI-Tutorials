@@ -1,0 +1,15 @@
+"boolc:
+"Effect
+"The function boolc returns a single-character character string of the type string. If the logical expression is true, "X" is returned. If the logical expression is false, a blank is returned.
+"In principle, boolc is one of the processing functions with character-like results and can be specified in general expression positions and in character-like expression positions.
+
+" so first retrieve involved TUs
+    io_read->retrieve(
+      EXPORTING
+        iv_node         = is_ctx-node_key
+        it_key          = it_key
+        iv_before_image = boolc( is_ctx-val_key = /sapyl/if_yard_tu_c=>sc_validation-root-vala_root_delete )
+      IMPORTING
+        eo_message      = lo_message
+        et_data         = lt_tu_root
+        et_failed_key   = lt_failed_key ).
