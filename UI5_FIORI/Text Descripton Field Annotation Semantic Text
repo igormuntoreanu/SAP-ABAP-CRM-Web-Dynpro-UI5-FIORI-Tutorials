@@ -1,0 +1,14 @@
+      @UI.selectionField: [{ position: 100 }]
+      @UI.lineItem: [{ position: 110, cssDefault: { width: '5rem' }}]
+      @EndUserText.label: 'Service Agent'
+      @UI.fieldGroup: [{ qualifier: 'TUDETAILS', position: 180 }]
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 0.7  }
+      @ObjectModel.text.element: ['ServiceAgentDesc']
+      @Consumption.valueHelpDefinition: [{ entity : { name : 'ZYL_LFA1_VH', element : 'lifnr' }}]
+      tu.ServiceAgent                                                        as ServiceAgent,
+
+      @UI.selectionField: [{ position: 110 }]
+      @EndUserText.label: 'Service Agent Desc.'
+      @Search: { defaultSearchElement: true, ranking: #MEDIUM, fuzzinessThreshold: 0.7  }
+      @Semantics.text: true
+      tu.ServiceAgentDesc                                                    as ServiceAgentDesc,
