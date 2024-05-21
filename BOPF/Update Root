@@ -1,3 +1,4 @@
+1) THrough KEY :
 METHOD save_service_agent.
 
   DATA: lt_tus TYPE TABLE OF /sapyl/s_yard_tu_root_c, "/sapyl/s_yard_tu_root,
@@ -71,6 +72,89 @@ METHOD save_service_agent.
          IMPORTING
            eo_change       = DATA(lo_change)  " Interface of Change Object
            eo_message      = lo_msg " Interface of Message Object
+      ).
+    CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+  ENDTRY.
+
+  IF lo_msg->check( ) = abap_false.
+    lo_tmgr->save( IMPORTING ev_rejected = DATA(ld_reject)
+                             et_rejecting_bo_key = DATA(lt_keys) ).
+  ENDIF.
+
+  IF ld_reject = abap_true.
+    lo_tmgr->cleanup( ).
+  ENDIF.
+
+ENDMETHOD.
+
+2) Through Alternative Key
+
+METHOD save_service_agent.
+
+  DATA: lt_tus TYPE TABLE OF /sapyl/s_yard_tu_root_c, "/sapyl/s_yard_tu_root,
+        lt_key TYPE /bobf/t_frw_key,
+        lt_mod TYPE /bobf/t_frw_modification,
+        lt_cf  TYPE /bobf/t_frw_name,
+        ls_cf  TYPE LINE OF /bobf/t_frw_name,
+        lt_sel TYPE /bobf/t_frw_query_selparam.
+  " Get Transaction Manager
+  DATA(lo_tmgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+  " Service Manager Instance
+  DATA(lo_smgr) = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( /sapyl/if_yard_tu_c=>sc_bo_key ).
+
+  DATA(lv_tu) = VALUE #( it_item[ 1 ]-tu_number OPTIONAL ).
+
+  "Get TU key by tu_num_ext
+  lo_smgr->convert_altern_key(
+    EXPORTING
+      iv_node_key   = /sapyl/if_yard_tu_c=>sc_node-root
+      iv_altkey_key = /sapyl/if_yard_tu_c=>sc_alternative_key-root-tu_num_ext
+      it_key        = VALUE /sapyl/t_yard_tu_alt_key( ( tu_num_ext = lv_tu ) )
+    IMPORTING
+      et_key        = lt_key ).
+
+  lo_smgr->retrieve( EXPORTING iv_node_key = /sapyl/if_yard_tu_c=>sc_node-root
+                               it_key = lt_key
+                     IMPORTING et_data = lt_tus ).
+
+  CHECK lt_tus IS NOT INITIAL.
+
+  ls_cf = 'TDLNR'.
+  APPEND ls_cf TO lt_cf.
+  ls_cf = 'NAME1'.
+  APPEND ls_cf TO lt_cf.
+  ls_cf = 'TDLNR_T'.
+  APPEND ls_cf TO lt_cf.
+  ls_cf = 'NAME1_T'.
+  APPEND ls_cf TO lt_cf.
+
+  DATA(ls_tu_bopf) = lt_tus[ 1 ].
+
+  ls_tu_bopf-tdlnr = VALUE #( it_business_partner[ bupa_role = 'CRM010' ]-partner OPTIONAL ).
+  IF ls_tu_bopf-tdlnr IS NOT INITIAL.
+    ls_tu_bopf-tdlnr_t = ls_tu_bopf-tdlnr.
+    SELECT SINGLE name1
+      FROM lfa1
+      INTO ls_tu_bopf-name1
+      WHERE lifnr = ls_tu_bopf-tdlnr.
+    IF sy-subrc = 0.
+      ls_tu_bopf-name1_t = ls_tu_bopf-name1.
+    ENDIF.
+  ENDIF.
+
+  INSERT VALUE #( node = /sapyl/if_yard_tu_c=>sc_node-root
+                  change_mode = /bobf/if_frw_c=>sc_modify_update
+                  data = REF #( ls_tu_bopf ) "REF #( ls_tu )
+                  changed_fields = lt_cf
+                  key = lt_key[ 1 ]-key ) INTO TABLE lt_mod.
+
+  TRY.
+      lo_smgr->modify(
+        EXPORTING
+          it_modification  = lt_mod           " Changes
+         IMPORTING
+           eo_change       = DATA(lo_change)  " Interface of Change Object
+           eo_message      = DATA(lo_msg) " Interface of Message Object
       ).
     CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
   ENDTRY.
