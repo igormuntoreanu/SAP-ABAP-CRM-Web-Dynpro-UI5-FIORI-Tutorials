@@ -1,0 +1,45 @@
+MO_YTU_SRV_MANAGER	Instance Attribute	Protected	Type Ref To	/BOBF/IF_TRA_SERVICE_MANAGER
+MO_TRA_MANAGER	Instance Attribute	Protected	Type Ref To	/BOBF/IF_TRA_TRANSACTION_MGR
+
+---
+  METHOD get_tu_license_plate.
+*----------------------------------------------------------------------*
+* Title: get_tu_license_plate
+*----------------------------------------------------------------------*
+* Project Name  : SAP Yard Logistics
+* Project Phase : Release 2021
+* Date created  : 2021-04-14 SAP Innovative Business Solutions
+*----------------------------------------------------------------------*
+* Description:
+*   Get TU License Plate
+*----------------------------------------------------------------------*
+
+    DATA: lt_root   TYPE /sapyl/t_yard_tu_root_c,
+          lt_tu_key TYPE /bobf/t_frw_key.
+
+    CLEAR: rv_license_plate.
+
+    "Get TU key by tu_num_ext
+    mo_ytu_srv_manager->convert_altern_key(
+      EXPORTING
+        iv_node_key   = /sapyl/if_yard_tu_c=>sc_node-root
+        iv_altkey_key = /sapyl/if_yard_tu_c=>sc_alternative_key-root-tu_num_ext
+        it_key        = VALUE /sapyl/t_yard_tu_alt_key( ( tu_num_ext = iv_tu_no_ext ) )
+      IMPORTING
+        et_key        = lt_tu_key ).
+
+    "TU is not found, return
+    IF lt_tu_key IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    mo_ytu_srv_manager->retrieve(
+      EXPORTING
+        iv_node_key = /sapyl/if_yard_tu_c=>sc_node-root
+        it_key      = lt_tu_key
+      IMPORTING
+        et_data     = lt_root ).
+
+    rv_license_plate = VALUE #( lt_root[ 1 ]-lic_plate OPTIONAL ).
+
+  ENDMETHOD.
