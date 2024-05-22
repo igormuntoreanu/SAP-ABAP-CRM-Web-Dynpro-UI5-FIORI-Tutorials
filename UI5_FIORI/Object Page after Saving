@@ -1,0 +1,79 @@
+onAfterRendering: function(oEvent){
+  this.extensionAPI.getTransactionController().attachAfterSave(function (oEvent) {
+                  oEvent.saveEntityPromise
+                      .then(function (result) {
+                          this.getView().attachModelContextChange(function () {
+                              this._transformTextToLink(null, null)
+                          }.bind(this));
+                      }.bind(this))
+              }.bind(this));
+}
+
+_transformTextToLink: function (oEvent, afterCheckIn) {
+            if (oEvent) {
+                var isCheckedIn = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/isCheckedIn");
+                var sText = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/TuNumExt");
+                var sTuGuid = oEvent.context.oModel.getProperty(oEvent.context.sDeepPath + "/DbKeyTu");
+            } else if (afterCheckIn) {
+                var oContext = this.getView().getBindingContext();
+                if (oContext) {
+                    var sPath = oContext.getDeepPath();
+                    var oModel = this.getView().getModel();
+                    isCheckedIn = afterCheckIn;
+                    sText = oModel.getProperty(sPath + "/TuNumExt");
+                    sTuGuid = oModel.getProperty(sPath + "/DbKeyTu");
+                }
+            } else {
+                oContext = this.getView().getBindingContext();
+                if (oContext) {
+                    var sPath = oContext.getDeepPath();
+                    var oModel = this.getView().getModel();
+                    isCheckedIn = oModel.getProperty(sPath + "/isCheckedIn");;
+                    sText = oModel.getProperty(sPath + "/TuNumExt");
+                    sTuGuid = oModel.getProperty(sPath + "/DbKeyTu");
+                }
+            }
+
+            var oGroupElement = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::GroupElement");
+            if (oGroupElement && sTuGuid) {
+                var sTu = sTuGuid.replace(/-/g, '').toUpperCase();
+                var sTarget = sTu; // Set the href value for the link
+                var that = this;
+                var oLinkControl = new sap.m.Link({
+                    text: sText,
+                    target: sTarget,
+                    press: function () {
+                        //#YardTransportationUnit-change?change_mode=&key=0D6FA5371A3B1EDE91FDAEF55B8DC60F&sap-app-origin-hint=&sap-wd-configid=%252FSAPYL%252FWDCA_YTU&skip_initial_screen=X&wdconfigurationid=%252FSAPYL%252FWDCA_YTU
+                        var vNavigationParameters = {
+                            "change_mode": '',
+                            "key": sTarget,
+                            "sap-wd-configid": "%252FSAPYL%252FWDCA_YTU",
+                            "skip_initial_screen": 'X',
+                            "wdconfigurationid": "%252FSAPYL%252FWDCA_YTU"
+                        };
+                        that.oNavigationHandler.navigate("YardTransportationUnit", "change", vNavigationParameters, {});
+                    }
+                });
+
+                var oTuText = new sap.m.Text({
+                    text: sText
+                })
+                // Now, you can replace the original sap.m.Text control with the newly created sap.m.Link control
+                oGroupElement.removeElement("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::Field")
+                var oTextGroup = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::TuNumExt::Field");
+                if (oTextGroup) {
+                    oTextGroup.destroy();
+                    oTextGroup = null;
+                }
+                oGroupElement.removeAllFields();
+                if (isCheckedIn) {
+                    oGroupElement.addElement(oLinkControl);
+                } else {
+                    oGroupElement.addElement(oTuText);
+                }
+                var oLabel = oGroupElement.getAggregation("_label");
+                if (oLabel) {
+                    oLabel.setText("TU");
+                }
+            }
+        },
