@@ -1,0 +1,116 @@
+************************************************************************
+* SELECTION-SCREEN elements  (Select-options and Parameters)           *
+************************************************************************
+SELECTION-SCREEN: BEGIN OF BLOCK blk1 WITH FRAME TITLE TEXT-001.
+  PARAMETERS:
+    p_yard  TYPE c LENGTH 4 OBLIGATORY,
+    p_werks TYPE mard-werks OBLIGATORY, "MATCHCODE OBJECT h_t001l,
+    p_lgort TYPE mard-lgort OBLIGATORY DEFAULT 'YRD1'. " Yard
+SELECTION-SCREEN END OF BLOCK blk1.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_lgort.
+  PERFORM f_werks_lgort_f4 USING 'LGORT' CHANGING p_lgort.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_werks .
+  PERFORM f_werks_lgort_f4 USING 'WERKS' CHANGING p_werks.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_yard.
+  PERFORM f_yard_f4.
+__________________________________
+FORM f_werks_lgort_f4 USING    up_fieldname ##PERF_NO_TYPE
+                      CHANGING cp_field ##PERF_NO_TYPE.
+
+  DATA: lr_lgort TYPE RANGE OF t001l-lgort,
+        lr_werks TYPE RANGE OF t001l-werks.
+
+  DATA: lt_return   TYPE STANDARD TABLE OF ddshretval,
+        lt_dynpread TYPE TABLE OF dynpread.
+
+  lt_dynpread = VALUE #( ( fieldname = 'P_WERKS' ) ( fieldname = 'P_LGORT' ) ).
+
+  CALL FUNCTION 'DYNP_VALUES_READ'
+    EXPORTING
+      dyname               = sy-cprog
+      dynumb               = sy-dynnr
+    TABLES
+      dynpfields           = lt_dynpread
+    EXCEPTIONS
+      invalid_abapworkarea = 1
+      invalid_dynprofield  = 2
+      invalid_dynproname   = 3
+      invalid_dynpronummer = 4
+      invalid_request      = 5
+      no_fielddescription  = 6
+      invalid_parameter    = 7
+      undefind_error       = 8
+      double_conversion    = 9
+      stepl_not_found      = 10
+      OTHERS               = 11.
+  IF sy-subrc EQ 0 AND lines( lt_dynpread ) > 0.
+    DATA(lv_lgort) = VALUE #( lt_dynpread[ fieldname = 'P_LGORT' ]-fieldvalue ).
+    IF lv_lgort IS NOT INITIAL.
+      lr_lgort = VALUE #( ( sign = 'I' option = 'CP' low = lv_lgort ) ).
+    ENDIF.
+    DATA(lv_werks) = VALUE #( lt_dynpread[ fieldname = 'P_WERKS' ]-fieldvalue ).
+    IF lv_werks IS NOT INITIAL.
+      lr_werks = VALUE #( ( sign = 'I' option = 'CP' low = lv_werks ) ).
+    ENDIF.
+  ENDIF.
+
+  SELECT a~werks, a~name1, b~lgort, b~lgobe
+    FROM t001w AS a INNER JOIN t001l AS b ON a~werks = b~werks "#EC CI_BUFFJOIN
+    INTO TABLE @DATA(lt_values)
+    WHERE a~werks IN @lr_werks
+      AND b~lgort IN @lr_lgort.
+
+* Function module for f4 help
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = CONV fieldname( up_fieldname )
+      value_org       = 'S'
+    TABLES
+      value_tab       = lt_values
+      return_tab      = lt_return
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc = 0.
+    cp_field = VALUE #( lt_return[ 1 ]-fieldval OPTIONAL ).
+  ENDIF.
+
+ENDFORM.
+
+FORM f_yard_f4. " CHANGING cp_yard TYPE char4.
+
+  CALL FUNCTION 'Z_YL_GET_YARD_FOR_AUDIT_REPORT' DESTINATION gv_destination
+    IMPORTING
+      et_yards          = i_yards
+    EXCEPTIONS
+      field_not_found   = 1
+      no_help_for_field = 2
+      inconsistent_help = 3
+      no_values_found   = 4
+      OTHERS            = 5.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-023 TYPE 'S' DISPLAY LIKE 'E'. "technical exception
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+* Function module for f4 help
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'YARDNO'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield     = 'P_YARD'
+      value_org       = 'S'
+    TABLES
+      value_tab       = i_yards
+*     return_tab      = lt_return_tab
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3 ##FM_SUBRC_OK.
+
+ENDFORM.
