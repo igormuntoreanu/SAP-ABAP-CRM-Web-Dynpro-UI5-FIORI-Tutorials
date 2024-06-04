@@ -11,6 +11,7 @@ SUBMIT rm07docs WITH werks   IN lr_werks             "#EC CI_SUBMIT
 DELETE FROM DATABASE indx(yl) ID 'AUDIT_REPORT'.
 
 "Somewhere in Mb51 transaction
+DATA: lv_audit_report type c.
 IMPORT lv_audit_report = lv_audit_report FROM DATABASE indx(yl) ID 'AUDIT_REPORT'.
 IF lv_audit_report IS NOT INITIAL and sy-calld IS NOT INITIAL.
   DELETE FROM DATABASE indx(yl) ID 'AUDIT_REPORT'.
