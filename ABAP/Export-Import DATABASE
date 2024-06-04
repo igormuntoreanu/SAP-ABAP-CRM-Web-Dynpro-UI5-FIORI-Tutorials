@@ -1,0 +1,17 @@
+"Z report
+EXPORT lv_audit_report = abap_true TO DATABASE indx(yl) ID 'AUDIT_REPORT'.
+
+SUBMIT rm07docs WITH werks   IN lr_werks             "#EC CI_SUBMIT
+                WITH matnr   IN lr_matnr
+                WITH rflat_l EQ abap_true
+                WITH alv_def EQ '/DEFAULT'
+                EXPORTING LIST TO MEMORY
+                AND RETURN.
+
+DELETE FROM DATABASE indx(yl) ID 'AUDIT_REPORT'.
+
+"Somewhere in Mb51 transaction
+IMPORT lv_audit_report = lv_audit_report FROM DATABASE indx(yl) ID 'AUDIT_REPORT'.
+IF lv_audit_report IS NOT INITIAL and sy-calld IS NOT INITIAL.
+  DELETE FROM DATABASE indx(yl) ID 'AUDIT_REPORT'.
+ENDIF.
