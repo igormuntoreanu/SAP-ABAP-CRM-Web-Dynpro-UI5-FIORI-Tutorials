@@ -1,0 +1,3 @@
+This error occurs because when you have different Transport Request for different Entity Set in your project.
+
+Check Interface (ABAP Objects) TR and assign all entity set to the same.
