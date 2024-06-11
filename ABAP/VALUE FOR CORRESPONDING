@@ -1,0 +1,1 @@
+et_entityset = VALUE #( FOR ls_headerfinal IN lt_header_final ( CORRESPONDING #( ls_headerfinal ) ) ).
