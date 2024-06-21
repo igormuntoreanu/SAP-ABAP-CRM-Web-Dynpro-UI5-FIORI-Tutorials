@@ -1,0 +1,21 @@
+onAfterRendering: function (oEvent) {
+            this.extensionAPI.getTransactionController().attachAfterSave(function (oEvent) {
+                oEvent.saveEntityPromise
+                    .then(function (result) {
+                        this.getView().attachModelContextChange(function () {
+                            this._transformTextToLink(null, null)
+                        }.bind(this));
+                    }.bind(this))
+            }.bind(this));
+
+            //Refresh Products Table after Deleting a Delivery
+            this.extensionAPI.getTransactionController().attachAfterLineItemDelete(function(oEvent){
+                oEvent.deleteEntitiesPromise
+                    .then(function(result){
+                        var oProductTable = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--ProductsTable::responsiveTable");
+                        if (oProductTable) {
+                            oProductTable.getBinding("items").refresh();
+                        }
+                    }.bind(this))
+            }.bind(this));
+        },
