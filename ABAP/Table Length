@@ -1,0 +1,1 @@
+DESCRIBE TABLE lt_content_bin. "If no addition is specified, the statement DESCRIBE TABLE only sets the system fields sy-tfill and sy-tleng.
