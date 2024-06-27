@@ -1,3 +1,4 @@
+//For some Event
 onStatusChange: function (oEvent) {
         //Get Selected Item Key
         var oSelectedItem = oEvent.getSource().getSelectedItem();
@@ -6,3 +7,20 @@ onStatusChange: function (oEvent) {
         var sPath = oSelectedItem.getParent().getBindingContext().getPath();
         oSelectedItem.getParent().getModel().setProperty( sPath + "/Status" , sKey);
 },
+________________________________________________________________________________________________________________________
+//For Fiori Object Page:
+onAfterRendering: function (oEvent) {
+            this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+                if (oEvent.context) {
+                    const tu = oEvent.context.getModel().getProperty( oEvent.context.sPath + "/TuNumExt" );
+                    const yard = oEvent.context.getModel().getProperty( oEvent.context.sPath + "/YardNo" );
+                    if (tu) {
+                        this.getOwnerComponent().getModel("Tukey").setProperty("/TuNumExt", tu);
+                    }
+                    if (yard) {
+                        this.getOwnerComponent().getModel("Tukey").setProperty("/YardNo", yard);
+                    }
+                }
+        }.bind(this);
+}
+________________________________________________________________________________________________________________________
