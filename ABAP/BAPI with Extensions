@@ -1,1 +1,22 @@
 
+  lt_extension_in = VALUE #( ( structure = '/SAPYL/I_EEW_YARD_TU_ROOT' valuepart1 = ls_ext_valuepart1 ) ) ##enh_ok. "pragma does not work!
+* Function module is related to a BAdI implementation /SAPYL/ES_BAPI_YTU_UPDATE / implementing class ZCL_YL_BAPI_YTU_UPDATE.
+* It is necessary for dealing with customer extension fields. Please observe!
+
+* First call with empty product table => delete all products
+  CLEAR lt_ytu_product.
+  CALL FUNCTION '/SAPYL/BAPI_YTU_UPDATE'
+    EXPORTING
+      tu_num_ext       = is_tu_data-tu_num
+      yard_tu_update   = ls_yard_tu_update
+    IMPORTING
+      rejected         = lv_rejected
+    TABLES
+      threshold        = lt_threshold_tu
+      product          = lt_ytu_product
+      extension_in     = lt_extension_in
+      extension_out    = lt_extension_out
+      return           = lt_return
+    EXCEPTIONS
+      no_authorization = 1
+      OTHERS           = 2.
