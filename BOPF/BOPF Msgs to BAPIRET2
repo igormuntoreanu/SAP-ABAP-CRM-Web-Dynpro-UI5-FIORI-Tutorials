@@ -1,0 +1,7 @@
+lo_msg->get_messages( IMPORTING et_message = DATA(lt_messages) ).
+    "Convert BOPF Messages to BAPIRET2
+    /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+       EXPORTING
+        it_message              = lt_messages  " Message Table
+      CHANGING
+        ct_bapiret2             = lt_return ). " Error Messages
