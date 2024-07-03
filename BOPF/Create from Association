@@ -1,0 +1,217 @@
+METHOD zyard_tus_delive_create_entity.
+
+  DATA: ls_del            TYPE zcl_zyard_fiori_tus_cd_mpc=>ts_zyard_tus_deliveries_cdstyp,
+        ls_yardtu         TYPE /sapyl/bapi_yard_tu,
+        ls_yard_tu_update TYPE /sapyl/bapi_yard_tu_update,
+        lt_act            TYPE TABLE OF /sapyl/bapi_yard_tu_sr_act,
+        ls_prod           TYPE /sapyl/bapi_yard_tu_product,
+        lt_prod           TYPE TABLE OF /sapyl/bapi_yard_tu_product,
+        lt_return         TYPE TABLE OF bapiret2,
+        lv_posnr          TYPE posnr_vl,
+        lv_rejected       TYPE /sapyl/bapi_yard_tu_ctrl-rejected.
+
+  DATA:
+    lt_group          TYPE TABLE OF /sapyl/bapi_yard_tu_group,
+    lt_measurement    TYPE TABLE OF /sapyl/bapi_yard_tu_measuremnt,
+    lt_threshold      TYPE TABLE OF /sapyl/bapi_yard_tu_threshold,
+    lt_seal_num       TYPE TABLE OF /sapyl/bapi_yard_tu_seal_num,
+    lt_loading_scheme TYPE TABLE OF /sapyl/bapi_yard_tu_lsch,
+    lt_whse_visit     TYPE TABLE OF /sapyl/bapi_yard_tu_whse_visit,
+    lt_extension_in   TYPE TABLE OF bapiparex,
+    lt_extension_out  TYPE TABLE OF bapiparex.
+
+  DATA: lt_mod       TYPE /bobf/t_frw_modification,
+        lt_cf        TYPE /bobf/t_frw_name,
+        ls_cf        TYPE LINE OF /bobf/t_frw_name,
+        ls_prod_bopf TYPE /sapyl/s_yard_tu_prod_c.
+
+  DATA lr_vbeln         TYPE TABLE OF bapidlv_range_vbeln.
+  DATA ls_vbeln         TYPE bapidlv_range_vbeln.
+  DATA ls_data_control  TYPE bapidlvbuffercontrol.
+  DATA lt_header        TYPE TABLE OF bapidlvhdr.
+  DATA lt_items         TYPE TABLE OF bapidlvitem.
+  DATA lt_flow          TYPE TABLE OF bapidocflow.
+
+  " Get Transaction Manager
+  DATA(lo_tmgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+  " Service Manager Instance
+  DATA(lo_smgr) = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( /sapyl/if_yard_tu_c=>sc_bo_key ).
+
+  io_data_provider->read_entry_data(
+    IMPORTING
+      es_data = ls_del ).
+
+  DATA(lo_message_container) = /iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
+
+  DATA(lv_destination) = zyl_cl_tools=>get_ecc_rfc_dest_from_yardno( iv_yard = ls_del-yardno ).
+  lv_posnr = ls_del-itemno.
+
+  "Check if Delivery and Item are already assigned to other TU
+  SELECT SINGLE *
+    FROM zyard_tus_deliveries_cds
+    INTO @DATA(ls_del_cds)
+    WHERE delivery = @ls_del-delivery
+      AND itemno   = @lv_posnr.
+  IF sy-subrc = 0.
+    "ZTU_FINDER_APP - 020 - Delivery &1 item &2 already assigned to TU &3
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'ZTU_FINDER_APP'
+        iv_msg_number             = 020
+        iv_msg_v1                 = CONV #( ls_del_cds-delivery )
+        iv_msg_v2                 = CONV #( ls_del_cds-itemno )
+        iv_msg_v3                 = CONV #( ls_del_cds-tunumber ) ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+  ENDIF.
+
+  CALL FUNCTION '/SAPYL/BAPI_YTU_GET_DETAIL'
+    EXPORTING
+      tu_num_ext       = ls_del-tunumber
+    IMPORTING
+      yard_tu          = ls_yardtu
+    TABLES
+      sr_act           = lt_act
+      product          = lt_prod
+      group            = lt_group
+      measurement      = lt_measurement
+      threshold        = lt_threshold
+      seal_num         = lt_seal_num
+      loading_scheme   = lt_loading_scheme
+      whse_visit       = lt_whse_visit
+      extension_in     = lt_extension_in
+      extension_out    = lt_extension_out
+      return           = lt_return
+    EXCEPTIONS
+      no_authorization = 1
+      OTHERS           = 2.
+  IF sy-subrc <> 0.
+    lo_message_container->add_messages_from_bapi(
+      EXPORTING
+        it_bapi_messages = lt_return ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+  ENDIF.
+
+  ls_vbeln-deliv_numb_low = ls_del-delivery.
+  ls_vbeln-option = 'EQ'.
+  ls_vbeln-sign = 'I'.
+  APPEND ls_vbeln TO lr_vbeln.
+
+  ls_data_control-bypassing_buffer = abap_true.
+  ls_data_control-item = abap_true.
+  ls_data_control-doc_flow = abap_true.
+
+  CALL FUNCTION 'BAPI_DELIVERY_GETLIST' DESTINATION lv_destination
+    EXPORTING
+      is_dlv_data_control = ls_data_control
+    TABLES
+      it_vbeln            = lr_vbeln
+      et_delivery_header  = lt_header
+      et_delivery_item    = lt_items
+      et_document_flow    = lt_flow
+      return              = lt_return.
+
+  READ TABLE lt_return WITH KEY type = 'E' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    mo_context->get_message_container( )->add_messages_from_bapi( EXPORTING it_bapi_messages = lt_return ). "bapiret2_t
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+  ENDIF.
+
+  READ TABLE lt_items ASSIGNING FIELD-SYMBOL(<fs_items>) WITH KEY vbeln = ls_del-delivery
+                                                                  posnr = lv_posnr.
+  IF sy-subrc <> 0.
+    "ZTU_FINDER_APP - 021 - Delivery &1 and item &2 do not exist.
+    lo_message_container->add_message(
+      EXPORTING
+        iv_msg_type               = 'E'
+        iv_msg_id                 = 'ZTU_FINDER_APP'
+        iv_msg_number             = 021
+        iv_msg_v1                 = CONV #( ls_del-delivery )
+        iv_msg_v2                 = CONV #( ls_del-itemno ) ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+  ENDIF.
+  DATA(ls_act) = VALUE #( lt_act[ 1 ] OPTIONAL ).
+  MOVE-CORRESPONDING ls_act TO ls_yard_tu_update.
+
+  APPEND: 'KEY'          TO lt_cf,
+          'ROOT_KEY'     TO lt_cf,
+          'PARENT_KEY'   TO lt_cf,
+          'MATNR'          TO lt_cf,
+          'MATQTY' TO lt_cf,
+          'MEINS'  TO lt_cf,
+          'MATQTY' TO lt_cf,
+          'BRGEW'  TO lt_cf,
+          'GEWEI'  TO lt_cf,
+          'VOLUM'  TO lt_cf,
+          'VOLEH'  TO lt_cf,
+          'YL_IM_DELIVERY' TO lt_cf,
+          'YL_IM_DELIVERY_ITEM' TO lt_cf,
+          'YL_WERKS' TO lt_cf,
+          'YL_DLVY_SLOC' TO lt_cf,
+          'YL_VENDOR' TO lt_cf.
+
+  MOVE-CORRESPONDING <fs_items> TO ls_prod_bopf.
+  ls_prod_bopf-key = /bobf/cl_frw_factory=>get_new_key( ).
+  ls_prod_bopf-root_key = ls_yardtu-key.
+  ls_prod_bopf-parent_key = VALUE #( lt_act[ 1 ]-key OPTIONAL ).
+  ls_prod_bopf-matqty = <fs_items>-lfimg.
+  ls_prod_bopf-yl_im_delivery = <fs_items>-vbeln.
+  ls_prod_bopf-yl_im_delivery_item = <fs_items>-posnr.
+  ls_prod_bopf-yl_werks = <fs_items>-werks.
+  ls_prod_bopf-yl_vendor = VALUE #( lt_header[ 1 ]-lifnr OPTIONAL ).
+  ls_prod_bopf-yl_dlvy_sloc = <fs_items>-lgort.
+
+  INSERT VALUE #( node = /sapyl/if_yard_tu_c=>sc_node-product
+                  association = /sapyl/if_yard_tu_c=>sc_association-sr_act-product
+                  change_mode = /bobf/if_frw_c=>sc_modify_create
+                  root_key = VALUE #( lt_act[ 1 ]-root_key OPTIONAL )
+                  source_key = VALUE #( lt_act[ 1 ]-key OPTIONAL )
+                  source_node = /sapyl/if_yard_tu_c=>sc_node-sr_act
+                  data = REF #( ls_prod_bopf ) "REF #( ls_tu )
+                  changed_fields = lt_cf
+                  key = ls_prod_bopf-key ) INTO TABLE lt_mod.
+
+  TRY.
+      lo_smgr->modify(
+        EXPORTING
+          it_modification  = lt_mod           " Changes
+         IMPORTING
+           eo_change       = DATA(lo_change)  " Interface of Change Object
+           eo_message      = DATA(lo_msg) " Interface of Message Object
+      ).
+    CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+  ENDTRY.
+
+  IF lo_msg->check( ) = abap_false.
+    lo_tmgr->save( IMPORTING ev_rejected = DATA(ld_reject)
+                             et_rejecting_bo_key = DATA(lt_keys_rej) ).
+  ENDIF.
+
+  IF ld_reject = abap_true.
+    lo_tmgr->cleanup( ).
+  ENDIF.
+
+
+  IF lo_msg IS BOUND.
+    lo_msg->get_messages( IMPORTING et_message = DATA(lt_messages) ).
+    "Convert BOPF Messages to BAPIRET2
+    /scmtms/cl_common_helper=>msg_convert_bopf_2_bapiret2(
+       EXPORTING
+        it_message              = lt_messages  " Message Table
+      CHANGING
+        ct_bapiret2             = lt_return ). " Error Messages
+  ENDIF.
+
+  READ TABLE lt_return WITH KEY type = 'E' TRANSPORTING NO FIELDS.
+  IF sy-subrc = 0.
+    lo_message_container->add_messages_from_bapi(
+          EXPORTING
+            it_bapi_messages = lt_return ).
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception.
+  ENDIF.
+
+ENDMETHOD.
