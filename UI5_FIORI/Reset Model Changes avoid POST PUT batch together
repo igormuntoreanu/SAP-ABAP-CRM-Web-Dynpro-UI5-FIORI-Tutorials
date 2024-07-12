@@ -1,0 +1,41 @@
+            //Refresh Products Table after Deleting a Delivery
+            this.extensionAPI.getTransactionController().attachAfterLineItemDelete(function (oEvent) {
+                //If the user tries to create a new Delivery and decide to delete one from the list, we need to reset the changes to avoid $batch with POST and DELETE together
+                oEvent.aContexts[0].oModel.resetChanges();
+                oEvent.deleteEntitiesPromise
+                    .then(function (result) {
+                        var closeCreation = sap.ui.getCore().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_TUS_DELIVERIES_CDS--closeColumn");
+                        if (closeCreation) {
+                            closeCreation.firePress();
+                        }
+                        setTimeout(() => {
+                            sap.ui.getCore().byId("yardtu::sap.suite.ui.generic.template.ListReport.view.ListReport::ZYARD_FIORI_TUS_CDS--listReportFilter-btnGo").firePress();
+                            var oReferenceTable = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--References::responsiveTable");
+                            if (oReferenceTable) {
+                                var oItems = oReferenceTable.getBinding("items");
+                                if (oItems) {
+                                    oItems.refresh();
+                                }
+                            }
+                            var oProductTable = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--ProductsTable::responsiveTable");
+                            if (oProductTable) {
+                                var oItems = oProductTable.getBinding("items");
+                                if (oItems) {
+                                    oItems.refresh();
+                                }
+                            }
+                            var oDeliveriesTable = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--Deliveries::responsiveTable");
+                            if (oDeliveriesTable) {
+                                var oItems = oDeliveriesTable.getBinding("items");
+                                if (oItems) {
+                                    oItems.refresh();
+                                }
+                            }
+
+                            var closeCreation = sap.ui.getCore().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_TUS_DELIVERIES_CDS--closeColumn");
+                            if (closeCreation) {
+                                closeCreation.firePress();
+                            }
+                        }, 999);
+                    }.bind(this))
+            }.bind(this));
