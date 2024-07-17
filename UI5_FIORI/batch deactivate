@@ -1,0 +1,19 @@
+//for a particular request:
+var oDataModel = this.getModel(); // sap.ui.model.odata.v2.ODataModel
+oDataModel.setUseBatch(false);
+
+-----------------
+
+global at manifest.json:
+{
+  "sap.ui5": {
+    "models": {
+      "yourV2ODataModel": {
+        "dataSource": "yourDataSource",
+        "settings": {
+          "useBatch": false
+        }
+      }
+    }
+  }
+}
