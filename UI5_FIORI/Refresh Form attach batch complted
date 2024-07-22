@@ -1,0 +1,12 @@
+var oForm = sap.ui.getCore().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--TUDETAILSID::Form--Form");
+                            debugger;
+                            if (oForm) {
+                                oForm.getModel().attachRequestCompleted(function(oEvent){
+                                    this._manageButtons();
+                                }.bind(this));
+                                oForm.getModel().attachBatchRequestCompleted(function(oEvent){
+                                    this._manageButtons();
+                                }.bind(this));
+
+                                oForm.getModel().refresh(true);
+                            }
