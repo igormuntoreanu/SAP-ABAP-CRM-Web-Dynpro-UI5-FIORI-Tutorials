@@ -1,0 +1,3 @@
+check your manifest file, delete
+"metadataUrlParams": { "sap-value-list": "none" }
+from your model
