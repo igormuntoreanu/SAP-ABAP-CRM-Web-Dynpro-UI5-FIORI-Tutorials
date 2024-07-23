@@ -1,0 +1,12 @@
+"Find 20 numbers characters of given string
+DATA: lv_number        TYPE string.
+
+"Extract the YO Internal from the Reference
+  FIND REGEX '(\d{20})' IN <fs_ref>-reference SUBMATCHES lv_number.
+          IF sy-subrc = 0.
+            CONDENSE lv_number.
+            ls_order-yardno = <fs_ref>-yardno.
+            ls_order-doccat = <fs_ref>-doccat.
+            ls_order-yo = lv_number.
+            APPEND ls_order TO lt_order. CLEAR ls_order.
+          ENDIF.
