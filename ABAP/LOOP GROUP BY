@@ -1,0 +1,51 @@
+SAP ABAP - Replacement of Loop iteration statements( AT .. ENDAT): 
+
+I have a requirement of summation of net price, quantity and count of materials that are available in the warehouse/plants in different company codes. 
+
+Example:
+
+There are materials like Mat-1,Mat-2,Mat-5,Mat-3 and Mat-4 are available in the plants 200,300 and 400 under the company codes 1010.
+
+Here , the question is the count of the materials are available under plant 200,300 and 400 with respect to the company codes 1010. 
+
+Solution: 
+
+Normally ,if you want to count or sum up the quantities or prices - we will generally use the loop iteration statements like, 
+
+AT FIRST,
+AT NEW <Field>,
+AT END OF <Field>,
+AT LAST.
+
+- If your internal table is in a different structure and you want to use the loop iteration statements it will through the work area filled with with * , to resolve this you have to make another work area and reassign the values and also you don’t need the fields used in combinations to be the first in the table structure.
+
+But in ABAP 7.4+ , we have an alternative approach "GROUP BY" .
+
+Types : Begin of lty_final,
+ BUKRS TYPE BUKRS,
+ WERKS TYPE WERKS_D,
+ MATNR TYPE MATNR_D,
+ QTY    TYPE NETWR,
+ NETPR TYPE NETWR,
+ End of lty_final.
+
+DATA : LT_FINAL TYPE TABLE OF LTY_FINAL.
+
+LOOP AT LT_FINAL INTO DATA(GT_FINAL)
+ GROUP BY ( BUKRS = GT_FINAL-BUKRS
+ WERKS = GT_FINAL-WERKS
+ ).
+//This outer loop will group the data w.r.t Burks and plant.
+
+LOOP AT GROUP GT_FINAL ASSIGNING FIELD-SYMBOL(<GFS_FINAL>).
+
+// This inner loop contains only unique company code and plant reading above
+//Derivation for material count and other logic.
+
+
+ENDLOOP.
+ENDLOOP.
+
+In GROUP BY there are few additions like size , index in the syntax.
+
+Happy Learning!!
