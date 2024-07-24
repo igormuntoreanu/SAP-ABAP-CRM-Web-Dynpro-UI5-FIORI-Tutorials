@@ -1,0 +1,10 @@
+//Refresh APP every 30 Seconds
+            this.setInterval = setInterval(function () {
+                var oTable = that.getView().byId("yardqueue::sap.suite.ui.generic.template.ListReport.view.ListReport::YardTaskSet--responsiveTable");
+                if (oTable) {
+                    var oItems = oTable.getBinding("items");
+                    if (oItems) {
+                        oItems.refresh();
+                    }
+                }
+            }, 30000);
