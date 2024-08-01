@@ -1,0 +1,2 @@
+ UPDATE /sapyl/yo_item SET lic_plate = @lv_lic_plate WHERE parent_key = @ls_yohdr-db_key.
+ UPDATE /sapyl/yard_tu SET lic_plate = @lv_lic_plate WHERE tu_num_ext = @ls_yo_item-tu_number.
