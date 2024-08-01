@@ -1,0 +1,6 @@
+//Controller 1 or 2
+sap.ui.getCore().getEventBus().subscribe("TrailerFinderOP", "ManageButtons", this._manageButtons, this);
+
+//Controller 1 or 2
+sap.ui.getCore().getEventBus().publish("TrailerFinderOP", "ManageButtons");
+
