@@ -1,0 +1,11 @@
+"DO_BLOCKING_DET (/SAPYL/CL_YO_D_ITEM)
+IF line_exists( lt_tu_status[ KEY primary_key COMPONENTS
+          tu_num = <ls_tu_root>-tu_num
+          tu_sr_act_num = <ls_tu_sr_act>-tu_sr_act_num
+          status_type = <ls_status_type>
+          status_value = abap_true ] ).
+
+          lv_is_blocked = abap_true.
+          EXIT.
+
+        ENDIF.
