@@ -1,0 +1,10 @@
+          TRY.
+              cl_abap_datfm=>conv_date_int_to_ext(
+                EXPORTING
+                  im_datint    = gs_equipment-installdat                  " interne Darstellung des Datums
+                   im_datfmdes = cl_abap_datfm=>get_datfm( )                  " Für Konvertierung gewünschtes Datumsformat
+                 IMPORTING
+                  ex_datext    = lv_user_date ).
+            CATCH cx_abap_datfm_format_unknown. " Ausnahme zur Klasse CL_ABAP_DATFM - Format unbekannt
+              lv_data_standard = gs_equipment-installdat+6(2) && '.' && gs_equipment-installdat+4(2) && '.' && gs_equipment-installdat(4) .
+          ENDTRY.
