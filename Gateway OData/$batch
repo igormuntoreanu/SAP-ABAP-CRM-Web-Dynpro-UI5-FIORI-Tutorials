@@ -45,7 +45,7 @@ METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_process.
                     iv_entity_name          = ls_request_details-target_entity
                     iv_entity_set_name      = ls_request_details-target_entity_set
                     iv_source_name          = ls_request_details-source_entity
-                    it_key_tab              = ls_request_details-context_params
+                    it_key_tab              = ls_request_details-KEY_TAB "KEY_TAB
                     io_tech_request_context = lo_request_context
                     it_navigation_path      = ls_request_details-navigation_path
                     io_data_provider        = lo_entry_provider
@@ -78,7 +78,7 @@ METHOD /iwbep/if_mgw_appl_srv_runtime~changeset_process.
                     iv_entity_name          = ls_request_details-target_entity
                     iv_entity_set_name      = ls_request_details-target_entity_set
                     iv_source_name          = ls_request_details-source_entity
-                    it_key_tab              = ls_request_details-context_params
+                    it_key_tab              = ls_request_details-KEY_TAB
                     io_tech_request_context = lo_request_context
                     it_navigation_path      = ls_request_details-navigation_path
                     io_data_provider        = lo_entry_provider
