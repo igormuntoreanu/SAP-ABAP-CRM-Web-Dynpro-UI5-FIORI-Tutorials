@@ -1,0 +1,34 @@
+REPORT abap_docu_example_frame.
+
+***********************************************************************
+* Textual ABAP example from ABAP Keyword Documentation                *
+***********************************************************************
+
+DATA:
+  spfli_tab TYPE SORTED TABLE OF spfli
+            WITH UNIQUE KEY carrid connid
+            WITH NON-UNIQUE SORTED KEY city_key
+                            COMPONENTS cityfrom cityto,
+  spfli_key LIKE LINE OF spfli_tab.
+
+SELECT *
+       FROM spfli
+       INTO TABLE @spfli_tab.
+
+READ TABLE spfli_tab
+           WITH TABLE KEY primary_key
+                COMPONENTS carrid = 'LH' connid = '400'
+           ASSIGNING FIELD-SYMBOL(<spfli>).
+IF sy-subrc = 0.
+  ...
+ENDIF.
+
+READ TABLE spfli_tab
+           WITH TABLE KEY city_key
+                COMPONENTS cityfrom = 'FRANKFURT' cityto = 'BERLIN'
+           ASSIGNING <spfli>.
+IF sy-subrc = 0.
+  ...
+ENDIF.
+
+// USE INSERT instead of APPEND
