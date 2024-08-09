@@ -1,0 +1,26 @@
+      "Deliveries after Check-in
+      SELECT *
+        FROM zyard_tus_deliveries_cds
+        INTO TABLE @DATA(lt_deliveries)
+        FOR ALL ENTRIES IN @lt_cds
+        WHERE yardno   = @lt_cds-yardno
+          AND tunumber = @lt_cds-tunumext.         "AND dbkeytu = @lt_cds-dbkeytu.
+      IF sy-subrc = 0.
+        SORT lt_deliveries BY yardno tunumber.
+      ENDIF.
+
+LOOP AT lt_cds ASSIGNING FIELD-SYMBOL(<fs_cds>).
+    READ TABLE lt_deliveries WITH KEY yardno   = <fs_cds>-yardno
+                                      tunumber = <fs_cds>-tunumext
+                             BINARY SEARCH TRANSPORTING NO FIELDS.
+    IF sy-subrc = 0.
+      lv_tabix = sy-tabix.
+      LOOP AT lt_deliveries INTO DATA(ls_delivery) FROM lv_tabix.
+        IF ls_delivery-yardno <> <fs_cds>-yardno OR
+           ls_delivery-tunumber <> <fs_cds>-tunumext.
+          EXIT.
+        ENDIF.
+  "Do your logic here
+      ENDLOOP.
+   ENDIF.
+ENDLOOP.
