@@ -1,0 +1,30 @@
+Controller ObjectPage:
+onAfterRendering: function (oEvent) {
+            var that = this;
+            this.extensionAPI.attachPageDataLoaded(function (oEvent) {
+            var oMultiDeliveries = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_TUS_DELIVERIES_CDS--DeliveriesMultiInput-mInput");
+
+            if (oMultiDeliveries) {
+                    oMultiDeliveries.removeAllValidators(); //Depending of the situation this line is not necessary, it was on my example with Fiori OData v2 List Report
+                    oMultiDeliveries.addValidator(that._multiInputValidator);
+                }
+
+_multiInputValidator: function (oMultiInput) {
+            var value = oMultiInput.text;
+            var oToken = new Token({ key: value, text: value });
+            return oToken;
+        },
+
+
+XML:
+<core:FragmentDefinition xmlns:sfi="sap.ui.comp.smartfield"
+    xmlns:core="sap.ui.core"
+    xmlns="sap.m"
+    xmlns:sfo="sap.ui.comp.smartform"
+    xmlns:smi="sap.ui.comp.smartmultiinput"
+    xmlns:smii="sap.ui.comp.smartfilterbar"
+    xmlns:smiii="sap.ui.comp.smartfilterbar">
+    <sfo:GroupElement>
+        <smi:SmartMultiInput id="DeliveriesMultiInput" value="{Delivery}" entitySet="ZYARD_TUS_DELIVERIES_CDS" supportRanges="true" textLabel="Deliveries" visible="{= ${ui>/editable}}" historyEnabled="false" showSuggestion="false"/>
+    </sfo:GroupElement>
+</core:FragmentDefinition>
