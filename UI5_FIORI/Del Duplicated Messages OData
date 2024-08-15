@@ -1,0 +1,101 @@
+//After a batch request, the Standard Fiori is generating duplicated messages in the UI
+//With the following Code, using the sap.ui.getCore().getMessageManager().getMessageModel().getData();
+//we can remove these duplicates
+
+beforeSaveExtension: function (oEvent) {
+            var oModel = this.getView().getModel();
+            const oMultiDeliveries = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_TUS_DELIVERIES_CDS--DeliveriesMultiInput-mInput");
+            if (oMultiDeliveries) {
+                var aTokens = oMultiDeliveries.getTokens();
+                if (aTokens.length === 0) {
+                    throw new Error("No valid Deliveries to be assigned to the TU");
+                }
+                // Create an array to hold batch operations
+                var tuNumber = Object.values(this.getView().getModel().getPendingChanges())[0].TuNumber;
+                var yardNo = Object.values(this.getView().getModel().getPendingChanges())[0].YardNo;
+                var yardOrderNo = Object.values(this.getView().getModel().getPendingChanges())[0].YardOrderNo;
+            }
+            //Remove Standard Request from the Delivery
+            if (oModel.mDeferredRequests && oModel.mDeferredRequests.Changes && oModel.mDeferredRequests.Changes.changes && oModel.mDeferredRequests.Changes.changes.Changes) {
+                var changesArray = oModel.mDeferredRequests.Changes.changes.Changes;
+                // Remove the item if the key contains the specified string ZYARD_TUS_DELIVERIES_CDS
+                changesArray = changesArray.filter(function (change) {
+                    return !(change.request && change.request.key && change.request.key.includes("ZYARD_TUS_DELIVERIES_CDS"));
+                });
+                // Update the model if necessary, depending on your UI5 setup
+                oModel.mDeferredRequests.Changes.changes.Changes = changesArray;
+            }
+
+            if (oModel.mDeferredRequests && oModel.mDeferredRequests.Changes && oModel.mDeferredRequests.Changes.map) {
+                var changesMapArray = Object.keys(oModel.mDeferredRequests.Changes.map);
+
+                changesMapArray = changesMapArray.filter(function (change) {
+                    return (change.includes("ZYARD_TUS_DELIVERIES_CDS"));
+                });
+                // Remove the item if the key contains the specified string ZYARD_TUS_DELIVERIES_CDS
+                changesMapArray.forEach(entity => {
+                    if (oModel.mDeferredRequests.Changes.map.hasOwnProperty(entity)) {
+                        delete oModel.mDeferredRequests.Changes.map[entity];
+                    }
+                });
+            }
+            //Remove Request from the Delivery
+            if (oModel.mChangedEntities) {
+                var changesEntitiesArray = Object.keys(oModel.mChangedEntities);
+
+                changesEntitiesArray = changesEntitiesArray.filter(function (change) {
+                    return (change.includes("ZYARD_TUS_DELIVERIES_CDS"));
+                });
+                // Remove the item if the key contains the specified string ZYARD_TUS_DELIVERIES_CDS
+                changesEntitiesArray.forEach(entity => {
+                    if (oModel.mChangedEntities.hasOwnProperty(entity)) {
+                        delete oModel.mChangedEntities[entity];
+                    }
+                });
+            }
+            //Deliveries Manage from the Deliveries Object Page (not TU Object Page)
+            if (oMultiDeliveries) {
+                oModel.resetChanges();
+                oModel.abortInternalRequest("Changes"); // Abort Changes from Standard
+                //Set our own Changes groups by replacing the standard one
+                oModel.setDeferredGroups(["Changes"]);
+                if (aTokens) {
+                    aTokens.forEach(token => {
+                        // Define the payload for the first POST request
+                        let payload = {
+                            Delivery: token.getKey(),
+                            TuNumber: tuNumber,
+                            YardNo: yardNo,
+                            YardOrderNo: yardOrderNo
+                        };
+                        oModel.createEntry("/ZYARD_TUS_DELIVERIES_CDS", {
+                            properties: payload,
+                            groupId: "Changes",
+                            refreshAfterChange: false
+                        });
+                    });
+                    oModel.oMessageParser.getProcessor().attachMessageChange(function(oEvent){
+                        var aMessages = [];
+                        var coreMessages = sap.ui.getCore().getMessageManager().getMessageModel().getData();
+                        //Remove Duplicated Messages from the Core
+                        for (let i = 0; i < coreMessages.length; i++) {
+                            if (aMessages.includes(coreMessages[i].message)) {
+                                //Push duplicated message to old messages
+                                coreMessages.splice(i, 1); // Delete the current item from originalArray
+                                i--; // Decrement index to account for the removed element
+                            } else {
+                                aMessages.push(coreMessages[i].message);
+                            }
+                        }
+                        sap.ui.getCore().getMessageManager().getMessageModel().setData(coreMessages);
+                    });
+                } else {
+                    //Error message
+                }
+            }
+
+            //Necessary because of oModel.resetChanges();
+            /*             oModel.attachBatchRequestCompleted(function (oEvent) {
+            
+                        }.bind(this)); */
+        },
