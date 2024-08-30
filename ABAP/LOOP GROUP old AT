@@ -1,0 +1,210 @@
+FORM shipment_create .
+
+  DATA :  i_xvbpa TYPE STANDARD TABLE OF vbpavb WITH HEADER LINE.
+  DATA :  i_yvbpa TYPE STANDARD TABLE OF vbpavb.
+  DATA :  i_xvbadr TYPE STANDARD TABLE OF sadrvb.
+  DATA :  i_yvbadr TYPE STANDARD TABLE OF sadrvb.
+  DATA ls_bapishpitm_group TYPE bapishipmentitem.
+  DATA lt_bapishpitm_group TYPE STANDARD TABLE OF bapishipmentitem.
+  DATA lt_return_shipment_create TYPE STANDARD TABLE OF bapiret2.
+
+  LOOP AT t_vbeln ASSIGNING FIELD-SYMBOL(<fs_traid_traty_group>)
+    GROUP BY ( key1 = <fs_traid_traty_group>-traid
+               key2 = <fs_traid_traty_group>-traty ).
+      "Logic for whole group
+      CLEAR: wa_bapishphead,
+             ls_bapishpitm_group,
+             lt_bapishpitm_group,
+             wa_bapishipmenthdunheader,
+             it_bapishipmenthdunheader,
+             it_bapishpadd,
+             v_shpnum.
+      LOOP AT GROUP <fs_traid_traty_group> ASSIGNING FIELD-SYMBOL(<fs_traid_traty_group_item>).
+        "Logic for item of a group
+        READ TABLE it_bapishpitm INTO ls_bapishpitm_group WITH KEY delivery = <fs_traid_traty_group_item>-vbeln.
+        IF sy-subrc = 0.
+          APPEND ls_bapishpitm_group TO lt_bapishpitm_group.
+          IF lines( lt_bapishpitm_group ) = 1.
+            MOVE c_trplnpt   TO wa_bapishphead-trans_plan_pt.
+            MOVE lv_shptyp  TO wa_bapishphead-shipment_type.
+            IF <fs_traid_traty_group_item>-traid NE space.
+              wa_bapishphead-container_id = ls_vbeln-traid.
+            ELSE.
+              IF p_man IS INITIAL.
+                SELECT header_guid                                                                 "$smart: #601
+                        FROM /deereag/shuti
+                        WHERE ecc_delivery =  @<fs_traid_traty_group_item>-vbeln
+                        ORDER BY PRIMARY KEY INTO @DATA(lv_header_guid) UP TO 1 ROWS.            "$smart: #601
+                ENDSELECT.                                                                         "$smart: #601
+                IF lv_header_guid NE space.
+                  SELECT SINGLE shuttle_list, trailer_id
+                    FROM /deereag/shuth
+                    WHERE header_guid = @lv_header_guid
+                    INTO  (@lv_shuttle_list,@lv_trailer_id).
+                  wa_bapishphead-container_id  = lv_trailer_id.
+                  wa_bapishphead-external_id_1 = lv_shuttle_list.
+                  CLEAR: lv_header_guid, lv_trailer_id, lv_shuttle_list.
+                ENDIF.
+              ELSE.
+                "Message 'Delivery TRAID is empty' already set for line of it_ship_cr within process_selected_rows
+              ENDIF.
+            ENDIF.
+
+            "Begin of EWMYG-424
+            "Remove hardcode
+*  wa_bapishphead-service_agent_id = '0000005490'.
+            IF ls_bapishpitm_group-delivery IS NOT INITIAL .
+              SELECT a~vbeln, a~traty, b~scacd, b~lifnr                                                    "$smart: #601
+                FROM likp AS a
+                INNER JOIN lfa1 AS b ON a~traty = b~scacd
+                WHERE a~vbeln = @ls_bapishpitm_group-delivery
+                ORDER BY b~lifnr                                                                           "$smart: #601
+                INTO @DATA(ls_likp) UP TO 1 ROWS.                                                          "$smart: #601
+              ENDSELECT.                                                                                   "$smart: #601
+              IF sy-subrc = 0.
+                wa_bapishphead-service_agent_id = ls_likp-lifnr.
+              ENDIF.
+              CLEAR ls_likp.
+            ENDIF.
+            "End of EWMYG-424
+
+            "Begin of EWMYG-401
+            "After creation of the shipment the status should be set to 1 = Planning completed.
+            IF gr_sttrg IS NOT INITIAL.
+              DATA(lv_sttrg) = VALUE #( gr_sttrg[ 1 ]-low OPTIONAL ).
+              CONDENSE lv_sttrg.
+              CASE lv_sttrg.
+                WHEN '1'. "Planned Completed
+                  wa_bapishphead-status_plan = 'X'.
+                WHEN OTHERS.
+              ENDCASE.
+            ENDIF.
+            "End of EWMYG-401
+
+*  MOVE 'X'                 TO wa_bapishphead-status_plan.
+*  MOVE 'X'                 TO wa_bapishphead-status_checkin.
+*  MOVE 'X'                 TO wa_bapishphead-status_load_start.
+*  MOVE 'X'                 TO wa_bapishphead-status_load_end.
+*  MOVE 'X'                 TO wa_bapishphead-status_compl.
+
+            SELECT SINGLE vgbel,vgpos ,lgort, werks FROM lips INTO (@DATA(lv_vgbel),
+                                                    @DATA(lv_vgpos),
+                                                    @DATA(lv_lgort),
+                                                    @DATA(lv_werks))
+              WHERE vbeln = @<fs_traid_traty_group_item>-vbeln
+              AND   posnr = @<fs_traid_traty_group_item>-posnr.
+
+            IF NOT lv_vgbel IS INITIAL.
+              SELECT SINGLE emlif INTO @DATA(lv_emlif)
+                FROM ekpo
+                WHERE ebeln = @lv_vgbel
+                AND   ebelp = @lv_vgpos.
+              CLEAR: lv_vgbel, lv_vgpos.
+            ENDIF.
+
+            SELECT partner, ship_mat FROM zla0_auto_ship_c INTO @DATA(ls_yl_data)
+              up to 1 rows
+              WHERE werks = @lv_werks
+              AND emlif IN ( @lv_emlif, @space )
+              AND lgort IN ( @lv_lgort, @space )
+              ORDER BY SORT .
+              ENDSELECT.
+
+            CLEAR: lv_lgort, lv_werks, lv_emlif.
+
+            IF sy-subrc = 0.
+              wa_bapishipmenthdunheader-ship_mat = ls_yl_data-ship_mat.
+            ELSE.
+              wa_bapishipmenthdunheader-ship_mat   = c_sddummy1.
+            ENDIF.  "End SAGK9C0DIO
+            wa_bapishipmenthdunheader-hdl_unit_exid = '$0001'.
+            APPEND wa_bapishipmenthdunheader TO it_bapishipmenthdunheader.
+          ENDIF.
+        ENDIF.
+      ENDLOOP.
+      "Logic after all items of a group were looped
+
+*  wa_bapishpaddress-ADDR_NO = '0000973922'.
+*  APPEND wa_bapishpaddress TO it_bapishpadd.
+      CALL FUNCTION 'BAPI_SHIPMENT_CREATE'
+        EXPORTING
+          headerdata = wa_bapishphead
+        IMPORTING
+          transport  = v_shpnum
+*     SHIPMENTGUID    =
+        TABLES
+*     HEADERDEADLINE  =
+          itemdata   = lt_bapishpitm_group
+          hdunheader = it_bapishipmenthdunheader
+*     hdunitem   = it_bapishipmenthdunitem
+          address    = it_bapishpadd
+          return     = lt_return_shipment_create. "#EC CI_USAGE_OK[2438131]                                     "$smart: #110 #615
+      APPEND LINES OF lt_return_shipment_create TO gt_return.
+* if shipment number is initial then there is an error in BAPI call
+      IF v_shpnum IS INITIAL.
+        LOOP AT it_ship_cr INTO ls_ship_cr WHERE tknum IS INITIAL.
+          READ TABLE lt_return_shipment_create INTO ls_return WITH KEY type = 'E'.                                   "$smart: #110
+          IF sy-subrc EQ 0.
+            ls_ship_cr-tknum = v_shpnum.
+            MOVE-CORRESPONDING ls_return TO ls_ship_cr.
+            MODIFY it_ship_cr FROM ls_ship_cr TRANSPORTING tknum type id number message message_v1 message_v2 message_v3 message_v4.
+          ENDIF.
+          CLEAR: lt_return_shipment_create, ls_return.
+        ENDLOOP.
+        CLEAR ls_yl_data.
+      ELSE.
+*PARTNER UPDATE
+        CLEAR: i_xvbpa[], i_xvbpa.
+
+        i_xvbpa-vbeln = v_shpnum.
+        i_xvbpa-parvw = 'EC'.
+*    READ TABLE t_vbeln INTO  DATA(wa_vbeln) INDEX 1. "Stard delition SAGK9C0DIO
+*    IF sy-subrc EQ 0.
+*      SELECT   SINGLE vgbel,vgpos FROM lips INTO (@DATA(lv_vgbel),
+*                                                  @DATA(lv_vgpos))
+*        WHERE vbeln = @wa_vbeln-vbeln
+*        AND   posnr = @wa_vbeln-posnr.
+*      IF NOT lv_vgbel IS INITIAL.
+*        SELECT SINGLE emlif INTO @DATA(lv_emlif)
+*          FROM ekpo
+*          WHERE ebeln = @lv_vgbel
+*          AND   ebelp = @lv_vgpos.
+*      ENDIF.
+*    ENDIF.
+**    i_xvbpa-KUNNR = 'A000000010'.
+*    i_xvbpa-kunnr =  lv_emlif.   "End delition SAGK9C0DIO
+        i_xvbpa-kunnr =  ls_yl_data-partner.
+        i_xvbpa-updkz = 'I'. "For Insert new row
+        APPEND i_xvbpa TO i_xvbpa.                                                                   "$smart: #110
+        CALL FUNCTION 'SD_PARTNER_UPDATE'
+          EXPORTING
+            f_vbeln  = v_shpnum
+            object   = 'VTPA'
+          TABLES
+            i_xvbadr = i_xvbadr
+            i_xvbpa  = i_xvbpa
+            i_yvbadr = i_yvbadr
+            i_yvbpa  = i_yvbpa.
+        IF sy-subrc = 0.
+          LOOP AT it_ship_cr INTO ls_ship_cr WHERE tknum IS INITIAL.
+            READ TABLE lt_return_shipment_create  INTO ls_return WITH KEY type = 'S'.                                "$smart: #110
+            IF sy-subrc EQ 0.
+              COMMIT WORK AND WAIT.
+              ls_ship_cr-tknum = v_shpnum.
+              MOVE-CORRESPONDING  ls_return TO ls_ship_cr.
+              MODIFY it_ship_cr FROM ls_ship_cr TRANSPORTING tknum type id number message message_v1 message_v2 message_v3 message_v4.
+            ENDIF.
+            CLEAR: lt_return_shipment_create, ls_return.
+          ENDLOOP.
+        ENDIF.
+        CLEAR ls_yl_data.
+        IF p_man IS INITIAL.
+          CONCATENATE 'Shipment successfully created:'
+                    v_shpnum
+                    INTO DATA(lv_msg)
+                    SEPARATED BY space.
+          MESSAGE lv_msg TYPE 'S'.
+        ENDIF.
+      ENDIF.
+  ENDLOOP.
+ENDFORM.
