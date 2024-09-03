@@ -1,3 +1,6 @@
+
+With group and max and/or distintic ,or directly with assoctiation setting the cardinality to max of 1
+_____________________________________________________
 @AbapCatalog.sqlViewName: '/PBK/V_MDM_BCAP2'
 @AbapCatalog.compiler.compareFilter: true
 @AbapCatalog.preserveKey: true
@@ -15,3 +18,98 @@ define view /PBK/CDS_MDM_BCAP_DISTINCT as select from /PBK/CDS_MDM_BCAP {
     max(lchg_date_time) as lchg_date_time,
     max(lchg_uname) as lchg_uname
 } group by vehicle_type, mjahr_comment, plant_id
+______________________________________________________
+@AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'CDS for /SAPYL/YO_HDR'
+@Metadata.ignorePropagatedAnnotations: true
+@ObjectModel.usageType:{
+    serviceQuality: #X,
+    sizeCategory: #S,
+    dataClass: #MIXED
+}
+@UI.presentationVariant: [{
+    sortOrder: [{
+        by: 'CompletionDate',
+        direction: #DESC
+    }],
+    visualizations: [{
+        type: #AS_LINEITEM
+    }]
+}]
+define view entity zyard_yo_hdr
+  as select distinct from /sapyl/yo_item as item
+  association [1..1] to /sapyl/yo_hdr   as header on item.parent_key = header.db_key
+  association [0..1] to /sapyl/yo_dtime as yoTime on yoTime.parent_key = item.parent_key
+                                                  and(
+                                                    yoTime.record_type = '03'
+                                                    or //Completion Inb.Yo
+                                                    yoTime.record_type = '04'
+                                                  ) //Completion Outb.Yo
+{
+      @UI.hidden
+  key header.db_key               as DbKeyHeader,
+      @UI.hidden
+      //key item.db_key                 as DbKeyItem,
+      item.db_key                 as DbKeyItem,
+      @UI.hidden
+      item.tu_sr_act_key          as TuSrActKey,
+      @UI.hidden
+      header.node_cat_key         as NodeCatKey,
+      @UI.lineItem: [{ position: 10, importance: #HIGH }]
+      max(header.yard_no)         as YardNo,
+      @UI.hidden //Object is a Link built with Custom Field at Fiori extension
+      max(header.yard_order_no)   as YardOrderNo,
+      @UI.hidden
+      header.yo_ref_key           as YoRefKey,
+      @UI.hidden
+      header.yo_dir_ref_key       as YoDirRefKey,
+      max(header.order_type)      as OrderType,
+      @UI.hidden
+      max(header.direction)       as Direction,
+      @UI.lineItem: [{ position: 20, importance: #HIGH }]
+      case when header.direction = 'O' then 'Outbound'
+           when header.direction = 'I' then 'Inbound'
+           when header.direction = 'P' then 'Internal'
+           else ''
+      end                         as DirectionTxt,
+      @UI.hidden
+      header.status_order         as StatusOrder,
+      @UI.lineItem: [{ position: 30, importance: #HIGH }]
+      @EndUserText.label: 'Status'
+      case when header.status_order = '01' then 'Planned'
+           when header.status_order = '02' then 'Active'
+           when header.status_order = '05' then 'Completed'
+           when header.status_order = '06' then 'Cancelled'
+           else ''
+      end                         as StatusOrderTxt,
+      max(header.carrier_bp)      as CarrierBp,
+      max(item.tu_number)         as TuNumber,
+      @UI.lineItem: [{ position: 40, importance: #HIGH}]
+      cast('' as abap.char(255) ) as ItemText,
+      @UI.lineItem: [{ position: 50, importance: #HIGH}]
+      @Semantics.dateTime: true
+      @EndUserText.label: 'Completion At'
+      case when header.status_order = '06' then max(yoTime.planned_end)
+      else max(yoTime.actual_end)
+      end                         as CompletionDate
+}
+where
+  header.doc_cat = 'YO' //Yard Order
+group by
+  header.db_key,
+  item.db_key,
+  item.tu_sr_act_key,
+  header.node_cat_key,
+  header.yard_no,
+  header.yard_order_no,
+  header.yo_ref_key,
+  header.yo_dir_ref_key,
+  header.order_type,
+  header.direction,
+  header.status_order,
+  header.carrier_bp,
+  item.tu_number,
+  yoTime.planned_end,
+  yoTime.actual_end
+
