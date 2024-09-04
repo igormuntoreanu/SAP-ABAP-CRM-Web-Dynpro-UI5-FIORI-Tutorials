@@ -1,0 +1,3 @@
+in oData make sure that in the GEt ENTITY set the following code exits
+
+es_response_context-inlinecount = lines( et_entityset ).
