@@ -30,6 +30,8 @@ Example inside of a Get Entity Set
         ct_data  = et_entityset.
   ENDIF.
 
+es_response_context-inlinecount = lines( et_entityset ).
+
       CALL METHOD /iwbep/cl_mgw_data_util=>paging
         EXPORTING
           is_paging = is_paging
