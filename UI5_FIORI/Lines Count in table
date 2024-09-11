@@ -1,3 +1,18 @@
 in oData make sure that in the GEt ENTITY set the following code exits
 
 es_response_context-inlinecount = lines( et_entityset ).
+
+_____________________-
+1. Row count can be added by annotation UI.HeaderInfo.TypeNamePlural.
+
+https://sapui5.hana.ondemand.com/#/topic/cce93e6f067a4133a8430c4f5d7b8fc7.html
+
+If your OData is based on CDS View, add below annotation before view definition.
+
+@UI: { 
+    headerInfo: { 
+        typeName: 'Sales Order Item', 
+        typeNamePlural: 'Sales Order Items'
+    }
+}
+define view xxx as select from xxx
