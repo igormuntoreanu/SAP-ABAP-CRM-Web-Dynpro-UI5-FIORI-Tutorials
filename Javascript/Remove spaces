@@ -1,0 +1,8 @@
+let noSpacesStr = str.replace(/\s+/g, ''); // Removes all spaces
+
+----------------
+
+//This method removes both leading and trailing whitespace from a string.
+let str = "   Hello, World!   ";
+let trimmedStr = str.trim();
+console.log(trimmedStr); // Output: "Hello, World!"
