@@ -1,0 +1,16 @@
+Do you want to write scripts but you don’t have administrator right on your corporate laptop? This is how I work around it in 2023.
+
+
+How to set up
+
+Download the User Installer version of VSCode through https://code.visualstudio.com/download. This is a portable version of VSCode that does not require administrator right to install
+Download the binary version of Node.js through https://nodejs.org/en/download. Extract the content out from the zip file to your computer.
+Create a folder in any path you want. This folder will later becomes the reference to your systemPATH variable
+Move node.exe from step 2 to the folder you created
+Move npm.cmd from step 2 to the folder you created
+Move npm_modules/npm from step 2 to the folder you created
+Open the “Run” dialog - Windows + R shortkey
+Types rundll32 sysdm.cpl,EditEnvironmentVariables into Run dialog and execute. This would opens Environment Variables dialog for you, even your organization limit your access to it
+Add the path of the folder you created in step 2 to the Path variable under current user account
+Verify the setup by entering node -v and npm -v into command prompt. If it returns the node version and npm version in the CLI, then it means we success. Before testing, ensure you close all CLI, including the command prompt in VSCode
+Now you could enjoy the wonder of node.js in your corporate laptop without administrator right!
