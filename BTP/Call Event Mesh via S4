@@ -1,0 +1,508 @@
+FUNCTION /bay0/o2c_3pl_nf_event_mesh .
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IS_NF_DATA) TYPE  /BAY0/O2C_3PL_NF
+*"     REFERENCE(IV_EVENT) TYPE  SWETYPECOU-EVENT DEFAULT 'COMPLETED'
+*"  EXPORTING
+*"     REFERENCE(EV_STATUS) TYPE  STATUS2_BR
+*"----------------------------------------------------------------------
+
+*-----------------------------------------------------------------------
+* Identification
+* Author        : EISFQ - Susmita Pardhi
+* Creation date : 21.04.2022
+* Owner         : SHRO - Angela Menzel
+* CRT           : 3097385
+* Basis Release : 755
+*-----------------------------------------------------------------------
+* Changes
+* Chg. date |  Developer | Owner | CRT | reference ID | Description
+
+*-----------------------------------------------------------------------
+* Description (short)
+* This function is implemented to trigger event mesh for 3PL integration.
+* Nota fiscal information will be sent to Proagrica with this interface
+*
+*-----------------------------------------------------------------------
+
+
+
+
+*-----------------------------------------------------------------------
+*--- Declarations
+*-----------------------------------------------------------------------
+* Data
+  DATA  ls_data TYPE ts_nf_data.
+
+* Constants
+  CONSTANTS: lc_type              TYPE /bay0/tda_case VALUE 'PROAGRICA_EVENTS_NF',
+             lc_appllog_object    TYPE balobj_d VALUE 'ZZO2C_3PL_TRIGGER',
+             lc_appllog_subobject TYPE balobj_d VALUE 'ZZO2C_3PL_NF_TRIGGER'.
+
+
+
+
+
+*-----------------------------------------------------------------------
+*--- Create Payload Data
+*-----------------------------------------------------------------------
+  MOVE-CORRESPONDING is_nf_data TO ls_data.
+  CHECK ls_data-nrnota IS NOT INITIAL.
+  DATA(lv_json_data) = /ui2/cl_json=>serialize(
+                                           data        = ls_data
+                                           compress    = abap_false
+                                           pretty_name = /ui2/cl_json=>pretty_mode-none ).
+
+
+
+*-----------------------------------------------------------------------
+*--- Timestamp Generation
+*-----------------------------------------------------------------------
+  GET TIME STAMP FIELD DATA(lv_timestamp).
+  DATA(lv_eventtime) = |{ lv_timestamp TIMESTAMP = ISO TIMEZONE = 'UTC' }| && 'Z'.
+
+
+
+*-----------------------------------------------------------------------
+*--- Generating a random 16 byte universal unique identifier UUID
+*-----------------------------------------------------------------------
+  TRY.
+      DATA(lv_eventid) = cl_system_uuid=>create_uuid_x16_static( ).
+    CATCH cx_uuid_error cx_dynamic_check ##NO_HANDLER.
+  ENDTRY.
+
+
+
+*-----------------------------------------------------------------------
+*--- Create payload JSON
+*-----------------------------------------------------------------------
+  DATA(lv_json) =
+                   '{ ' &&
+                   '"eventType":"' && iv_event && '", ' &&
+                   '"cloudEventVersion":"0.1", ' &&
+                   '"source":"https://S4HANAoD.1805.sap.com", ' &&
+                   '"eventID":"'   && lv_eventid   && '", ' &&
+                   '"eventTime":"' && lv_eventtime && '", ' &&
+                   '"schemaURL":"https://S4HANAOD.1805.sap.com/sap/opu/odata/IWXBE/BROWSER_SRV/", ' &&
+                   '"contentType":"application/json", ' &&
+                   '"data":' && lv_json_data &&
+                   ' }'
+                  .
+
+
+*-----------------------------------------------------------------------
+*--- Trigger Event Mesh
+*-----------------------------------------------------------------------
+  DATA(lv_appl_objkey) = CONV sweinstcou-objkey( |{ ls_data-nrnota ALPHA = OUT }| && lv_eventtime ).
+  CALL FUNCTION '/BAY0/TDA_EVENT_MESH'
+    EXPORTING
+      iv_type      = lc_type
+      iv_json      = lv_json
+      iv_object    = lc_appllog_object     "Appl. Log Object ID
+      iv_subobject = lc_appllog_subobject  "Appl. Log Subobject ID
+      iv_objkey    = lv_appl_objkey        "Appl log object Log Number
+    IMPORTING
+      ev_status    = ev_status.
+
+
+
+*-----------------------------------------------------------------------
+*--- Response handling
+*-----------------------------------------------------------------------
+  IF ev_status = 'E'.
+    TRY.
+        DATA(ls_nf_data) = CORRESPONDING /bay0/o2c_3pl_nf( ls_data ).
+        INSERT /bay0/o2c_3pl_nf FROM ls_nf_data.
+        IF sy-subrc EQ 0.
+          COMMIT WORK.
+        ENDIF.
+      CATCH cx_sy_open_sql_db cx_dynamic_check ##NO_HANDLER.
+    ENDTRY.
+  ENDIF.
+
+ENDFUNCTION.
+
+_______________________________________________________________________________________________________
+
+FUNCTION /bay0/tda_event_mesh.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(IV_TYPE) TYPE  /BAY0/TDA_CASE OPTIONAL
+*"     VALUE(IV_JSON) TYPE  STRING OPTIONAL
+*"     REFERENCE(IV_OBJKEY) TYPE  SWEINSTCOU-OBJKEY OPTIONAL
+*"     REFERENCE(IV_OBJECT) TYPE  BALOBJ_D OPTIONAL
+*"     VALUE(IV_VALUE) TYPE  IHTTPVAL DEFAULT '1'
+*"     VALUE(IV_SUBOBJECT) TYPE  BALSUBOBJ OPTIONAL
+*"     REFERENCE(IV_GET_MTHD) TYPE  FLAG OPTIONAL
+*"     REFERENCE(IV_URL) TYPE  STRING OPTIONAL
+*"     REFERENCE(IV_SIGNAPI) TYPE  FLAG OPTIONAL
+*"     REFERENCE(IV_SIGN_DATA) TYPE  STRING OPTIONAL
+*"  EXPORTING
+*"     REFERENCE(EV_STATUS) TYPE  STATUS2_BR
+*"     REFERENCE(ET_FIELDS) TYPE  TIHTTPNVP
+*"     REFERENCE(EV_RESPONSE) TYPE  STRING
+*"----------------------------------------------------------------------
+
+*&---------------------------------------------------------------------*
+*& Identification
+*& Author        : EISOI, Ashwath Shetty
+*& Creation date : 2022-06-07
+*& CRT           : 3082883
+*& Documentation : TDA
+*&---------------------------------------------------------------------*
+*& Description
+*& FM is used for below process:
+*& 1. trigger the data to BTP event / 3rd party tool
+*& 2. get the list of SIGN approver
+*&---------------------------------------------------------------------*
+
+  DATA: ls_message_log TYPE bapiret2,
+        lt_message     TYPE bapiret2_t.
+
+  DATA: lv_url    TYPE string,
+        lv_status TYPE char1.
+
+  CONSTANTS: lc_guid  TYPE char6 VALUE 'GUID',
+             lc_param TYPE string VALUE 'H'.
+
+  SELECT SINGLE *
+    FROM /bay0/tda_exturl                            "#EC CI_SEL_NESTED
+    INTO @DATA(ls_exturl)
+    WHERE use_case = @iv_type
+    AND   syst_id  = @sy-sysid.
+
+  CHECK sy-subrc EQ 0.
+
+  CLEAR: lt_message, ls_message_log.
+  ls_message_log-type   = 'E'.
+  ls_message_log-id     = '00'.
+  ls_message_log-number = '001'.
+
+* calling control block to send the request
+  IF iv_url IS NOT INITIAL.
+    lv_url = iv_url.
+  ELSE.
+    lv_url = ls_exturl-url.
+  ENDIF.
+
+  cl_http_client=>create_by_url(
+    EXPORTING
+      url                = lv_url
+      ssl_id             = 'ANONYM'
+    IMPORTING
+      client             = DATA(lo_http_client)
+    EXCEPTIONS
+      argument_not_found = 1
+      plugin_not_active  = 2
+      internal_error     = 3
+      OTHERS             = 4
+  ).
+  IF sy-subrc <> 0.
+    CLEAR ls_message_log-message.
+    lv_status = abap_true.
+
+    ls_message_log-message = |{ TEXT-t01 }| & | | & |{ ls_exturl-url }|.
+    APPEND ls_message_log TO lt_message.
+  ENDIF.
+
+  IF lo_http_client IS NOT INITIAL.
+    "Disabling the logon popup
+    lo_http_client->propertytype_logon_popup = if_http_client=>co_disabled.
+
+    "Disabling the request to new url in case of current url not found
+    lo_http_client->propertytype_redirect    = if_http_client=>co_disabled.
+
+    IF iv_get_mthd EQ abap_true.
+      DATA(lv_method) = if_http_request=>co_request_method_get.
+    ELSE.
+      lv_method = if_http_request=>co_request_method_post.
+    ENDIF.
+
+    " Raising a request for post calling set method
+    CALL METHOD lo_http_client->request->set_method
+      EXPORTING
+        method = lv_method.
+
+    " Creating profile to set the token for OAuth 2.0
+    TRY.
+        CALL METHOD cl_oauth2_client=>create
+          EXPORTING
+            i_profile        = ls_exturl-profile
+            i_configuration  = ls_exturl-config
+          RECEIVING
+            ro_oauth2_client = DATA(lo_oa2c_client).
+
+      CATCH cx_oa2c INTO DATA(lo_oa2c).
+        DATA(lv_text) = lo_oa2c->get_text( ).
+
+        CLEAR ls_message_log-message.
+        lv_status = abap_true.
+
+        ls_message_log-message = |{ TEXT-t02 }| & | | & |{ lv_text }|.
+        APPEND ls_message_log TO lt_message.
+    ENDTRY.
+
+    " setting the access token in the http client
+    IF lo_oa2c_client IS NOT INITIAL.
+      TRY.
+          CALL METHOD lo_oa2c_client->set_token
+            EXPORTING
+              io_http_client = lo_http_client "sending HTTP client instance as a parameter.
+              i_param_kind   = lc_param.
+
+        CATCH cx_oa2c INTO lo_oa2c.
+          TRY.
+              "   When you use grant-type "Client Credentials" in the profile the ABAP code has to be changed from
+              "   CALL METHOD lo_oa2c_client->execute_refresh_flow. to CALL METHOD lo_oa2c_client->execute_cc_flow.
+              CALL METHOD lo_oa2c_client->execute_cc_flow( ).
+            CATCH cx_oa2c INTO lo_oa2c.
+              lv_text                = lo_oa2c->get_text( ).
+
+              CLEAR ls_message_log-message.
+              lv_status = abap_true.
+              ls_message_log-message = |{ TEXT-t03 }| & | | & |{ lv_text }|.
+              APPEND ls_message_log TO lt_message.
+          ENDTRY.
+
+          TRY.
+              CALL METHOD lo_oa2c_client->set_token
+                EXPORTING
+                  io_http_client = lo_http_client
+                  i_param_kind   = lc_param.
+            CATCH cx_oa2c INTO lo_oa2c.
+              lv_text                = lo_oa2c->get_text( ).
+
+              CLEAR ls_message_log-message.
+              lv_status = abap_true.
+              ls_message_log-message = |{ TEXT-t04 }| & | | & |{ lv_text }|.
+              APPEND ls_message_log TO lt_message.
+          ENDTRY.
+      ENDTRY.
+    ENDIF.
+
+    lo_http_client->request->set_header_fields( fields = VALUE #( ( name = 'Content-Type' value = 'application/json' ) ) ).
+    lo_http_client->request->set_header_fields( fields = VALUE #( ( name = 'Content' value = 'application/json' ) ) ).
+    lo_http_client->request->set_header_fields( fields = VALUE #( ( name = 'x-qos' value = iv_value ) ) ).
+
+    "pass data for SIGN API to get the list of approver based on
+    "company code, process , amount and currency.
+    IF iv_signapi EQ abap_true.
+      SPLIT iv_sign_data AT '|' INTO DATA(lv_bukrs) DATA(lv_process) DATA(lv_amount) DATA(lv_curr).
+      lo_http_client->request->set_form_field( name = 'companyId'      value = lv_bukrs ).
+      lo_http_client->request->set_form_field( name = 'categoryId'     value = lv_process ).
+      lo_http_client->request->set_form_field( name = 'approvalAmount' value = lv_amount ).
+      lo_http_client->request->set_form_field( name = 'currency'       value = lv_curr ).
+    ENDIF.
+
+    " exporting the json data payload
+    lo_http_client->request->if_http_entity~set_cdata(  EXPORTING data =  iv_json ).
+    " enabling the accept cookies
+    lo_http_client->propertytype_accept_cookie = if_http_client=>co_enabled.
+
+    " Sending the data to HTTP client
+    CALL METHOD lo_http_client->send
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3
+        http_invalid_timeout       = 4
+        OTHERS                     = 5.
+    IF sy-subrc <> 0.
+      CLEAR ls_message_log-message.
+      lv_status = abap_true.
+      ls_message_log-message = |{ TEXT-t05 }| & | | & |{ sy-msgv1 }| & |{ sy-msgv2 }| & |{ sy-msgv3 }|.
+      APPEND ls_message_log TO lt_message.
+    ENDIF.
+
+    " Receiving the response
+    CALL METHOD lo_http_client->receive
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3
+        OTHERS                     = 4.
+    IF sy-subrc <> 0.
+      CLEAR ls_message_log-message.
+      lv_status = abap_true.
+      ls_message_log-message = |{ TEXT-t05 }| & | | & |{ sy-msgv1 }| & |{ sy-msgv2 }| & |{ sy-msgv3 }|.
+      APPEND ls_message_log TO lt_message.
+    ENDIF.
+
+    " getting the status code for the data
+    CALL METHOD lo_http_client->response->get_status
+      IMPORTING
+        code = DATA(lv_status_code).
+
+    IF lv_status_code <> 204 AND
+       lv_status_code <> 200.
+      " for the enterprise rest call the response for success is 204
+      CLEAR ls_message_log-message.
+      lv_status = abap_true.
+      ls_message_log-message = |{ TEXT-t06 }| & | | & |{ lv_status_code }|.
+      APPEND ls_message_log TO lt_message.
+    ELSE.
+      IF iv_get_mthd EQ abap_true. "return the response
+        CALL METHOD lo_http_client->response->get_header_fields
+          CHANGING
+            fields = et_fields.
+      ENDIF.
+    ENDIF.
+
+    " check the response
+    CALL METHOD lo_http_client->response->get_cdata
+      RECEIVING
+        data = DATA(lv_response).
+    IF lv_response IS NOT INITIAL.
+      ev_response = lv_response.
+      if lv_status = abap_true.   " only add payload to message in case of lv_status_code signaling not successful
+        CLEAR ls_message_log-message.
+*        lv_status = abap_true.
+        ls_message_log-message = lv_response.
+        APPEND ls_message_log TO lt_message.
+      endif.
+    ENDIF.
+
+    " close the HTTP connection
+    CALL METHOD lo_http_client->close
+      EXCEPTIONS
+        http_invalid_state = 1
+        OTHERS             = 2.
+    IF sy-subrc <> 0.
+      CLEAR ls_message_log-message.
+      lv_status = abap_true.
+      ls_message_log-message = |{ TEXT-t05 }| & | | & |{ sy-msgv1 }| & |{ sy-msgv2 }| & |{ sy-msgv3 }|.
+      APPEND ls_message_log TO lt_message.
+    ENDIF.
+  ENDIF.
+
+*  " START - Frank: add a logic that splits the message of type 00/001 with their message into the msgv1, msgv2, msgv3, msgv4 so that the application log can also show them
+*  LOOP AT lt_message ASSIGNING FIELD-SYMBOL(<l>)
+*  WHERE id = '00'AND number ='001' AND message <> ''.
+*
+*    CLEAR: sy-msgv1, sy-msgv2, sy-msgv3, sy-msgv4.
+*
+*    cl_message_helper=>set_msg_vars_for_clike( <l>-message ).
+*    <l>-message_v1 = sy-msgv1.
+*    <l>-message_v2 = sy-msgv2.
+*    <l>-message_v3 = sy-msgv3.
+*    <l>-message_v4 = sy-msgv4.
+*
+*  ENDLOOP.
+*  " END - Frank: add a logic that splits the message of type 00/001 with their message into the msgv1, msgv2, msgv3, msgv4 so that the application log can also show them
+
+  IF lv_status IS NOT INITIAL.
+
+    ev_status = 'E'.
+    "pass the message generated to create log for error
+    PERFORM create_log USING lt_message iv_objkey iv_object iv_subobject.
+
+  ELSE.
+
+    ev_status = 'S'.
+
+    CLEAR: ls_message_log, lt_message.
+    ls_message_log-type    = 'S'.
+    ls_message_log-id      = '00'.
+    ls_message_log-number  = '001'.
+    ls_message_log-message = |{ TEXT-t07 }| & | | & |{ iv_objkey }|.
+    APPEND ls_message_log TO lt_message.
+
+    "   pass the message generated to create log for success
+    PERFORM create_log USING lt_message iv_objkey iv_object iv_subobject.
+  ENDIF.
+
+ENDFUNCTION.                                             "#EC CI_VALPAR
+*&---------------------------------------------------------------------*
+*& Form create_log
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+FORM create_log USING pt_message_log TYPE bapiret2_t  "log table message
+                      pv_objkey TYPE sweinstcou-objkey
+                      pv_object TYPE balobj_d
+                      pv_subobject TYPE balsubobj.
+
+  DATA: ls_str_log    TYPE bal_s_log,
+        ls_str_balmsg TYPE bal_s_msg,
+        lv_log_handle TYPE balloghndl,
+        lv_msg_logged TYPE boolean.
+
+  CHECK pv_objkey IS NOT INITIAL.
+  ls_str_log-extnumber = pv_objkey. "object key
+  CONDENSE ls_str_log-extnumber.
+  ls_str_log-object    = pv_object.
+  ls_str_log-subobject = pv_subobject.
+
+  "Log create
+  CALL FUNCTION 'BAL_LOG_CREATE'
+    EXPORTING
+      i_s_log                 = ls_str_log
+    IMPORTING
+      e_log_handle            = lv_log_handle
+    EXCEPTIONS
+      log_header_inconsistent = 1
+      OTHERS                  = 2.
+
+  CHECK sy-subrc EQ 0.
+
+  " START - Frank: add a logic that splits the message of type 00/001 with their message into the msgv1, msgv2, msgv3, msgv4 so that the application log can also show them
+  LOOP AT pt_message_log ASSIGNING FIELD-SYMBOL(<l>)
+      WHERE id = '00' AND number ='001' AND message <> ''.
+    CLEAR: sy-msgv1, sy-msgv2, sy-msgv3, sy-msgv4.
+    cl_message_helper=>set_msg_vars_for_clike( <l>-message ).
+    <l>-message_v1 = sy-msgv1.
+    <l>-message_v2 = sy-msgv2.
+    <l>-message_v3 = sy-msgv3.
+    <l>-message_v4 = sy-msgv4.
+  ENDLOOP.
+  " END - Frank: add a logic that splits the message of type 00/001 with their message into the msgv1, msgv2, msgv3, msgv4 so that the application log can also show them
+
+  "add the message
+  LOOP AT pt_message_log INTO DATA(ls_message_log) ##NEEDED.
+*    MOVE-CORRESPONDING ls_message_log TO ls_str_balmsg ##NEEDED.
+    CASE ls_message_log-type.
+      WHEN 'E' OR 'A'.
+        ls_str_balmsg-probclass = 1.
+      WHEN OTHERS.
+        CLEAR ls_str_balmsg-probclass.
+    ENDCASE.
+
+    ls_str_balmsg-msgty = ls_message_log-type.
+    ls_str_balmsg-msgid = ls_message_log-id.
+    ls_str_balmsg-msgno = ls_message_log-number.
+    ls_str_balmsg-msgv1 = ls_message_log-message_v1.
+    ls_str_balmsg-msgv2 = ls_message_log-message_v2.
+    ls_str_balmsg-msgv3 = ls_message_log-message_v3.
+    ls_str_balmsg-msgv4 = ls_message_log-message_v4.
+
+    CALL FUNCTION 'BAL_LOG_MSG_ADD'
+      EXPORTING
+        i_log_handle     = lv_log_handle
+        i_s_msg          = ls_str_balmsg
+      IMPORTING
+        e_msg_was_logged = lv_msg_logged
+      EXCEPTIONS
+        log_not_found    = 1
+        msg_inconsistent = 2
+        log_is_full      = 3
+        OTHERS           = 4.
+
+    CLEAR: ls_message_log, ls_str_balmsg.
+  ENDLOOP.
+
+  "save the log to DB
+  CHECK sy-subrc EQ 0.
+  CALL FUNCTION 'BAL_DB_SAVE'
+    EXPORTING
+      i_save_all       = abap_true
+    EXCEPTIONS
+      log_not_found    = 1
+      save_not_allowed = 2
+      numbering_error  = 3
+      OTHERS           = 4.
+
+ENDFORM.
