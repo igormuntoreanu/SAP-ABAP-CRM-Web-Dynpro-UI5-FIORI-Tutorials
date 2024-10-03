@@ -1,0 +1,308 @@
+@EndUserText.label: 'Projection view for tax reporting'
+@AccessControl.authorizationCheck: #CHECK
+@Metadata.allowExtensions: true
+define root view entity /BAY0/PV_TAX_REPORTING
+  as projection on /BAY0/IV_TAX_REPORTING
+{
+  key         docnum,
+  key         itmnum,
+  key         taxtyp,
+  key         taxgrp,
+  key         rate,
+  key         base,
+  key         taxval,
+  key         cfop,
+              docdat,
+              pstdat,
+              bukrs,
+              branch,
+              werks,
+              docref,
+              vstel,
+              direct,
+              nfenum,
+              nfnum9,
+              series,
+              manual,
+              cancel,
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     nfkey          : abap.sstring( 45 ),
+              nftype,
+              parid,
+              name1,
+              regio,
+              matnr,
+              maktx,
+              matorg,
+              charg,
+              nfci,
+              // cfop,
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     cfotxt         : abap.char( 50 ),
+              nbm,
+              menge,
+              netpr,
+              meins,
+              utrib,
+              netdis,
+              nfnett,
+              // taxgrp,
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMSbase       : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMSrate       : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMSvalue      : abap.char(50),
+
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     PISbase        : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     PISrate        : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     PISvalue       : abap.char(50),
+
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     IPIbase        : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     IPIrate        : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     IPIvalue       : abap.char(50),
+
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     COFINSbase     : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     COFINSrate     : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     COFINSvalue    : abap.char(50),
+
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_DESTbase  : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_DESTrate  : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_DESTvalue : abap.char(50),
+
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_ORIGbase  : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_ORIGrate  : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_ORIGvalue : abap.char(50),
+
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_FCPbase   : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_FCPrate   : abap.char(50),
+              @ObjectModel.readOnly: true
+              @ObjectModel.virtualElement: true
+              @ObjectModel.virtualElementCalculatedBy: 'ABAP:/BAY0/CL_O2C_TAX_REPORT'
+  virtual     ICMS_FCPvalue  : abap.char(50),
+
+              // rate,
+              // base,
+              // taxval,
+              taxsit,
+              taxlw1,
+              taxsi2,
+              taxlw2,
+              taxlw4,
+              taxsi4,
+              taxlw5,
+              taxsi5,
+              waerk,
+              crenam,
+              chanam
+}
+________________________________________________________
+
+CLASS /bay0/cl_o2c_tax_report DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+
+    INTERFACES if_sadl_exit .
+    INTERFACES if_sadl_exit_calc_element_read .
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+
+
+CLASS /bay0/cl_o2c_tax_report IMPLEMENTATION.
+
+
+  METHOD if_sadl_exit_calc_element_read~calculate.
+*&---------------------------------------------------------------------*
+*& Identification
+*& Author        : EINWB, Rishabh Agarwal
+*& Creation date : 2022-01-31
+*& CRT           : 3093587
+*& Documentation : O2C
+*& Development ID: DAB031
+*&---------------------------------------------------------------------*
+*& Description
+*&---------------------------------------------------------------------*
+*& 1. Virtual element data fetch logic
+
+*&---------------------------------------------------------------------*
+    DATA: lt_original TYPE TABLE OF /bay0/pv_tax_reporting.
+
+    lt_original = CORRESPONDING #( it_original_data  ).
+
+    IF lt_original IS NOT INITIAL.
+
+* fetching NFKEY
+      SELECT docnum, regio, nfyear, nfmonth, stcd1, model, serie, nfnum9, docnum9, cdv, tpemis
+      FROM j_1bnfe_active
+      INTO TABLE @DATA(lt_nfkey)
+      FOR ALL ENTRIES IN @lt_original
+      WHERE docnum = @lt_original-docnum.
+      IF sy-subrc EQ 0.
+        SORT lt_nfkey BY docnum.
+      ENDIF.
+
+* fetching CFOP description
+      SELECT cfop, cfotxt FROM j_1bagnt
+      INTO TABLE @DATA(lt_descr)
+        FOR ALL ENTRIES IN @lt_original
+        WHERE spras = 'P'
+        AND   cfop  = @lt_original-cfop.
+      IF sy-subrc EQ 0.
+        SORT lt_descr BY cfop.
+      ENDIF.
+
+* Fetching tax type for tax group
+      SELECT  taxtyp, taxgrp
+      FROM j_1baj
+      INTO TABLE @DATA(lt_taxtype)
+      WHERE ( taxgrp EQ 'ICMS') OR ( taxgrp EQ 'PIS' ) OR ( taxgrp EQ 'IPI' ) OR ( taxgrp EQ 'COFI' ).
+
+      LOOP AT lt_original ASSIGNING FIELD-SYMBOL(<ls_original>).
+* Reading NFkey data
+        READ TABLE lt_nfkey INTO DATA(ls_nfkey) WITH KEY docnum = <ls_original>-docnum BINARY SEARCH.
+        CHECK  sy-subrc EQ 0.
+        <ls_original>-nfkey = |{ ls_nfkey-regio }| & |{ ls_nfkey-nfyear }| & |{ ls_nfkey-nfmonth }| &
+                              |{ ls_nfkey-stcd1 }| & |{ ls_nfkey-serie }| & |{ ls_nfkey-nfnum9 }| &
+                              |{ ls_nfkey-docnum9 }| & |{ ls_nfkey-tpemis }| & |{ ls_nfkey-cdv }|.
+
+        IF <ls_original>-taxgrp EQ 'ICMS'.
+          <ls_original>-icmsbase  =  <ls_original>-base.
+          <ls_original>-icmsrate  =  <ls_original>-rate.
+          <ls_original>-icmsvalue =  <ls_original>-taxval.
+
+        ELSEIF <ls_original>-taxgrp EQ 'IPI'.
+          <ls_original>-ipibase  =  <ls_original>-base.
+          <ls_original>-ipirate  =  <ls_original>-rate.
+          <ls_original>-ipivalue =  <ls_original>-taxval.
+
+        ELSEIF <ls_original>-taxgrp EQ 'PIS'.
+          <ls_original>-pisbase  =  <ls_original>-base.
+          <ls_original>-pisrate  =  <ls_original>-rate.
+          <ls_original>-pisvalue =  <ls_original>-taxval.
+
+        ELSEIF <ls_original>-taxgrp EQ 'COFI'.
+          <ls_original>-cofinsbase  =  <ls_original>-base.
+          <ls_original>-cofinsrate  =  <ls_original>-rate.
+          <ls_original>-cofinsvalue =  <ls_original>-taxval.
+
+*        ELSEIF <ls_original>-taxtyp EQ 'ICAP'.
+*        clear: <ls_original>-icmsbase, <ls_original>-icmsrate, <ls_original>-icmsvalue.
+*          <ls_original>-ICMS_DESTbase  =  <ls_original>-base.
+*          <ls_original>-ICMS_DESTrate  =  <ls_original>-rate.
+*          <ls_original>-ICMS_DESTvalue =  <ls_original>-taxval.
+        ENDIF.
+
+* Reading CFOP description
+        READ TABLE lt_descr INTO DATA(ls_descr) WITH KEY cfop = <ls_original>-cfop BINARY SEARCH.
+        CHECK sy-subrc EQ 0.
+        <ls_original>-cfotxt = ls_descr-cfotxt.
+      ENDLOOP.
+    ENDIF.
+
+    DATA(lt_temp) = lt_original[].
+    DELETE ADJACENT DUPLICATES FROM lt_temp COMPARING docnum itmnum.
+    LOOP AT lt_temp INTO DATA(ls_temp).
+
+      READ TABLE lt_original ASSIGNING FIELD-SYMBOL(<ls_temp>) WITH KEY docnum = ls_temp-docnum
+                                                                        itmnum = ls_temp-itmnum.
+      IF sy-subrc EQ 0.
+        LOOP AT lt_original INTO DATA(ls_orignal) WHERE itmnum = ls_temp-itmnum.
+
+          IF ls_orignal-taxgrp EQ 'ICMS'.
+            <ls_temp>-icmsbase  = ls_orignal-icmsbase.
+            <ls_temp>-icmsrate  = ls_orignal-icmsrate.
+            <ls_temp>-icmsvalue = ls_orignal-icmsvalue.
+
+          ELSEIF ls_orignal-taxgrp EQ 'IPI'.
+            <ls_temp>-ipibase  = ls_orignal-ipibase.
+            <ls_temp>-ipirate  = ls_orignal-ipirate.
+            <ls_temp>-ipivalue = ls_orignal-ipivalue.
+
+          ELSEIF ls_orignal-taxgrp EQ 'PIS'.
+            <ls_temp>-pisbase  = ls_orignal-pisbase.
+            <ls_temp>-pisrate  = ls_orignal-pisrate.
+            <ls_temp>-pisvalue = ls_orignal-pisvalue.
+
+          ELSEIF ls_orignal-taxgrp EQ 'COFI'.
+            <ls_temp>-cofinsbase  = ls_orignal-cofinsbase.
+            <ls_temp>-cofinsrate  = ls_orignal-cofinsrate.
+            <ls_temp>-cofinsvalue = ls_orignal-cofinsvalue.
+
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
+    ENDLOOP.
+
+    ct_calculated_data = CORRESPONDING #( lt_original ).
+  ENDMETHOD.
+
+  METHOD if_sadl_exit_calc_element_read~get_calculation_info.
+
+  ENDMETHOD.
+ENDCLASS.
