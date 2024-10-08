@@ -455,9 +455,22 @@ METHOD if_sadl_exit_calc_element_read~calculate.
 ENDMETHOD.
 
 
-  method IF_SADL_EXIT_CALC_ELEMENT_READ~GET_CALCULATION_INFO.
-*    BREAK-POINT.
-  endmethod.
+METHOD if_sadl_exit_calc_element_read~get_calculation_info.
+  "Mandatory read Fields go Here
+  DATA: lv_line TYPE string.
+  lv_line = 'DBKEYTU'. CONDENSE lv_line.
+  INSERT lv_line INTO TABLE et_requested_orig_elements. CLEAR lv_line.
+  lv_line = 'DBKEYHEADER'. CONDENSE lv_line.
+  INSERT lv_line INTO TABLE et_requested_orig_elements. CLEAR lv_line.
+  lv_line = 'YARDNO'. CONDENSE lv_line.
+  INSERT lv_line INTO TABLE et_requested_orig_elements. CLEAR lv_line.
+  lv_line = 'TUNUMEXT'. CONDENSE lv_line.
+  INSERT lv_line INTO TABLE et_requested_orig_elements. CLEAR lv_line.
+  lv_line = 'YONUMBER'. CONDENSE lv_line.
+  INSERT lv_line INTO TABLE et_requested_orig_elements. CLEAR lv_line.
+  lv_line = 'YRNUMBER'. CONDENSE lv_line.
+  INSERT lv_line INTO TABLE et_requested_orig_elements. CLEAR lv_line.
+ENDMETHOD.
 
 
 METHOD if_sadl_exit_filter_transform~map_atom.
@@ -465,55 +478,117 @@ METHOD if_sadl_exit_filter_transform~map_atom.
   DATA: lv_guid TYPE /sapyl/yard_tu-pmat.
   DATA(lo_condition_manager) = cl_sadl_cond_prov_factory_pub=>create_simple_cond_factory( ).
 
-  IF iv_element EQ 'FilterMaterial' OR iv_element EQ 'FilterProduct'.
+  CASE iv_element.
+    WHEN 'FilterMaterial' OR 'FilterProduct'.
 
-    IF iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'.
-      DATA(lo_filter) = lo_condition_manager->element( iv_name = 'PMAT' ).
+      IF iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'.
+        DATA(lo_filter) = lo_condition_manager->element( iv_name = 'PMAT' ).
 
-      CALL FUNCTION 'CONVERSION_EXIT_MDLPD_INPUT'
-        EXPORTING
-          input  = iv_value
-        IMPORTING
-          output = lv_guid.
-    ELSE.
-      lo_filter = lo_condition_manager->element( iv_name = iv_element ).
-    ENDIF.
+        CALL FUNCTION 'CONVERSION_EXIT_MDLPD_INPUT'
+          EXPORTING
+            input  = iv_value
+          IMPORTING
+            output = lv_guid.
+      ELSE.
+        lo_filter = lo_condition_manager->element( iv_name = iv_element ).
+      ENDIF.
 
-    CASE iv_operator.
-      WHEN if_sadl_exit_filter_transform~co_operator-equals.
-        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
-                                THEN lo_filter->equals( iv_value = lv_guid )
-                                ELSE lo_filter->equals( iv_value = iv_value ) ) .
-      WHEN if_sadl_exit_filter_transform~co_operator-less_than.
-        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
-                                THEN lo_filter->less_than( iv_value = lv_guid )
-                                ELSE lo_filter->less_than( iv_value = iv_value ) ) .
-      WHEN if_sadl_exit_filter_transform~co_operator-covers_pattern.
-        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct' ##TYPE
-                          THEN lo_filter->covers_pattern( iv_value = CONV #( lv_guid ) )
-                          ELSE lo_filter->covers_pattern( iv_value = iv_value ) ) .
-      WHEN if_sadl_exit_filter_transform~co_operator-is_null.
-        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
-                          THEN lo_filter->is_null( )
-                          ELSE lo_filter->is_null( ) ) .
-      WHEN if_sadl_exit_filter_transform~co_operator-greater_than.
-        ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
-                          THEN lo_filter->greater_than( iv_value = lv_guid )
-                          ELSE lo_filter->greater_than( iv_value = iv_value ) ) .
-      WHEN OTHERS.
-        RAISE EXCEPTION TYPE cx_sadl_exit_filter_not_supp.
-    ENDCASE.
+      CASE iv_operator.
+        WHEN if_sadl_exit_filter_transform~co_operator-equals.
+          ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                                  THEN lo_filter->equals( iv_value = lv_guid )
+                                  ELSE lo_filter->equals( iv_value = iv_value ) ) .
+        WHEN if_sadl_exit_filter_transform~co_operator-less_than.
+          ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                                  THEN lo_filter->less_than( iv_value = lv_guid )
+                                  ELSE lo_filter->less_than( iv_value = iv_value ) ) .
+        WHEN if_sadl_exit_filter_transform~co_operator-covers_pattern.
+          ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct' ##TYPE
+                            THEN lo_filter->covers_pattern( iv_value = CONV #( lv_guid ) )
+                            ELSE lo_filter->covers_pattern( iv_value = iv_value ) ) .
+        WHEN if_sadl_exit_filter_transform~co_operator-is_null.
+          ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                            THEN lo_filter->is_null( )
+                            ELSE lo_filter->is_null( ) ) .
+        WHEN if_sadl_exit_filter_transform~co_operator-greater_than.
+          ro_condition = COND #( WHEN iv_element = 'FilterMaterial' OR iv_element = 'FilterProduct'
+                            THEN lo_filter->greater_than( iv_value = lv_guid )
+                            ELSE lo_filter->greater_than( iv_value = iv_value ) ).
+        WHEN OTHERS.
+          RAISE EXCEPTION TYPE cx_sadl_exit_filter_not_supp.
+      ENDCASE.
+*EQUALS
+*NOT_EQUALS
+*LESS_THAN
+*GREATER_THAN
+*LESS_THAN_OR_EQUALS
+*GREATER_THAN_OR_EQUALS
+*IS_NULL
+*IS_NOT_NULL
+*COVERS_PATTERN
+*NOT_COVERS_PATTERN
+*BETWEEN
+*NOT_BETWEEN
+*    WHEN 'SCAC'.
+*      lo_filter = lo_condition_manager->element( iv_name = iv_element ).
+*
+*      CASE iv_operator.
+*        WHEN if_sadl_exit_filter_transform~co_operator-equals.
+*          ro_condition = lo_filter->equals( iv_value = iv_value ).
+*        WHEN if_sadl_exit_filter_transform~co_operator-less_than.
+*          ro_condition = lo_filter->less_than( iv_value = iv_value ).
+*        WHEN if_sadl_exit_filter_transform~co_operator-covers_pattern.
+*          ro_condition = lo_filter->covers_pattern( iv_value = iv_value ).
+*        WHEN if_sadl_exit_filter_transform~co_operator-is_null.
+*          ro_condition = lo_filter->is_null( ).
+*        WHEN if_sadl_exit_filter_transform~co_operator-greater_than.
+*          ro_condition = lo_filter->greater_than( iv_value = iv_value ).
+*        WHEN OTHERS.
+*          RAISE EXCEPTION TYPE cx_sadl_exit_filter_not_supp.
+*      ENDCASE.
+    WHEN OTHERS.
+      "Avoid Dump for Cast calculated CDS Columns
+      DATA(lo_true) = lo_condition_manager->true( ).
+      DATA(lo_false) = lo_condition_manager->false( ).
+*      BREAK-POINT.
+      READ TABLE zcl_zyard_fiori_tus_cd_dpc_ext=>it_filter_calc_cast_fields
+      ASSIGNING FIELD-SYMBOL(<fs_filter_calc>) WITH KEY property = iv_element.
+      IF sy-subrc = 0.
+        DATA(lv_tabix) = sy-tabix.
+        DATA(lv_operator) = VALUE #( <fs_filter_calc>-select_options[ 1 ]-option OPTIONAL ).
+        DATA(lv_sign) = VALUE #( <fs_filter_calc>-select_options[ 1 ]-sign OPTIONAL ).
+        IF lv_operator = 'NE' OR "not equals
+           lv_operator = 'NN' OR "is not null
+           lv_operator = 'NP' OR "not covers pattern
+           lv_sign     = 'E'. "exclude
 
-  ELSE.
-    "Avoid Dump for Cast calculated CDS Columns
-*    lo_filter = lo_condition_manager->element( iv_name = 'TuNumExt' ).
-    DATA(lo_true) = lo_condition_manager->true( ).
-    ro_condition = lo_true.
-*    ro_condition = lo_filter->covers_pattern( iv_value = '*' ).
-  ENDIF.
+          ro_condition = lo_false.
+        ELSE.
+          ro_condition = lo_true.
+        ENDIF.
+        IF lv_operator IS NOT INITIAL.
+          DELETE <fs_filter_calc>-select_options INDEX 1.
+        ENDIF.
+      ELSE.
+        "Try to read the stack. When we have 2 call at MAP_FILTER_ATOM means it is a negative
+        DATA: lt_abap_stack TYPE abap_callstack.
+
+        CALL FUNCTION 'SYSTEM_CALLSTACK'
+          EXPORTING
+            max_level = 0
+          IMPORTING
+            callstack = lt_abap_stack.
+
+        DELETE lt_abap_stack WHERE blockname <> 'MAP_FILTER_ATOM'.
+        IF lines( lt_abap_stack ) = 2.
+          ro_condition = lo_false.
+        ELSE.
+          ro_condition = lo_true.
+        ENDIF.
+      ENDIF.
+  ENDCASE.
 
 ENDMETHOD.
-
 
 METHOD if_sadl_exit_sort_transform~map_element.
 " Always with Uppercase
