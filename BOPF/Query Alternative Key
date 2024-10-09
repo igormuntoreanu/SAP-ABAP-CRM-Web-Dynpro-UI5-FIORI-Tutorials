@@ -1,6 +1,9 @@
 MO_YTU_SRV_MANAGER	Instance Attribute	Protected	Type Ref To	/BOBF/IF_TRA_SERVICE_MANAGER
 MO_TRA_MANAGER	Instance Attribute	Protected	Type Ref To	/BOBF/IF_TRA_TRANSACTION_MGR
 
+    mo_yt_srv_manager  = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = /sapyl/if_yard_task_c=>sc_bo_key ).
+    mo_ytu_srv_manager = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = /sapyl/if_yard_tu_c=>sc_bo_key ).
+    mo_tra_manager     = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
 ---
   METHOD get_tu_license_plate.
 *----------------------------------------------------------------------*
