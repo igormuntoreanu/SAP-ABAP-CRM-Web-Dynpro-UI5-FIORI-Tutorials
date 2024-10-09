@@ -1,0 +1,46 @@
+@78\QImporting@	IS_CTX	TYPE /BOBF/S_FRW_CTX_VAL	Context Information for Validations
+@78\QImporting@	IT_KEY	TYPE /BOBF/T_FRW_KEY	Key Table
+@78\QImporting@	IO_READ	TYPE REF TO /BOBF/IF_FRW_READ	Interface to Read Data
+@79\QExporting@	EO_MESSAGE	TYPE REF TO /BOBF/IF_FRW_MESSAGE	Interface of Message Object
+@79\QExporting@	ET_FAILED_KEY	TYPE /BOBF/T_FRW_KEY	Key Table
+@03\QException@	/BOBF/CX_FRW		BOPF Exception Class
+
+
+DATA: lt_price_data TYPE ztest_t_price_scale.
+
+eo_message = /bobf/cl_frw_factory=>get_message( ).
+
+io_read->retrieve(
+    EXPORTING
+    iv_node = is_ctx-node_key
+    it_key = it_key
+    iv_fill_data = abap_true
+    IMPORTING
+    et_data = lt_price_data ).
+LOOP AT lt_price_data REFERENCE INTO DATA(lr_price_data).
+  DATA(ld_error) = abap_false.
+  IF lr_price_data->min_quantity <= 0.
+    ld_error = abap_true.
+  ENDIF.
+  IF lr_price_data->discount < 0.
+    ld_error = abap_true.
+  ENDIF.
+  IF ld_error = abap_true.
+
+  APPEND VALUE #( key = lr_price_data->key ) TO et_failed_key.
+
+  eo_message->add_message(
+      EXPORTING
+      is_msg = VALUE #( msgty = 'E' msgid = 'ZTEST_MSG' msgno = '001'   )
+      iv_node = is_ctx-node_key
+      iv_key = lr_price_data->key  ).
+  ENDIF.
+
+"      /sapyl/cl_helper_base=>add_symsg2bobf(
+"        EXPORTING
+"          io_message    = eo_message
+"          iv_node       = is_ctx-node_key
+"          iv_key        = <ls_tu_root>-key
+"        CHANGING
+"          ct_failed_key = et_failed_key ).
+ENDLOOP.
