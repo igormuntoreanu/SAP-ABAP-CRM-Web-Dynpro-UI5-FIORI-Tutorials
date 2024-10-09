@@ -1,0 +1,124 @@
+@78\QImporting@	IS_ACTIVE_SR_ACT	TYPE /SAPYL/S_YARD_TU_SR_ACT_C	Shipping and Receiving Activity - #GENERATED#
+@79\QExporting@	ET_CREATED_YT_KEY	TYPE /BOBF/T_FRW_KEY	Key Table
+@79\QExporting@	ET_FAILED_KEY	TYPE /BOBF/T_FRW_KEY	Key Table
+@79\QExporting@	EV_REJECTED	TYPE BOOLE_D	Data element for domain BOOLE: TRUE (='X') and FALSE (=' ')
+@79\QExporting@	EO_MESSAGE	TYPE REF TO /BOBF/IF_FRW_MESSAGE	Interface of Message Object
+@03\QException@	/IWBEP/CX_MGW_BUSI_EXCEPTION		Business Exception
+@03\QException@	/IWBEP/CX_MGW_TECH_EXCEPTION		Technical Exception
+
+  METHOD create_activate_yard_task.
+*----------------------------------------------------------------------*
+*Title: Function 'CreateActivateYardTask'
+*----------------------------------------------------------------------*
+*Project Name  : SAP Yard Logistics
+*Project Phase : REL 4.0
+*Date created  : 2020-03-23 SAP Custom Development
+*----------------------------------------------------------------------*
+*Description: Method creates and activates yard task
+*----------------------------------------------------------------------*
+
+    DATA: lt_created_yt_key TYPE /bobf/t_frw_key,
+          lo_message type ref to /bobf/if_frw_message.
+
+    CLEAR: eo_message, et_failed_key, et_created_yt_key, ev_rejected.
+
+    eo_message = /bobf/cl_frw_factory=>get_message( ).
+    "Create new ADHOC YT
+    "Parameters are filled from request body and active S&R activity
+    mo_yt_srv_manager->do_action(
+      EXPORTING
+        iv_act_key    = /sapyl/if_yard_task_c=>sc_action-root-create_yt
+        is_parameters = NEW /sapyl/s_yt_header_item( yard_no                = is_request_body-yardno
+                                                     activity_type          = is_request_body-activitytype
+                                                     stor_binsrc            = is_active_sr_act-stor_bin
+                                                     stor_typesrc           = is_active_sr_act-stor_type
+                                                     stor_sectionsrc        = is_active_sr_act-stor_section
+                                                     stor_bindst            = is_request_body-storbindst
+                                                     stor_typedst           = is_request_body-stortypedst
+                                                     stor_sectiondst        = is_request_body-storsectiondst
+                                                     max_priority_indicator = is_request_body-maxpriorityindicator
+                                                     item                   = VALUE #( ( tu_no_ext = is_request_body-tunoext ) ) )
+      IMPORTING
+        eo_message    = lo_message
+        et_failed_key = et_failed_key
+        et_data       = lt_created_yt_key
+        eo_change     = DATA(lo_change) ).
+
+    IF lo_message IS BOUND.
+      eo_message->add( lo_message ).
+    ENDIF.
+
+    "If task is not created
+    IF et_failed_key IS NOT INITIAL AND lt_created_yt_key IS INITIAL.
+      "Raise exception with message
+      me->raise_exception_with_msg(
+        EXPORTING
+          io_message = lo_message ).
+
+    ENDIF.
+
+    "Get changes
+    DATA(lt_changes) = lo_change->get_changes( ).
+
+    READ TABLE lt_changes ASSIGNING FIELD-SYMBOL(<ls_change>)
+      WITH KEY bo_key = /sapyl/if_yard_task_c=>sc_bo_key.
+
+    IF sy-subrc EQ 0.
+      "Get YT root node changes
+      <ls_change>-change_object->get_changes(
+        EXPORTING
+          iv_change_mode  = /bobf/if_frw_c=>sc_modify_create
+          iv_node_key     = /sapyl/if_yard_task_c=>sc_node-root
+        IMPORTING
+          et_changed_key  = DATA(lt_changed_key) ).
+
+      IF lt_changed_key IS NOT INITIAL.
+        lt_created_yt_key = lt_changed_key.
+      ENDIF.
+
+    ENDIF.
+
+    "For the newly created task, statuses must be changed
+    me->do_yt_activation_workflow(
+      EXPORTING
+        it_yt_key     = lt_created_yt_key
+      IMPORTING
+        et_failed_key = et_failed_key
+        eo_message    = lo_message ).
+
+    "add messages
+    IF lo_message IS BOUND.
+      eo_message->add( lo_message ).
+    ENDIF.
+
+    "If failed key is not initial
+    IF et_failed_key IS NOT INITIAL.
+      "Raise business exception with message
+      me->raise_exception_with_msg(
+        EXPORTING
+          io_message = lo_message ).
+    ENDIF.
+
+    "Do Save
+    me->save(
+     IMPORTING
+       eo_message  = lo_message
+       ev_rejected = ev_rejected ).
+
+    IF lo_message IS BOUND.
+      eo_message->add( lo_message ).
+    ENDIF.
+
+    "If save is forbidden
+    IF ev_rejected EQ abap_true.
+      "Raise business exception
+      me->raise_exception_with_msg(
+        EXPORTING
+          io_message = lo_message ).
+    ENDIF.
+
+    et_created_yt_key = lt_created_yt_key.
+
+    /sapyl/cl_usage_collector=>get_mobile_yt_create_001( ).
+
+  ENDMETHOD.
