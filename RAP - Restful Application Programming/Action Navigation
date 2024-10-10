@@ -1,0 +1,2 @@
+  action ( features : instance ) setAsCorrected result [1] $self; //Will navigate to Object Page
+  action ( features : instance ) setAsManual result [0..*] $self; //Will remain in the LR Page
