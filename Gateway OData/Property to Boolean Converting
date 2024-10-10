@@ -1,0 +1,67 @@
+AT MPC_EXT:
+METHOD define.
+  DATA lo_ann_target TYPE REF TO /iwbep/if_mgw_vocan_ann_target. " Vocabulary Annotation Target
+  DATA lo_annotation TYPE REF TO /iwbep/if_mgw_vocan_annotation. " Vocabulary Annotation
+  DATA lo_simp_value TYPE REF TO /iwbep/if_mgw_vocan_simple_val. " Vocabulary Annotation Simple Value
+  DATA lo_reference  TYPE REF TO /iwbep/if_mgw_vocan_reference.  " Vocabulary Annotation
+
+  super->define( ).
+
+  lo_reference = vocab_anno_model->create_vocabulary_reference( iv_vocab_id      = '/IWBEP/VOC_COMMON'
+                                                                iv_vocab_version = '0001' ).
+  lo_reference->create_include( iv_namespace = 'com.sap.vocabularies.Common.v1'
+                                iv_alias     = 'Common' ).
+
+  " annotations for entity type "StorBinSHGen" and property "EmpStorBin"
+
+  lo_ann_target = vocab_anno_model->create_annotations_target( 'StorBinSHGen/EmpStorBin' ).
+  "/sapyl/DAS_YARD_OPERATOR_SRV/
+  lo_ann_target->set_namespace_qualifier( 'DAS_YARD_OPERATOR_SRV' ).    " change the namespace to the SRV namespace
+
+  " map text 001 to label
+  lo_annotation = lo_ann_target->create_annotation( iv_term = 'Common.Label' ).
+  lo_simp_value = lo_annotation->create_simple_value( ).
+  lo_simp_value->set_string_from_text_element( iv_text_element_symbol        = '001' " Occupied?
+                                               io_text_element_container_ref = me ).
+
+  " map text 002 to heading
+  lo_annotation = lo_ann_target->create_annotation( iv_term = 'Common.Heading' ).
+  lo_simp_value = lo_annotation->create_simple_value( ).
+  lo_simp_value->set_string_from_text_element( iv_text_element_symbol        = '001' " Occupied?
+                                               io_text_element_container_ref = me ).
+
+  " map text 003 to quickinfo
+  lo_annotation = lo_ann_target->create_annotation( iv_term = 'Common.QuickInfo' ).
+  lo_simp_value = lo_annotation->create_simple_value( ).
+  lo_simp_value->set_string_from_text_element( iv_text_element_symbol        = '001' " Occupied?
+                                               io_text_element_container_ref = me ).
+
+  TRY.
+      DATA(lo_entitytype) = model->get_entity_type( iv_entity_name = 'StorBinSHGen' ).
+      DATA(lo_empstorbin) = lo_entitytype->get_property( iv_property_name = 'EmpStorBin' ).
+      lo_empstorbin->set_type_edm_boolean( ).
+      lo_empstorbin->bind_data_element(
+        EXPORTING
+          iv_element_name     = 'FLAG'
+      ).
+
+      lo_empstorbin->set_creatable( abap_false ).
+      lo_empstorbin->set_updatable( abap_false ).
+      lo_empstorbin->set_sortable( abap_true ).
+      lo_empstorbin->set_nullable( abap_false ).
+      lo_empstorbin->set_filterable( abap_true ).
+      lo_empstorbin->/iwbep/if_mgw_odata_annotatabl~create_annotation( 'sap' )->add(
+            EXPORTING
+              iv_key      = 'unicode'
+              iv_value    = 'false' ).
+*      lo_empstorbin->set_maxlength( iv_max_length = 0 ).
+      lo_empstorbin->set_maxlength( iv_max_length = 1 ). "#EC NOTEXT
+      lo_empstorbin->set_nullable(
+          iv_nullable = abap_true
+      ).
+      lo_empstorbin->set_precison( iv_precision = 0 ).
+
+    CATCH /iwbep/cx_mgw_med_exception. " Meta data exception
+  ENDTRY.
+
+ENDMETHOD.
