@@ -1,0 +1,114 @@
+class ZCL_TU_D_ROOT definition
+  public
+  inheriting from /SAPYL/CL_TU_D_BASE
+  final
+  create public
+
+  global friends /SAPYL/CL_TU_D_BASE .
+
+public section.
+
+  methods DET_ROOT_BEFORE_SAVE
+    importing
+      !IS_CTX type /BOBF/S_FRW_CTX_DET
+      !IT_KEY type /BOBF/T_FRW_KEY
+      !IO_READ type ref to /BOBF/IF_FRW_READ
+      !IO_MODIFY type ref to /BOBF/IF_FRW_MODIFY
+    exporting
+      !EO_MESSAGE type ref to /BOBF/IF_FRW_MESSAGE
+      !ET_FAILED_KEY type /BOBF/T_FRW_KEY .
+
+  methods /BOBF/IF_FRW_DETERMINATION~EXECUTE
+    redefinition .
+protected section.
+
+  methods GET_DET_METHOD_NAME
+    redefinition .
+private section.
+ENDCLASS.
+
+
+
+CLASS ZCL_TU_D_ROOT IMPLEMENTATION.
+
+
+METHOD /bobf/if_frw_determination~execute.
+
+  DATA: lt_tus TYPE TABLE OF /sapyl/s_yard_tu_root_c,
+        lt_cf  TYPE /bobf/t_frw_name,
+        ls_cf  TYPE LINE OF /bobf/t_frw_name.
+
+  io_read->retrieve(
+    EXPORTING
+      iv_node                 = /sapyl/if_yard_tu_c=>sc_node-root " Node Name
+      it_key                  = it_key                            " Key Table
+    IMPORTING
+      eo_message              = eo_message             " Message Object
+      et_data                 = lt_tus                 " Data Return Structure
+      et_failed_key           = et_failed_key          " Key Table
+                       ).
+
+  IF lt_tus IS NOT INITIAL.
+    DATA(ls_tu) = lt_tus[ 1 ].
+    "Update NAME1 Field
+    SELECT SINGLE name1
+      FROM lfa1
+      INTO ls_tu-name1
+      WHERE lifnr = ls_tu-tdlnr.
+    IF sy-subrc = 0.
+      ls_tu-name1_t = ls_tu-name1.
+    ENDIF.
+    ls_tu-tdlnr_t = ls_tu-tdlnr.
+
+    ls_cf = 'TDLNR'.
+    APPEND ls_cf TO lt_cf.
+    ls_cf = 'NAME1'.
+    APPEND ls_cf TO lt_cf.
+    ls_cf = 'TDLNR_T'.
+    APPEND ls_cf TO lt_cf.
+    ls_cf = 'NAME1_T'.
+    APPEND ls_cf TO lt_cf.
+
+    "Update Trailer Status if necessary: if it is '' or created for the first time
+    IF ls_tu-trailer_status IS INITIAL AND ls_tu-tu_num_ext IS NOT INITIAL.
+      DATA(lo_upd_stat) = NEW zcl_update_trailer_status( ).
+      IF lo_upd_stat IS BOUND.
+        DATA(lv_status) = lo_upd_stat->get_trailer_status_for_tu( iv_tu_no_ext = ls_tu-tu_num_ext iv_tu_det = abap_true ).
+        IF lv_status IS NOT INITIAL.
+          ls_tu-trailer_status = lv_status.
+          ls_cf = 'TRAILER_STATUS'.
+          APPEND ls_cf TO lt_cf.
+          ls_cf = 'TRAILER_STATUS_T'.
+          APPEND ls_cf TO lt_cf.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+
+    TRY.
+        io_modify->update(
+          EXPORTING
+            iv_node           = /sapyl/if_yard_tu_c=>sc_node-root " Node Name
+            iv_key            = it_key[ 1 ]-key                   " Key
+            is_data           = REF #( ls_tu )                    " Data
+            it_changed_fields = lt_cf                             " List of Names (e.g. Fieldnames)
+        ).
+      CATCH /bobf/cx_frw_contrct_violation. " Caller violates a BOPF contract
+    ENDTRY.
+  ENDIF.
+
+ENDMETHOD.
+
+
+METHOD det_root_before_save.
+
+
+
+ENDMETHOD.
+
+
+METHOD get_det_method_name.
+
+  rv_method_name = 'DET_ROOT_BEFORE_SAVE'.
+
+ENDMETHOD.
+ENDCLASS.
