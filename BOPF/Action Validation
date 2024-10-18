@@ -1,0 +1,176 @@
+class ZYL_CL_TU_V_SR_ACT_A definition
+  public
+  inheriting from /BOBF/CL_LIB_V_SUPERCL_SIMPLE
+  final
+  create public .
+
+public section.
+
+  methods /BOBF/IF_FRW_VALIDATION~EXECUTE
+    redefinition .
+protected section.
+private section.
+ENDCLASS.
+
+
+
+CLASS ZYL_CL_TU_V_SR_ACT_A IMPLEMENTATION.
+
+
+METHOD /bobf/if_frw_validation~execute.
+
+  DATA lt_sr_act TYPE /sapyl/t_yard_tu_sr_act_c.
+  DATA lr_stor_types TYPE RANGE OF /scwm/lgtyp.
+  "Check if the user has access to jump this validation
+  SELECT pgmid, enh_id, lgnum, counter, key1
+    FROM zewm_venhval
+    INTO TABLE @DATA(lt_ven)
+    WHERE pgmid = 'ZYARDTU'
+      AND enh_id = 'COUT'.
+
+  eo_message = /bobf/cl_frw_factory=>get_message( ).
+
+  io_read->retrieve( EXPORTING iv_node       = is_ctx-node_key
+                               it_key        = it_key
+                     IMPORTING eo_message    = DATA(lo_message)
+                               et_data       = lt_sr_act
+                               et_failed_key = DATA(lt_failed_key) ).
+
+  CHECK lt_sr_act IS NOT  INITIAL.
+  DATA(ls_act) = VALUE #( lt_sr_act[ 1 ] OPTIONAL ).
+  DELETE lt_ven WHERE lgnum NE ls_act-yard_no.
+
+  CHECK lt_ven IS NOT INITIAL.
+  lr_stor_types = VALUE #( FOR i = 1 UNTIL i = lines( lt_ven ) + 1 ( sign = 'I' option = 'EQ' low = lt_ven[ i ]-key1 ) ).
+
+  "Error: Check-out from Stor.Type &1 not allowed. Move the Trailer first.
+  IF ls_act-stor_type IN lr_stor_types.
+    MESSAGE e042(ztu_finder_app) WITH ls_act-stor_type INTO DATA(lv_dummy).
+
+    /sapyl/cl_helper_base=>add_symsg2bobf(
+      EXPORTING
+        io_message    = eo_message
+        iv_node       = is_ctx-node_key
+        iv_key        = VALUE #( it_key[ 1 ]-key )
+        iv_attribute  = zyard_tu_c=>sc_node_attribute-sr_act-stor_type
+      CHANGING
+        ct_failed_key = et_failed_key ).
+  ENDIF.
+
+ENDMETHOD.
+ENDCLASS.
+
+
+__________________________________________________________________________________________________________________________
+
+class ZYL_CL_TU_V_ROOT_UPDATE definition
+  public
+  inheriting from /BOBF/CL_LIB_V_SUPERCL_SIMPLE
+  final
+  create public .
+
+public section.
+
+  methods /BOBF/IF_FRW_VALIDATION~EXECUTE
+    redefinition .
+protected section.
+private section.
+ENDCLASS.
+
+
+
+CLASS ZYL_CL_TU_V_ROOT_UPDATE IMPLEMENTATION.
+
+
+METHOD /bobf/if_frw_validation~execute.
+  DATA lt_failed_key    TYPE /bobf/t_frw_key.
+  DATA lt_tu_root       TYPE /sapyl/t_yard_tu_root_c.
+  DATA lo_message       TYPE REF TO /bobf/if_frw_message.
+  DATA lr_roles         TYPE RANGE OF zewm_de_venhkey1.
+  DATA ls_role          LIKE LINE OF lr_roles.
+
+  "Check if the user has access to jump this validation
+  SELECT pgmid, enh_id, counter, key1
+    FROM zewm_venhval
+    INTO TABLE @DATA(lt_ven)
+    WHERE pgmid = 'ZYARDTU'
+      AND enh_id = 'TRST'.
+  IF sy-subrc = 0.
+    ls_role-sign = 'I'.
+    ls_role-option = 'CP'.
+    LOOP AT lt_ven ASSIGNING FIELD-SYMBOL(<fs_ven>).
+      IF <fs_ven>-key1 IS NOT INITIAL.
+        ls_role-low = <fs_ven>-key1.
+        APPEND ls_role TO lr_roles. CLEAR ls_role-low.
+      ENDIF.
+    ENDLOOP.
+
+    IF lr_roles IS NOT INITIAL.
+      SELECT agr_name, uname, from_dat, to_dat
+        FROM agr_users
+        INTO TABLE @DATA(lt_jump_validation_roles)
+        WHERE agr_name IN @lr_roles
+          AND uname    EQ @sy-uname.
+    ENDIF.
+  ENDIF.
+
+  CHECK lt_jump_validation_roles IS INITIAL.
+
+  eo_message = /bobf/cl_frw_factory=>get_message( ).
+
+  io_read->retrieve( EXPORTING iv_node       = is_ctx-node_key
+                               it_key        = it_key
+                     IMPORTING eo_message    = lo_message
+                               et_data       = lt_tu_root
+                               et_failed_key = lt_failed_key ).
+
+  IF lt_tu_root IS NOT INITIAL.
+    SORT lt_tu_root BY tu_num.
+    " Get actual data from DB
+    SELECT db_key, tu_num, trailer_status
+      FROM /sapyl/yard_tu
+      INTO TABLE @DATA(lt_tu_db)
+      FOR ALL ENTRIES IN @it_key
+      WHERE db_key = @it_key-key.
+    IF sy-subrc = 0.
+      SORT lt_tu_db BY db_key.
+      LOOP AT it_key ASSIGNING FIELD-SYMBOL(<fs_key>).
+        READ TABLE lt_tu_db ASSIGNING FIELD-SYMBOL(<fs_tu_db>) WITH KEY db_key = <fs_key>-key BINARY SEARCH.
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+
+        READ TABLE lt_tu_root ASSIGNING FIELD-SYMBOL(<fs_tu_root>) WITH KEY tu_num = <fs_tu_db>-tu_num BINARY SEARCH.
+        IF sy-subrc <> 0.
+          CONTINUE.
+        ENDIF.
+
+        IF <fs_tu_db>-trailer_status IS NOT INITIAL."When creating, does not validate it
+
+          IF <fs_tu_root>-trailer_status <> <fs_tu_db>-trailer_status AND (
+             <fs_tu_root>-trailer_status <> 'RETURNS'
+             AND <fs_tu_root>-trailer_status <> 'EXPORT'
+             AND <fs_tu_root>-trailer_status <> 'OUTBOUND'
+             AND <fs_tu_root>-trailer_status <> 'PRELOAD' ).
+            " Raise error because as per defnition the user can only set the 4 status mentioned.
+            " Every other status must be determined through the TU determination
+            " Not possible to set status &1. The status is automatically calculated
+            MESSAGE e040(ztu_finder_app) WITH <fs_tu_root>-trailer_status INTO DATA(lv_dummy).
+
+            /sapyl/cl_helper_base=>add_symsg2bobf(
+              EXPORTING
+                io_message    = eo_message
+                iv_node       = is_ctx-node_key
+                iv_key        = <fs_key>-key
+                iv_attribute  = zyard_tu_c=>sc_node_attribute-root-trailer_status
+              CHANGING
+                ct_failed_key = et_failed_key ).
+
+          ENDIF.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+  ENDIF.
+ENDMETHOD.
+ENDCLASS.
+
