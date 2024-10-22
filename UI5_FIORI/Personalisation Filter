@@ -1,0 +1,112 @@
+onInitSmartFilterBarExtension: function (oEvent) {
+            var oSmartFilterBar = oEvent.getSource();
+            this._adjustFilterValues();
+            this._getPersonalizationAndFilter(); ///////////////////////////////// GET Personalisation
+            oSmartFilterBar.attachAfterVariantLoad(function (oEvent) {
+                let sVariant = oEvent.oSource.getCurrentVariantId();
+                this._adjustFilterValues(sVariant);
+            }.bind(this));
+        },
+
+onResourceChanged: function (oEvent) {
+            var handlingResource = oEvent.getParameter("selectedItem").getKey();
+            var oLocalModel = this.getView().getModel("localModel");
+            if (oLocalModel) {
+                var oData = oLocalModel.getData();
+                oData.HandlingResource = handlingResource;
+                oLocalModel.setData(oData);
+                this._setPersonalization(oData.YardNo, oData.HandlingResource); ///////////////////////////////// SET Personalisation
+            }
+        },
+
+
+_adjustFilterValues: function (sVariant) {
+            var oResource = this.getView().byId("Resource");
+            var oYard = this.getView().byId("YardNo");
+            if (oYard.getSelectedKey()) {
+                oResource.setEnabled(true);
+            } else {
+                oResource.setEnabled(false);
+            }
+            var oData = this.getView().getModel("localModel").getData();
+            oData.YardNo = oYard.getSelectedKey();
+            oData.HandlingResource = oResource.getSelectedKey();
+            this.getView().getModel("localModel").setData(oData);
+
+            if (oResource) {
+                var oResourceBinding = oResource.getBinding("items");
+                oResourceBinding.filter(new Filter("YardNo", FilterOperator.EQ, oData.YardNo));
+            }
+            //If no Variant was picken then set the Data from the Personalisation
+            //if (!sVariant && arguments.length > 0) {
+            if (oData.YardNo && oData.HandlingResource) {
+                this._setPersonalization(oData.YardNo, oData.HandlingResource); ///////////////////////////////// SET Personalisation 
+            }
+            //}
+        },
+
+        _getPersonalizationAndFilter: function () {
+            if (!this.oPersonalizer) {
+                var oPersId = {
+                    container: "TasksCustomization",
+                    item: "settings"
+                };
+
+                try {
+                    this.oPersonalizer = sap.ushell.Container.getService("Personalization").getPersonalizer(
+                        oPersId);
+                    this.oPersonalizer.getPersData().done(
+                        this._retrievePersonalizedData.bind(this)).fail();
+                } catch (oExc) {
+                    jQuery.sap.log.error("Fetching failed");
+                }
+            }
+        },
+
+        _retrievePersonalizedData: function (data) {
+            if (data && data.yard) {
+                this.Param = data;
+                var oLocalModel = this.getView().getModel("localModel");
+                if (oLocalModel) {
+                    var oData = oLocalModel.getData();
+                    oData.YardNo = data.yard;
+                    oData.HandlingResource = data.resource;
+                    oLocalModel.setData(oData);
+                    if (oData.YardNo) {
+                        var oComboBox = this.getView().byId("YardNo");
+                        oComboBox.setSelectedKey(
+                            oData.YardNo
+                        );
+                    }
+                    if (oData.HandlingResource) {
+                        oComboBox = this.getView().byId("Resource");
+                        oComboBox.setEnabled(true);
+                        oComboBox.setSelectedKey(
+                            oData.HandlingResource
+                        );
+                        var oGo = sap.ui.getCore().byId("yardqueue::sap.suite.ui.generic.template.ListReport.view.ListReport::YardTaskSet--listReportFilter-btnGo");
+                        oGo.firePress();
+                    }
+
+                }
+                // this._reloadTasksList();
+                //this.oPersonalizationLoadFinishedDeferred.resolve();
+            }
+            /*  else {
+                 this.handleSettingsPress();
+             } */
+        },
+
+        _setPersonalization: function (sYard, sResource) {
+            const Param = {
+                yard: sYard,
+                resource: sResource,
+                timeout: 60000
+            }
+            this.Param = Param;
+            this.oPersonalizer.setPersData(this.Param).done(function () {
+
+            }).fail(function () {
+                jQuery.sap.log.error("Writing personalization data failed.");
+            });
+        }
