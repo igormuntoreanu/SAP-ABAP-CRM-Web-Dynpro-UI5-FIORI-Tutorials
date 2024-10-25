@@ -1,0 +1,26 @@
+CSS file:
+.uppercaseInput input {
+    text-transform: uppercase !important;
+}
+
+.uppercaseTextArea textarea  {
+    text-transform: uppercase !important;
+}
+______________________________________________________________-
+View:
+<Label text="Pack Mat" labelFor="packMatInput"/>
+                <Input id="packMatInput" maxLength="40" showValueHelp="true" showSuggestion="true" valueHelpRequest=".onPackMatVH" suggestionItems="{/PackMatSHSet}" class="uppercaseInput">
+                    <suggestionItems>
+                        <core:Item text="{PackMat}" />
+                    </suggestionItems>
+                </Input>
+
+                <Label text="Comment" labelFor="commentInput"/>
+		        <TextArea id="commentInput" maxLength="150" width="100%" class="uppercaseTextArea"/>
+
+______________________________________________________________-
+via JS:
+let usefulConfirmationText = this.getView().byId("yardtu::sap.suite.ui.generic.template.ObjectPage.view.Details::ZYARD_FIORI_TUS_CDS--com.sap.vocabularies.UI.v1.FieldGroup::TUDETAILS::GeneralMessage::Field-text");
+                    if (usefulConfirmationText && usefulConfirmationText.getText()) {
+                        usefulConfirmationText.addStyleClass("uppercaseTextArea");
+                    }
