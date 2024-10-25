@@ -1,0 +1,112 @@
+Make sure Default Layout Type If External Navigation
+ of Object page is empty at the PAge map 
+________________________________________________
+sap.ui.define([
+    "sap/ui/generic/app/navigation/service/NavigationHandler",
+    "sap/ui/generic/app/navigation/service/NavType",
+    "sap/ui/model/Filter",
+    "sap/ui/model/FilterOperator",
+    "sap/ui/comp/smartfilterbar/SmartFilterBar",
+    "sap/m/ComboBox",
+    "sap/ui/model/json/JSONModel",
+    "sap/ui/core/Fragment",
+    "sap/m/MessageBox",
+    "sap/ui/core/BusyIndicator"
+], function (NavigationHandler, NavType, Filter, FilterOperator, SmartFilterBar, ComboBox, JSONModel, Fragment, MessageBox, BusyIndicator) {
+    'use strict';
+
+________________________________________________
+
+onInit:
+// create an instance of the navigation handler
+            this.oNavigationHandler = new NavigationHandler(this.getOwnerComponent());
+
+            // on back navigation, the previous app state is returned in a Promise
+            this.oNavigationHandler
+                .parseNavigation()
+                .done(this.onNavigationDone.bind(this));
+__________________________________________
+
+onCreateTuDialog: function (oEvent) {
+            // Get values from the inputs
+            var that = this;
+            var oModel = this.getOwnerComponent().getModel();
+            var bNavigate = this.byId("checkInMoveTrailerCheckBox").getSelected();
+            var sYardNo = this.byId("yardNoInput").getValue();
+            // Call the OData function import
+            oModel.callFunction("/CreateEmptyTu", {
+                method: "POST",
+                //data: data,
+                urlParameters: {
+                    YardNo: sYardNo,
+                    Tu: this.byId("tuInput").getValue(),
+                    Scac: this.byId("scacInput").getValue(),
+                    TuType: this.byId("tuTypeInput").getValue(),
+                    MeansOfTransport: this.byId("meansOfTransportInput").getValue(),
+                    PackMat: this.byId("packMatInput").getValue(),
+                    Comment: this.byId("commentInput").getValue(),
+                    DbKeyHeader: '00000000-0000-0000-0000-000000000000',
+                    CheckInNavigate: bNavigate
+                },
+                success: function (oData) {
+                    this._oDialogCreateTu.close();
+                    let sTu = oData.Tu + "-" + oData.Scac;
+                    var sTuNoSpaces = sTu.replace(/\s+/g, ''); // Removes all spaces
+                    sTuNoSpaces = sTuNoSpaces.toUpperCase();
+                    let sMsg = "Trailer " + sTuNoSpaces + " successfully created";
+
+                    MessageBox.success(sMsg);
+
+                    if (bNavigate) { //Navigate to Ad-hoc
+
+                        const oFilters = [new sap.ui.model.Filter("Pgmid", sap.ui.model.FilterOperator.EQ, "ZYARD_TU"),
+                        new sap.ui.model.Filter("EnhId", sap.ui.model.FilterOperator.EQ, "LGTY"),
+                        new sap.ui.model.Filter("Lgnum", sap.ui.model.FilterOperator.EQ, sYardNo)
+                        ];
+
+                        oModel.read("/EnhancementValuesSet", {
+                            filters: oFilters,
+                            success: function (oData, oResponse) {
+                                var vNavigationParameters = {
+                                    "YardTaskActivityType": oData.results[0].Key2,
+                                    "YardNo": sYardNo,
+                                    "TuNumExt": sTuNoSpaces
+                                };
+                                that.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+                            },
+                            error: function (oError) {
+                                var vNavigationParameters = {
+                                    "YardTaskActivityType": "MV01",
+                                    "YardNo": sYardNo,
+                                    "TuNumExt": sTuNoSpaces
+                                };
+                                that.oNavigationHandler.navigate("YardTask", "adhocext", vNavigationParameters, {});
+                            }
+                        })
+
+
+                    } else {
+                        //Navigate to Object Page
+                        var vNavigationParameters = {
+                            "DbKeyHeader": oData.DbKeyHeader
+                        };
+                        that.oNavigationHandler.navigate("ZYL_TU_MANAGER", "display", vNavigationParameters, {});
+                    }
+                }.bind(this),
+                error: function (oError) {
+                    // Handle any errors
+                    var aErrors = JSON.parse(oError["responseText"]).error.innererror.errordetails;
+                    var sErrorMsg = "";
+                    if (aErrors) {
+                        aErrors.forEach(Error => {
+                            if (sErrorMsg) {
+                                sErrorMsg = sErrorMsg + ' ; ' + Error.message;
+                            } else {
+                                sErrorMsg = Error.message;
+                            }
+                        });
+                    }
+                    MessageBox.error(sErrorMsg);
+                }
+            });
+        },
