@@ -13,6 +13,7 @@
 define view entity ZYL_I_ALERT_STATUS
   as select from dd07t
 {
+      @ObjectModel.text.element: [ 'Text' ] // If you want dropdown with keys, comment this line
   key domvalue_l as Value,
       @Semantics.text: true
       ddtext     as Text
@@ -20,7 +21,9 @@ define view entity ZYL_I_ALERT_STATUS
 where
       domname    = 'ZYL_ALERT_STATUS_D'
   and ddlanguage = $session.system_language
-_______________________________
+____________________________________________________________________________________
+in your MetadataExtension or Consumption View, do:
+
  @UI.selectionField: [{ position: 30 }]
   @UI.lineItem: [{ position: 30 }]
   @UI.fieldGroup: [{ qualifier: 'ALERTDETAILS', position: 40 }]
