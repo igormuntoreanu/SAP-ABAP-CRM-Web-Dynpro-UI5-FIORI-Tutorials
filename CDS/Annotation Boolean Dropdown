@@ -1,0 +1,3 @@
+Make Sure that the Data Element is created as FLAG or BOOLE_D.
+@Consumption.filter: { selectionType: #SINGLE, multipleSelections: false }
+  Preflg;
