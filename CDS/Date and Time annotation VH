@@ -1,0 +1,5 @@
+Annotation for value help:
+@Consumption.filter: { selectionType: #INTERVAL, multipleSelections: false }
+
+
+This will create a Time Picker for Time or a Calendar Date Picker for Date
