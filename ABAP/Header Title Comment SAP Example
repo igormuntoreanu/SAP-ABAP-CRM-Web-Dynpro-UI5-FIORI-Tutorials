@@ -1,0 +1,23 @@
+*----------------------------------------------------------------------*
+* Title: Exit to modify data
+*----------------------------------------------------------------------*
+* Project Name  : SAP Yard Logistics
+* Project Phase : REL 1.0
+* Date created  : 2015-07-16 SAP Custom Development
+*----------------------------------------------------------------------*
+* Description:
+*   Exit to modify data.
+*   1. Text collection is a delegated node data where
+*      FBI does not support property handling of such a node, so do it
+*      manually. If Yard Order/Request in create/edit mode and this object
+*      isn't active/released then text collection must be allowed for
+*      maintenance.
+*   2. It shall not be possible to change an outbound YO item if
+*      open tasks with status "Planned", "Active" or "In Process" exist.
+*      Note: TU number and loading scheme attributes are still available for input
+*   3. check if TU master data properties can be changed:
+*     3.1 The TU doesn’t have any SR activities, in other words the
+*         TU has never been checked-in yet;
+*     3.2 The TU has only one reference to a yard document;
+*         it might be either a yard request or a yard order.
+*----------------------------------------------------------------------*
