@@ -1,0 +1,4 @@
+The code sets the status to value ‘B’. However, the value shown is Booked as the field has value help attached and the annotation @UI.textArrangement: #TEXT_ONLY is used in the metadata extension, 
+and @ObjectModel.text.element: ['TravelStatusText'] in the projection CDS root entity.
+
+For this to work, it is important to have the value B added to the help table.
