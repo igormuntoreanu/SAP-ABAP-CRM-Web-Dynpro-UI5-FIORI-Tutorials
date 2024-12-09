@@ -1,0 +1,493 @@
+*&---------------------------------------------------------------------*
+*& Report  /BAY0/ICBR_DEF_TAB_UPL                                *
+*----------------------------------------------------------------------*
+* Identification
+* Author        : Igor Muntoreanu - EARZP
+* Creation date : 09.12.2024
+* Owner         : Igor Muntoreanu - EARZP
+* Basis Release : 4.7
+*-----------------------------------------------------------------------
+* Description   : SM30 Tables Upload
+*----------------------------------------------------------------------*
+* Changes                                                              *
+* Vers. Date       Author  Request           Description               *
+* V001             EARZP   XXXX000000        created                   *
+*----------------------------------------------------------------------*
+REPORT /bay0/o2c_def_tab_upl MESSAGE-ID /bay0/o2c_def_msg.
+
+TYPE-POOLS: vrm.
+
+* Global Internal Tables.
+DATA: gt_icdef_agr TYPE TABLE OF /bay0/o2c_defagr,
+      gt_icdef_app TYPE TABLE OF /bay0/o2c_defapp,
+      gt_icdef_aum TYPE TABLE OF /bay0/o2c_defaum,
+      gt_icdef_cul TYPE TABLE OF /bay0/o2c_defcul,
+      gt_icdef_mat TYPE TABLE OF /bay0/o2c_defmat,
+      gt_icdef_plg TYPE TABLE OF /bay0/o2c_defplg,
+      gt_icdef_prp TYPE TABLE OF /bay0/o2c_defprp.
+
+* Global Work Areas.
+DATA: gs_icdef_agr TYPE /bay0/o2c_defagr,
+      gs_icdef_app TYPE /bay0/o2c_defapp,
+      gs_icdef_aum TYPE /bay0/o2c_defaum,
+      gs_icdef_cul TYPE /bay0/o2c_defcul,
+      gs_icdef_mat TYPE /bay0/o2c_defmat,
+      gs_icdef_plg TYPE /bay0/o2c_defplg,
+      gs_icdef_prp TYPE /bay0/o2c_defprp.
+
+* Global Variables.
+DATA: gv_question(150) TYPE c,
+      gv_answer(1)     TYPE c,
+      gv_index         TYPE sy-tabix.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-b01. "#EC CI_USE_WANTED
+  PARAMETERS: p_table TYPE tabname16 AS LISTBOX OBLIGATORY VISIBLE LENGTH 36. "#EC CI_USE_WANTED
+  PARAMETERS: p_file TYPE rlgrap-filename OBLIGATORY.   "Flie path."#EC CI_USE_WANTED
+SELECTION-SCREEN END OF BLOCK b1.                    "#EC CI_USE_WANTED
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+* Choose the file to be Uploaded.
+  PERFORM choose_file.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_table.
+*  Fill p_table LISTBOX parameter.
+  PERFORM fill_table_listbox.
+
+START-OF-SELECTION.
+
+* Clear varibles internal tables and structures.
+  PERFORM clear_variables.
+
+  CONCATENATE TEXT-p01 "Are you sure you want update the table
+              p_table
+              TEXT-p02 " with the selected file?'
+              INTO gv_question SEPARATED BY space.
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+      text_question         = gv_question
+      text_button_1         = TEXT-p03 "'Yes'
+      icon_button_1         = 'ICON_OKAY'
+      text_button_2         = TEXT-p04 "'No'
+      icon_button_2         = 'ICON_CANCEL'
+      default_button        = '2'
+      display_cancel_button = ''
+    IMPORTING
+      answer                = gv_answer.
+
+  IF gv_answer <> '1'.
+*   Process canceld by user.
+    MESSAGE s000 WITH TEXT-e03 DISPLAY LIKE 'E'.     "#EC CI_USE_WANTED
+    LEAVE LIST-PROCESSING.                           "#EC CI_USE_WANTED
+  ENDIF.
+
+* Read excel file.
+  PERFORM read_file.
+
+*&---------------------------------------------------------------------*
+*&      Form  CHOOSE_FILE
+*&---------------------------------------------------------------------*
+*       Choose the file to be Uploaded.
+*----------------------------------------------------------------------*
+FORM choose_file .
+
+  DATA: lt_arquivo       TYPE filetable.
+
+  DATA: lv_subrc        TYPE sy-subrc,
+        lv_window_title TYPE string.
+
+  CONSTANTS:
+        lc_filtro_arquivo   TYPE string
+          VALUE 'Arquivo Excel (*.xls, *xlsx)|*.XLS;*.XLSX'.
+
+  lv_window_title = TEXT-d01."Select a file.
+
+
+  CALL METHOD cl_gui_frontend_services=>file_open_dialog
+    EXPORTING
+      window_title            = lv_window_title
+      file_filter             = lc_filtro_arquivo
+      multiselection          = space
+    CHANGING
+      file_table              = lt_arquivo
+      rc                      = lv_subrc
+    EXCEPTIONS
+      file_open_dialog_failed = 1
+      cntl_error              = 2
+      error_no_gui            = 3
+      not_supported_by_gui    = 4
+      OTHERS                  = 5.
+
+  IF sy-subrc IS NOT INITIAL.
+    MESSAGE s000 WITH TEXT-e01 DISPLAY LIKE 'E'.     "#EC CI_USE_WANTED
+    "File open failed.
+    LEAVE LIST-PROCESSING.                           "#EC CI_USE_WANTED
+  ELSE.
+    READ TABLE lt_arquivo INTO p_file INDEX 1.
+  ENDIF.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  FILL_TABLE_LISTBOX
+*&---------------------------------------------------------------------*
+*       Fill p_table LISTBOX parameter.
+*----------------------------------------------------------------------*
+FORM fill_table_listbox .
+  DATA: lt_vrm_values  TYPE vrm_values .
+  DATA: ls_vrm_values LIKE LINE OF lt_vrm_values.
+
+  CLEAR: ls_vrm_values.
+  ls_vrm_values-text = ls_vrm_values-key = 'X'.
+
+  ls_vrm_values-text = TEXT-t01." - Agronomist
+  ls_vrm_values-key  = '/BAY0/O2C_DEFAGR'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t02." - Aplication Type
+  ls_vrm_values-key  = '/BAY0/O2C_DEFAPP'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t03." - Unit of Measure Area
+  ls_vrm_values-key  = '/BAY0/O2C_DEFAUM'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t04." - Culture
+  ls_vrm_values-key  = '/BAY0/O2C_DEFCUL'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t06." - UF Material Conversion
+  ls_vrm_values-key  = '/BAY0/O2C_DEFMAT'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t09." - Plague
+  ls_vrm_values-key  = '/BAY0/O2C_DEFPLG'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t10." - Property
+  ls_vrm_values-key  = '/BAY0/O2C_DEFPRP'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_TABLE'
+      values = lt_vrm_values.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CLEAR_VARIABLES
+*&---------------------------------------------------------------------*
+*       Clear varibles internal tables and structures.
+*----------------------------------------------------------------------*
+FORM clear_variables .
+
+* Global Internal Tables.
+* Clear varibles internal tables and structures.
+  REFRESH: gt_icdef_agr,
+           gt_icdef_app,
+           gt_icdef_aum,
+           gt_icdef_cul,
+           gt_icdef_mat,
+           gt_icdef_plg,
+           gt_icdef_prp.
+* Global Work Areas.
+* Clear varibles internal tables and structures.
+  CLEAR: gs_icdef_agr,
+         gs_icdef_app,
+         gs_icdef_aum,
+         gs_icdef_cul,
+         gs_icdef_mat,
+         gs_icdef_plg,
+         gs_icdef_prp.
+
+* Global Variables.
+* Clear varibles internal tables and structures.
+  CLEAR: gv_question,
+         gv_answer,
+         gv_index.
+
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  READ_FILE
+*&---------------------------------------------------------------------*
+*       Read excel file.
+*----------------------------------------------------------------------*
+FORM read_file .
+
+  CASE p_table.
+    WHEN '/BAY0/O2C_DEFAGR'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_agr.
+
+      IF NOT gt_icdef_agr[] IS INITIAL.
+        LOOP AT gt_icdef_agr INTO gs_icdef_agr.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_agr-client = sy-mandt.
+          MODIFY gt_icdef_agr FROM gs_icdef_agr INDEX gv_index.
+        ENDLOOP.
+
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_agr.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+
+      ENDIF.
+
+    WHEN '/BAY0/O2C_DEFAPP'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_app.
+
+      IF NOT gt_icdef_app[] IS INITIAL.
+        LOOP AT gt_icdef_app INTO gs_icdef_app.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_app-mandt = sy-mandt.
+          MODIFY gt_icdef_app FROM gs_icdef_app INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_app.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY0/O2C_DEFAUM'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_aum.
+
+      IF NOT gt_icdef_aum[] IS INITIAL.
+        LOOP AT gt_icdef_aum INTO gs_icdef_aum.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_aum-mandt = sy-mandt.
+          MODIFY gt_icdef_aum FROM gs_icdef_aum INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_aum.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY0/O2C_DEFCUL'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_cul.
+
+      IF NOT gt_icdef_cul[] IS INITIAL.
+        LOOP AT gt_icdef_cul INTO gs_icdef_cul.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_cul-mandt = sy-mandt.
+          MODIFY gt_icdef_cul FROM gs_icdef_cul INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_cul.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY0/O2C_DEFMAT'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_mat.
+
+      IF NOT gt_icdef_mat[] IS INITIAL.
+        LOOP AT gt_icdef_mat INTO gs_icdef_mat.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_mat-mandt = sy-mandt.
+          CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+            EXPORTING
+              input  = gs_icdef_mat-matnr
+            IMPORTING
+              output = gs_icdef_mat-matnr.
+
+          MODIFY gt_icdef_mat FROM gs_icdef_mat INDEX gv_index. "#EC CI_SUBRC
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_mat.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY0/O2C_DEFPLG'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_plg.
+
+      IF NOT gt_icdef_plg[] IS INITIAL.
+        LOOP AT gt_icdef_plg INTO gs_icdef_plg.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_plg-mandt = sy-mandt.
+          MODIFY gt_icdef_plg FROM gs_icdef_plg INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_plg.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY0/O2C_DEFPRP'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_prp.
+
+      IF NOT gt_icdef_prp[] IS INITIAL.
+        LOOP AT gt_icdef_prp INTO gs_icdef_prp.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_prp-mandt = sy-mandt.
+          MODIFY gt_icdef_prp FROM gs_icdef_prp INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_prp.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN OTHERS.
+*     Do Nothing.
+  ENDCASE.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  READ_EXCEL
+*&---------------------------------------------------------------------*
+*       Read Excel File.
+*----------------------------------------------------------------------*
+FORM read_excel  USING pt_excel_table TYPE STANDARD TABLE.
+
+* Local Variables.
+  DATA lt_raw  TYPE truxs_t_text_data.
+  DATA ls_excel_line TYPE REF TO data.
+  DATA lv_excel_value TYPE zexcel_cell_value.
+  DATA lo_table_descr  TYPE REF TO cl_abap_tabledescr.
+  DATA lo_struct_descr TYPE REF TO cl_abap_structdescr.
+  DATA lv_matnr TYPE mara-matnr.
+  DATA lv_kunnr TYPE kna1-kunnr.
+  DATA lv_cpf   type J_1BCPF.
+
+  CREATE DATA ls_excel_line LIKE LINE OF pt_excel_table.
+  ASSIGN ls_excel_line->* TO FIELD-SYMBOL(<fs_excel_line>).
+
+  IF 1 = 2. "This could does not work on Fiori deployed Transaction, only in GUI
+
+    CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+      EXPORTING
+*       I_FIELD_SEPERATOR    =
+        i_line_header        = 'X'
+        i_tab_raw_data       = lt_raw
+        i_filename           = p_file
+      TABLES
+        i_tab_converted_data = pt_excel_table
+      EXCEPTIONS
+        conversion_failed    = 1
+        OTHERS               = 2.
+    IF sy-subrc <> 0.
+      MESSAGE s000 WITH TEXT-e02 DISPLAY LIKE 'E'.   "#EC CI_USE_WANTED
+      "Excel file open failed.
+      LEAVE LIST-PROCESSING.                         "#EC CI_USE_WANTED
+    ENDIF.
+
+  ENDIF.
+
+  DATA(lo_excel_reader) = NEW zcl_excel_reader_2007( ).
+  TRY.
+      DATA(lo_excel) = lo_excel_reader->zif_excel_reader~load_file(
+                       i_filename             =  p_file
+                       i_from_applserver      = abap_false  ).
+    CATCH zcx_excel. " Exceptions for ABAP2XLSX
+  ENDTRY.
+
+* Worksheet
+  DATA(o_worksheet) = lo_excel->get_active_worksheet( ).
+* max. Zeile und Spalte holen
+  DATA(lv_max_col) = o_worksheet->get_highest_column( ).
+  DATA(lv_max_row) = o_worksheet->get_highest_row( ).
+  DATA(lv_row) = 1.
+
+  GET TIME STAMP FIELD DATA(lv_timestamp).
+
+  lo_table_descr ?= cl_abap_structdescr=>describe_by_data( p_data = pt_excel_table ).
+  lo_struct_descr ?= lo_table_descr->get_table_line_type( ).
+* Count number of columns in structure
+  DATA(lv_number_of_columns) = lines( lo_struct_descr->components ).
+* Worksheet zeilenweise durchlaufen
+  WHILE lv_row <= lv_max_row.
+    IF lv_row > 1. "Skip Header or first line
+      DO lv_number_of_columns TIMES.
+        IF sy-index = 1.
+          CONTINUE.
+        ENDIF.
+        DATA(lv_index) = sy-index.
+* Spaltennummer (1) in Excel-Spalten-Bezeichner (A) umwandeln
+        DATA(lv_col_str) = zcl_excel_common=>convert_column2alpha( lv_index - 1 ). "-1 because MANDT was ignored
+
+        CASE lo_struct_descr->components[ lv_index ]-name.
+          WHEN 'LASTCHANGEDAT' OR 'LOCALLASTCHANGEDAT'.
+            lv_excel_value = lv_timestamp.
+          WHEN OTHERS.
+            "Zellinhalt Spalte x holen
+            o_worksheet->get_cell( EXPORTING
+                                     ip_column = lv_col_str
+                                     ip_row    = lv_row
+                                   IMPORTING
+                                     ep_value  = lv_excel_value ).
+
+            IF lo_struct_descr->components[ lv_index ]-name = 'AGRCPF'.
+              TRANSLATE lv_excel_value USING '. '.
+              TRANSLATE lv_excel_value USING '- '.
+              CONDENSE lv_excel_value NO-GAPS.
+              lv_cpf = lv_excel_value(11).
+              CLEAR lv_excel_value.
+              lv_excel_value = lv_cpf.
+              CONDENSE lv_excel_value NO-GAPS.
+            ELSEIF lo_struct_descr->components[ lv_index ]-name = 'MATNR'.
+              SHIFT lv_excel_value LEFT DELETING LEADING '0'.
+              CONDENSE lv_excel_value NO-GAPS.
+              CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+                EXPORTING
+                  input  = lv_excel_value
+                IMPORTING
+                  output = lv_matnr.
+
+              CLEAR lv_excel_value.
+              lv_excel_value = lv_matnr.
+              CONDENSE lv_excel_value NO-GAPS.
+            ELSEIF lo_struct_descr->components[ lv_index ]-name = 'KUNNR'.
+              SHIFT lv_excel_value LEFT DELETING LEADING '0'.
+              CONDENSE lv_excel_value NO-GAPS.
+              CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+                EXPORTING
+                  input  = lv_excel_value
+                IMPORTING
+                  output = lv_kunnr.
+
+              CLEAR lv_excel_value.
+              lv_excel_value = lv_kunnr.
+              CONDENSE lv_excel_value NO-GAPS.
+            ENDIF.
+        ENDCASE.
+
+        ASSIGN COMPONENT lv_index OF STRUCTURE <fs_excel_line> TO FIELD-SYMBOL(<fs_value>).
+        IF <fs_value> IS ASSIGNED.
+          <fs_value> = lv_excel_value.
+        ENDIF.
+        UNASSIGN <fs_value>.
+        CLEAR: lv_excel_value.
+      ENDDO.
+      APPEND <fs_excel_line> TO pt_excel_table.
+      CLEAR <fs_excel_line>.
+    ENDIF.
+    lv_row = lv_row + 1.
+  ENDWHILE.
+
+ENDFORM.
