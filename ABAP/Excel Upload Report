@@ -1,0 +1,635 @@
+*&---------------------------------------------------------------------*
+*& Report  /BAY0/ICBR_DEF_TAB_UPL                                *
+*----------------------------------------------------------------------*
+* Identification
+* Author        : Igor Muntoreanu - EARZP
+* Creation date : 09.12.2024
+* Owner         : Igor Muntoreanu - EARZP
+* Basis Release : 4.7
+*-----------------------------------------------------------------------
+* Description   : SM30 Tables Upload
+*----------------------------------------------------------------------*
+* Changes                                                              *
+* Vers. Date       Author  Request           Description               *
+* V001             EARZP   XXXX000000        created                   *
+*----------------------------------------------------------------------*
+REPORT /bay0/o2c_def_tab_upl MESSAGE-ID /bay0/o2c_def_msg.
+
+TYPE-POOLS: vrm.
+
+* Global Internal Tables.
+DATA: gt_icdef_agr TYPE TABLE OF /bay0/o2c_defagr,
+      gt_icdef_app TYPE TABLE OF /bay0/o2c_defapp,
+      gt_icdef_aum TYPE TABLE OF /bay0/o2c_defaum,
+      gt_icdef_cul TYPE TABLE OF /bay0/o2c_defcul,
+      gt_icdef_mat TYPE TABLE OF /bay0/o2c_defmat,
+      gt_icdef_plg TYPE TABLE OF /bay0/o2c_defplg,
+      gt_icdef_prp TYPE TABLE OF /bay0/o2c_defprp.
+
+* Global Work Areas.
+DATA: gs_icdef_agr TYPE /bay0/o2c_defagr,
+      gs_icdef_app TYPE /bay0/o2c_defapp,
+      gs_icdef_aum TYPE /bay0/o2c_defaum,
+      gs_icdef_cul TYPE /bay0/o2c_defcul,
+      gs_icdef_mat TYPE /bay0/o2c_defmat,
+      gs_icdef_plg TYPE /bay0/o2c_defplg,
+      gs_icdef_prp TYPE /bay0/o2c_defprp.
+
+* Global Variables.
+DATA: gv_question(150) TYPE c,
+      gv_answer(1)     TYPE c,
+      gv_index         TYPE sy-tabix.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-b01. "#EC CI_USE_WANTED
+  PARAMETERS: p_table TYPE tabname16 AS LISTBOX OBLIGATORY VISIBLE LENGTH 36. "#EC CI_USE_WANTED
+  PARAMETERS: p_file TYPE rlgrap-filename OBLIGATORY.   "Flie path."#EC CI_USE_WANTED
+SELECTION-SCREEN END OF BLOCK b1.                    "#EC CI_USE_WANTED
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+* Choose the file to be Uploaded.
+  PERFORM choose_file.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_table.
+*  Fill p_table LISTBOX parameter.
+  PERFORM fill_table_listbox.
+
+START-OF-SELECTION.
+
+* Clear varibles internal tables and structures.
+  PERFORM clear_variables.
+
+  CONCATENATE TEXT-p01 "Are you sure you want update the table
+              p_table
+              TEXT-p02 " with the selected file?'
+              INTO gv_question SEPARATED BY space.
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+    EXPORTING
+*     TITLEBAR              = ' '
+*     DIAGNOSE_OBJECT       = ' '
+      text_question         = gv_question
+      text_button_1         = TEXT-p03 "'Yes'
+      icon_button_1         = 'ICON_OKAY'
+      text_button_2         = TEXT-p04 "'No'
+      icon_button_2         = 'ICON_CANCEL'
+      default_button        = '2'
+      display_cancel_button = ''
+*     USERDEFINED_F1_HELP   = ' '
+*     START_COLUMN          = 25
+*     START_ROW             = 6
+*     POPUP_TYPE            =
+*     IV_QUICKINFO_BUTTON_1 = ' '
+*     IV_QUICKINFO_BUTTON_2 = ' '
+    IMPORTING
+      answer                = gv_answer.
+
+  IF gv_answer <> '1'.
+*   Process canceld by user.
+    MESSAGE s000 WITH TEXT-e03 DISPLAY LIKE 'E'.     "#EC CI_USE_WANTED
+    LEAVE LIST-PROCESSING.                           "#EC CI_USE_WANTED
+  ENDIF.
+
+* Read excel file.
+  PERFORM read_file.
+
+*&---------------------------------------------------------------------*
+*&      Form  CHOOSE_FILE
+*&---------------------------------------------------------------------*
+*       Choose the file to be Uploaded.
+*----------------------------------------------------------------------*
+FORM choose_file .
+
+  DATA: lt_arquivo       TYPE filetable.
+
+  DATA: lv_subrc        TYPE sy-subrc,
+        lv_window_title TYPE string.
+
+  CONSTANTS:
+        lc_filtro_arquivo   TYPE string
+          VALUE 'Arquivo Excel (*.xls, *xlsx)|*.XLS;*.XLSX'.
+
+  lv_window_title = TEXT-d01."Select a file.
+
+
+  CALL METHOD cl_gui_frontend_services=>file_open_dialog
+    EXPORTING
+      window_title            = lv_window_title
+      file_filter             = lc_filtro_arquivo
+      multiselection          = space
+    CHANGING
+      file_table              = lt_arquivo
+      rc                      = lv_subrc
+    EXCEPTIONS
+      file_open_dialog_failed = 1
+      cntl_error              = 2
+      error_no_gui            = 3
+      not_supported_by_gui    = 4
+      OTHERS                  = 5.
+
+  IF sy-subrc IS NOT INITIAL.
+    MESSAGE s000 WITH TEXT-e01 DISPLAY LIKE 'E'.     "#EC CI_USE_WANTED
+    "File open failed.
+    LEAVE LIST-PROCESSING.                           "#EC CI_USE_WANTED
+  ELSE.
+    READ TABLE lt_arquivo INTO p_file INDEX 1.
+  ENDIF.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  FILL_TABLE_LISTBOX
+*&---------------------------------------------------------------------*
+*       Fill p_table LISTBOX parameter.
+*----------------------------------------------------------------------*
+FORM fill_table_listbox .
+  DATA: lt_vrm_values  TYPE vrm_values .
+  DATA: ls_vrm_values LIKE LINE OF lt_vrm_values.
+
+  CLEAR: ls_vrm_values.
+  ls_vrm_values-text = ls_vrm_values-key = 'X'.
+
+  ls_vrm_values-text = TEXT-t01." - Agronomist
+  ls_vrm_values-key  = '/BAY0/O2C_DEFAGR'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t02." - Aplication Type
+  ls_vrm_values-key  = '/BAY0/O2C_DEFAPP'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t03." - Unit of Measure Area
+  ls_vrm_values-key  = '/BAY0/O2C_DEFAUM'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t04." - Culture
+  ls_vrm_values-key  = '/BAY0/O2C_DEFCUL'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t06." - UF Material Conversion
+  ls_vrm_values-key  = '/BAY0/O2C_DEFMAT'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t09." - Plague
+  ls_vrm_values-key  = '/BAY0/O2C_DEFPLG'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+  ls_vrm_values-text = TEXT-t10." - Property
+  ls_vrm_values-key  = '/BAY0/O2C_DEFPRP'.
+  APPEND ls_vrm_values TO lt_vrm_values.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_TABLE'
+      values = lt_vrm_values.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CLEAR_VARIABLES
+*&---------------------------------------------------------------------*
+*       Clear varibles internal tables and structures.
+*----------------------------------------------------------------------*
+FORM clear_variables .
+
+* Global Internal Tables.
+* Clear varibles internal tables and structures.
+  REFRESH: gt_icdef_agr,
+           gt_icdef_app,
+           gt_icdef_aum,
+           gt_icdef_cul,
+*           gt_icdef_fil,
+*           gt_icdef_hdr,
+*           gt_icdef_itm,
+*           gt_icdef_log,
+           gt_icdef_mat,
+*           gt_icdef_nfl,
+*           gt_icdef_pkg,
+           gt_icdef_plg,
+"BEGIN   - EPSZJ - 20/08/2020 - CRT-3067811: DEM-IBO-108520-PE19251-Defensives  Contro
+*           gt_icdef_pdp,
+*           gt_icdef_cdp,
+"END     - EPSZJ - 20/08/2020 - CRT-3067811: DEM-IBO-108520-PE19251-Defensives  Contro
+           gt_icdef_prp.
+*           gt_icdef_reg,
+*           gt_icdef_ufl,
+*           gt_icdef_ufs,
+*           gt_icdef_ure,
+*           gt_icws_lit,
+*           gt_icws_lhd.
+
+* Global Work Areas.
+* Clear varibles internal tables and structures.
+  CLEAR: gs_icdef_agr,
+         gs_icdef_app,
+         gs_icdef_aum,
+         gs_icdef_cul,
+*         gs_icdef_fil,
+*         gs_icdef_hdr,
+*         <gs_icdef_itm,
+*         gs_icdef_log,
+         gs_icdef_mat,
+*         gs_icdef_nfl,
+*         gs_icdef_pkg,
+         gs_icdef_plg,
+"BEGIN   - EPSZJ - 20/08/2020 - CRT-3067811: DEM-IBO-108520-PE19251-Defensives  Contro
+*         gs_icdef_pdp,
+*         gs_icdef_cdp,
+"END     - EPSZJ - 20/08/2020 - CRT-3067811: DEM-IBO-108520-PE19251-Defensives  Contro
+         gs_icdef_prp.
+*         gs_icdef_reg,
+*         gs_icdef_ufl,
+*         gs_icdef_ufs,
+*         gs_icdef_ure,
+*         gs_icws_lit,
+*         gs_icws_lhd.
+
+* Global Variables.
+* Clear varibles internal tables and structures.
+  CLEAR: gv_question,
+         gv_answer,
+         gv_index.
+
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  READ_FILE
+*&---------------------------------------------------------------------*
+*       Read excel file.
+*----------------------------------------------------------------------*
+FORM read_file .
+
+  CASE p_table.
+    WHEN '/BAY3/ICDEF_AGR'.
+
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_agr.
+
+      IF NOT gt_icdef_agr[] IS INITIAL.
+        LOOP AT gt_icdef_agr INTO gs_icdef_agr.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_agr-client = sy-mandt.
+          MODIFY gt_icdef_agr FROM gs_icdef_agr INDEX gv_index.
+        ENDLOOP.
+
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_agr.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+
+      ENDIF.
+
+    WHEN '/BAY3/ICDEF_APP'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_app.
+
+      IF NOT gt_icdef_app[] IS INITIAL.
+        LOOP AT gt_icdef_app INTO gs_icdef_app.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_app-mandt = sy-mandt.
+          MODIFY gt_icdef_app FROM gs_icdef_app INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_app.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY3/ICDEF_AUM'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_aum.
+
+      IF NOT gt_icdef_aum[] IS INITIAL.
+        LOOP AT gt_icdef_aum INTO gs_icdef_aum.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_aum-mandt = sy-mandt.
+          MODIFY gt_icdef_aum FROM gs_icdef_aum INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_aum.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+    WHEN '/BAY3/ICDEF_CUL'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_cul.
+
+      IF NOT gt_icdef_cul[] IS INITIAL.
+        LOOP AT gt_icdef_cul INTO gs_icdef_cul.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_cul-mandt = sy-mandt.
+          MODIFY gt_icdef_cul FROM gs_icdef_cul INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_cul.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_FIL'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_fil.
+*
+*      IF NOT gt_icdef_fil[] IS INITIAL.
+*        LOOP AT gt_icdef_fil INTO gs_icdef_fil.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_fil-mandt = sy-mandt.
+*          MODIFY gt_icdef_fil FROM gs_icdef_fil INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_fil.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+
+    WHEN '/BAY3/ICDEF_MAT'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_mat.
+
+      IF NOT gt_icdef_mat[] IS INITIAL.
+        LOOP AT gt_icdef_mat INTO gs_icdef_mat.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_mat-mandt = sy-mandt.
+          CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+            EXPORTING
+              input  = gs_icdef_mat-matnr
+            IMPORTING
+              output = gs_icdef_mat-matnr.
+
+          MODIFY gt_icdef_mat FROM gs_icdef_mat INDEX gv_index. "#EC CI_SUBRC
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_mat.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_NFL'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_nfl.
+*
+*      IF NOT gt_icdef_nfl[] IS INITIAL.
+*        LOOP AT gt_icdef_nfl INTO gs_icdef_nfl.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_nfl-mandt = sy-mandt.
+*          MODIFY gt_icdef_nfl FROM gs_icdef_nfl INDEX gv_index. "#EC CI_SUBRC
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_nfl.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_PKG'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_pkg.
+*
+*      IF NOT gt_icdef_pkg[] IS INITIAL.
+*        LOOP AT gt_icdef_pkg INTO gs_icdef_pkg.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_pkg-mandt = sy-mandt.
+*          MODIFY gt_icdef_pkg FROM gs_icdef_pkg INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_pkg.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+
+    WHEN '/BAY3/ICDEF_PLG'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_plg.
+
+      IF NOT gt_icdef_plg[] IS INITIAL.
+        LOOP AT gt_icdef_plg INTO gs_icdef_plg.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_plg-mandt = sy-mandt.
+          MODIFY gt_icdef_plg FROM gs_icdef_plg INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_plg.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+      "BEGIN   - EPSZJ - 20/08/2020 - CRT-3067811: DEM-IBO-108520-PE19251-Defensives  Contro
+*    WHEN '/BAY3/ICDEF_P_DP'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_pdp.
+*
+*      IF NOT gt_icdef_pdp[] IS INITIAL.
+*        LOOP AT gt_icdef_pdp INTO gs_icdef_pdp.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_pdp-mandt = sy-mandt.
+*          MODIFY gt_icdef_pdp FROM gs_icdef_pdp INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_pdp.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+*    WHEN '/BAY3/ICDEF_C_DP'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_cdp.
+*
+*      IF NOT gt_icdef_cdp[] IS INITIAL.
+*        LOOP AT gt_icdef_cdp INTO gs_icdef_cdp.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_cdp-mandt = sy-mandt.
+*          MODIFY gt_icdef_cdp FROM gs_icdef_cdp INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_cdp.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+*      "END     - EPSZJ - 20/08/2020 - CRT-3067811: DEM-IBO-108520-PE19251-Defensives  Contro
+    WHEN '/BAY3/ICDEF_PRP'.
+*     Read Excel File.
+      PERFORM read_excel USING gt_icdef_prp.
+
+      IF NOT gt_icdef_prp[] IS INITIAL.
+        LOOP AT gt_icdef_prp INTO gs_icdef_prp.
+          gv_index = sy-tabix.
+*         Ensure that the correct client is being used.
+          gs_icdef_prp-mandt = sy-mandt.
+          MODIFY gt_icdef_prp FROM gs_icdef_prp INDEX gv_index.
+        ENDLOOP.
+*       Atualiza tabela.
+        MODIFY (p_table) FROM TABLE gt_icdef_prp.         "#EC CI_SUBRC
+        COMMIT WORK.                                 "#EC CI_USE_WANTED
+        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+                          p_table
+                          TEXT-s02."successfully updated.
+      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_REG'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_reg.
+*
+*      IF NOT gt_icdef_reg[] IS INITIAL.
+*        LOOP AT gt_icdef_reg INTO gs_icdef_reg.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_reg-mandt = sy-mandt.
+*          MODIFY gt_icdef_reg FROM gs_icdef_reg INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_reg.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_UFL'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_ufl.
+*
+*      IF NOT gt_icdef_ufl[] IS INITIAL.
+*        LOOP AT gt_icdef_ufl INTO gs_icdef_ufl.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_ufl-mandt = sy-mandt.
+*          MODIFY gt_icdef_ufl FROM gs_icdef_ufl INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_ufl.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_UFS'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_ufs.
+*
+*      IF NOT gt_icdef_ufs[] IS INITIAL.
+*        LOOP AT gt_icdef_ufs INTO gs_icdef_ufs.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_ufs-mandt = sy-mandt.
+*          MODIFY gt_icdef_ufs FROM gs_icdef_ufs INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_ufs.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+
+*    WHEN '/BAY3/ICDEF_URE'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icdef_ure.
+*
+*      IF NOT gt_icdef_ure[] IS INITIAL.
+*        LOOP AT gt_icdef_ure INTO gs_icdef_ure.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icdef_ure-mandt = sy-mandt.
+*          MODIFY gt_icdef_ure FROM gs_icdef_ure INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icdef_ure.         "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+*    WHEN '/BAY3/ICWS_LIT'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icws_lit.
+*
+*      IF NOT gt_icws_lit[] IS INITIAL.
+*        LOOP AT gt_icws_lit INTO gs_icws_lit.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icws_lit-mandt = sy-mandt.
+*          MODIFY gt_icws_lit FROM gs_icws_lit INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icws_lit.          "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+*    WHEN '/BAY3/ICWS_LHD'.
+**     Read Excel File.
+*      PERFORM read_excel USING gt_icws_lhd.
+*
+*      IF NOT gt_icws_lhd[] IS INITIAL.
+*        LOOP AT gt_icws_lhd INTO gs_icws_lhd.
+*          gv_index = sy-tabix.
+**         Ensure that the correct client is being used.
+*          gs_icws_lhd-mandt = sy-mandt.
+*          MODIFY gt_icws_lhd FROM gs_icws_lhd INDEX gv_index.
+*        ENDLOOP.
+**       Atualiza tabela.
+*        MODIFY (p_table) FROM TABLE gt_icws_lhd.          "#EC CI_SUBRC
+*        COMMIT WORK.                                 "#EC CI_USE_WANTED
+*        MESSAGE s000 WITH TEXT-s01 "Table"#EC CI_USE_WANTED
+*                          p_table
+*                          TEXT-s02."successfully updated.
+*      ENDIF.
+    WHEN OTHERS.
+*     Do Nothing.
+  ENDCASE.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  READ_EXCEL
+*&---------------------------------------------------------------------*
+*       Read Excel File.
+*----------------------------------------------------------------------*
+FORM read_excel  USING pt_excel_table TYPE STANDARD TABLE.
+
+* Local Variables.
+  DATA: lt_raw  TYPE truxs_t_text_data.
+
+  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+    EXPORTING
+*     I_FIELD_SEPERATOR    =
+      i_line_header        = 'X'
+      i_tab_raw_data       = lt_raw
+      i_filename           = p_file
+    TABLES
+      i_tab_converted_data = pt_excel_table
+    EXCEPTIONS
+      conversion_failed    = 1
+      OTHERS               = 2.
+  IF sy-subrc <> 0.
+    MESSAGE s000 WITH TEXT-e02 DISPLAY LIKE 'E'.     "#EC CI_USE_WANTED
+    "Excel file open failed.
+    LEAVE LIST-PROCESSING.                           "#EC CI_USE_WANTED
+  ENDIF.
+
+ENDFORM.
