@@ -1,0 +1,4 @@
+// This Will Create a BUTTON in the LR table header. Use #WITH_INTENT_BASED_NAVIGATION to create an URL for the column
+  @UI: { lineItem: [ { label: 'Mass Creation', type: #FOR_INTENT_BASED_NAVIGATION, semanticObjectAction: 'manageLineItems' } ]}
+  @Consumption.semanticObject: 'ZDEFENSIVE'
+  Locallastchangedat;
