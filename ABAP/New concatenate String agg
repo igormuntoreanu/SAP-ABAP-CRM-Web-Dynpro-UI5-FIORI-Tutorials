@@ -1,0 +1,19 @@
+TYPES: BEGIN OF ty_employee,
+         employee_id TYPE pernr_d,
+         course_name TYPE text100,
+       END OF ty_employee,
+       tt_employee TYPE TABLE OF ty_employee WITH EMPTY KEY.
+
+DATA(lt_employees) = VALUE tt_employee( ( employee_id = '1' course_name = 'ABAP' )
+                                        ( employee_id = '1' course_name = 'UI5' )
+                                        ( employee_id = '1' course_name = 'Fiori' )
+                                        ( employee_id = '2' course_name = 'ABAP' )
+                                        ( employee_id = '2' course_name = 'UI5' ) ).
+
+SELECT FROM @lt_employees AS employees
+       FIELDS employee_id,
+              to_clob( STRING_AGG( course_name, ', ' ) ) AS courses
+       GROUP BY employee_id
+       INTO TABLE @DATA(lt_emp_courses).
+
+
