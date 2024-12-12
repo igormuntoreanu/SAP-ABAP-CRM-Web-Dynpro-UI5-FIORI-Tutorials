@@ -1,0 +1,525 @@
+
+class /DEEREAG/CL_LELO_LOGGER definition
+  public
+  create public .
+
+public section.
+
+  methods CONSTRUCTOR
+    importing
+      !IV_LOG_HANDLE type BALLOGHNDL optional
+      !IV_EXTNUMBER type BALNREXT optional
+      !IV_OBJECT type BALOBJ_D
+      !IV_SUBOBJECT type BALSUBOBJ
+      !IV_EXPIRATION_DAYS type I default 30                     "TODO: Discuss about default expiration days
+      !IV_SAVE_IMMEDIATELY type ABAP_BOOL .
+  methods ADD_BAPIRET2
+    importing
+      !IS_BAPIRET2 type BAPIRET2 optional
+      !IT_BAPIRET2 type BAPIRET2_T optional .
+  methods ADD_MESSAGE
+    importing
+      !IS_MSG type BAL_S_MSG
+      !IV_OPEN_NEW_LOG type ABAP_BOOL default ABAP_TRUE .
+  methods ADD_EXCEPTION
+    importing
+      !IO_EXCEPTION type ref to CX_ROOT .
+  methods ADD_TEXT
+    importing
+      !IV_TEXT type CSEQUENCE
+      !IV_MSG_TYPE type SYMSGTY default 'E' .
+  methods ADD_SELECTION_PARAM
+    importing
+      !IV_PARA_DESCR type CSEQUENCE
+      !IV_PARA_NAME type RSSCR_NAME
+      !IV_PARA_VALUE type ANY .
+  methods ADD_SELECTION_RANGE
+    importing
+      !IV_RANGE_DESCR type CSEQUENCE
+      !IV_RANGE_NAME type RSSCR_NAME
+      !IT_RANGE_VALUE type STANDARD TABLE .
+  methods ADD_SY .
+  methods SAVE_MSG .
+  methods CLEAR_MESSAGES .
+  methods IS_ERROR
+    returning
+      value(RV_ERROR) type ABAP_BOOL .
+  methods GET_HANDLE
+    returning
+      value(RV_HANDLE) type BALLOGHNDL .
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+
+    DATA mv_log_handle TYPE balloghndl .
+    DATA ms_last_message TYPE bal_s_msg .
+    DATA ms_log TYPE bal_s_log .
+*      mt_exception               TYPE TABLE OF REF TO cx_root,
+    DATA mt_msg_local TYPE bal_t_msg .
+    DATA mv_save_immediately TYPE abap_bool .
+    CONSTANTS mc_string_parameter TYPE string VALUE 'Parameter:' ##NO_TEXT.
+    CONSTANTS mc_string_select_option TYPE string VALUE 'Select-Option:' ##NO_TEXT.
+
+    METHODS get_probclass_from_msgty
+      IMPORTING
+        !iv_msgty           TYPE msgty
+      RETURNING
+        VALUE(rv_probclass) TYPE balprobcl .
+    METHODS get_message_count
+      RETURNING
+        VALUE(rv_count) TYPE balcntall .
+    METHODS open_log .
+    METHODS write_and_shift
+      IMPORTING
+        !iv_value       TYPE any
+      RETURNING
+        VALUE(rv_value) TYPE string .
+    METHODS load_log.
+ENDCLASS.
+
+
+
+CLASS /DEEREAG/CL_LELO_LOGGER IMPLEMENTATION.
+
+
+  METHOD add_bapiret2.
+
+    DATA: ls_msg      TYPE bal_s_msg,
+          ls_bapiret2 TYPE bapiret2,
+          lt_bapiret2 TYPE bapiret2_t.
+
+    IF is_bapiret2 IS INITIAL AND it_bapiret2 IS INITIAL.
+      RETURN.
+    ENDIF.
+
+    IF is_bapiret2 IS NOT INITIAL.
+      APPEND is_bapiret2 TO lt_bapiret2.
+    ENDIF.
+
+    IF it_bapiret2 IS NOT INITIAL.
+      APPEND LINES OF it_bapiret2 TO lt_bapiret2.
+    ENDIF.
+
+    LOOP AT lt_bapiret2 INTO ls_bapiret2.
+      "Nachricht umwandeln
+      ls_msg-msgty = ls_bapiret2-type.
+      ls_msg-msgid = ls_bapiret2-id.
+      ls_msg-msgno = ls_bapiret2-number.
+      ls_msg-msgv1 = ls_bapiret2-message_v1.
+      ls_msg-msgv2 = ls_bapiret2-message_v2.
+      ls_msg-msgv3 = ls_bapiret2-message_v3.
+      ls_msg-msgv4 = ls_bapiret2-message_v4.
+
+      CHECK NOT ls_msg IS INITIAL.
+
+      " In Protokoll speichern
+      me->add_message(
+        EXPORTING
+          is_msg           = ls_msg
+      ).
+
+      CLEAR ls_msg.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD add_exception.
+
+    DATA: lt_t_msg TYPE rs_t_msg,
+          ls_s_msg TYPE rs_s_msg.
+
+    CHECK NOT io_exception IS INITIAL.
+
+*    APPEND io_exception TO mt_exception.
+
+    " Exception in bal_s_msg umwandeln
+    CALL FUNCTION 'RS_EXCEPTION_TO_MESSAGE'
+      EXPORTING
+        i_r_exception = io_exception
+      CHANGING
+        c_t_msg       = lt_t_msg.
+
+    LOOP AT lt_t_msg INTO ls_s_msg.
+
+      CHECK NOT ls_s_msg IS INITIAL.
+
+      " Nachrichten aus Exception in Anwendungsprotokoll eintragen
+      me->add_message(
+        EXPORTING
+          is_msg           = CONV #( ls_s_msg )
+      ).
+
+      CLEAR ls_s_msg.
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD add_message.
+
+    DATA: ls_msg TYPE bal_s_msg.
+
+    CHECK NOT is_msg IS INITIAL.
+
+    ls_msg = is_msg.
+
+    " Ermitteln der Problemklasse aus Nachrichtentyp, falls diese nicht explizit angegeben wurde
+    IF ls_msg-probclass IS INITIAL.
+      ls_msg-probclass = me->get_probclass_from_msgty( ls_msg-msgty ).
+    ENDIF.
+
+*   Die gleiche Meldung zwei Mal hintereinander? Nee, besser nicht...
+    IF ms_last_message = ls_msg.
+      RETURN.
+    ENDIF.
+
+    APPEND ls_msg TO mt_msg_local.
+
+    " Collect Messages
+    CALL FUNCTION 'BAL_LOG_MSG_ADD'
+      EXPORTING
+        i_log_handle     = mv_log_handle " Log handle
+        i_s_msg          = ls_msg        " Notification data
+      EXCEPTIONS
+        log_not_found    = 1
+        msg_inconsistent = 2
+        log_is_full      = 3
+        OTHERS           = 4.
+
+    IF sy-subrc = 0.
+      ms_last_message = ls_msg.
+      CLEAR ls_msg.
+    ENDIF.
+
+    IF mv_save_immediately = abap_true.
+      save_msg( ).
+      IF iv_open_new_log = abap_true.
+        me->open_log( ). " Overwrites log handle <=> new header entry with current time in BAL
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD add_selection_param.
+
+    " Hilfsvariable zum Zusammensetzen des Textes
+    DATA: lv_value TYPE c LENGTH 100,
+          ls_msg   TYPE bal_s_msg.
+
+    " Parameterwert in Ausgabeformat bringen
+    IF iv_para_value = abap_true.
+      lv_value = text-001.
+    ELSEIF iv_para_value = abap_false.
+      lv_value = text-002.
+    ELSE.
+      WRITE iv_para_value TO lv_value LEFT-JUSTIFIED.
+    ENDIF.
+
+    ls_msg-msgty = ''.
+    ls_msg-msgid = '/DEEREAG/PNT'.
+    ls_msg-msgno = '041'.
+    ls_msg-msgv1 = mc_string_parameter.
+    ls_msg-msgv2 = iv_para_name.
+    ls_msg-msgv3 = |({ iv_para_descr }):|.
+    ls_msg-msgv4 = lv_value.
+
+    CHECK NOT ls_msg IS INITIAL.
+
+    me->add_message( is_msg = ls_msg ).
+
+  ENDMETHOD.
+
+
+  METHOD add_selection_range.
+
+    DATA: lv_range_value TYPE text255,
+          lv_value_help  TYPE text255,
+          ls_msg         TYPE bal_s_msg.
+
+    FIELD-SYMBOLS: <fs_value>   TYPE any.
+
+    LOOP AT it_range_value ASSIGNING FIELD-SYMBOL(<fs_range_value>).
+
+      ASSIGN COMPONENT 'SIGN' OF STRUCTURE <fs_range_value> TO <fs_value>.
+      lv_range_value = <fs_value>.
+
+      ASSIGN COMPONENT 'OPTION' OF STRUCTURE <fs_range_value> TO <fs_value>.
+      CONCATENATE lv_range_value <fs_value> INTO lv_range_value SEPARATED BY space.
+
+      ASSIGN COMPONENT 'LOW' OF STRUCTURE <fs_range_value> TO <fs_value>.
+      lv_value_help = me->write_and_shift( iv_value = <fs_value> ).
+      CONCATENATE lv_range_value lv_value_help INTO lv_range_value SEPARATED BY space.
+
+      ASSIGN COMPONENT 'HIGH' OF STRUCTURE <fs_range_value> TO <fs_value>.
+      IF <fs_value> IS NOT INITIAL.
+        lv_value_help = me->write_and_shift( iv_value = <fs_value> ).
+      ELSE.
+        CLEAR: lv_value_help.
+      ENDIF.
+      CONCATENATE lv_range_value lv_value_help INTO lv_range_value SEPARATED BY space.
+
+      ls_msg-msgty = ''.
+      ls_msg-msgid = '/DEEREAG/PNT'.
+      ls_msg-msgno = '041'.
+      ls_msg-msgv1 = mc_string_select_option.
+      ls_msg-msgv2 = iv_range_name.
+      ls_msg-msgv3 = |({ iv_range_descr }):|.
+      ls_msg-msgv4 = lv_range_value.
+
+      CHECK NOT ls_msg IS INITIAL.
+
+      me->add_message( is_msg = ls_msg ).
+
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+  METHOD add_sy.
+
+    DATA: ls_msg TYPE bal_s_msg.
+
+    " Nachricht aus sy bilden
+    ls_msg-msgty = sy-msgty.
+    ls_msg-msgid = sy-msgid.
+    ls_msg-msgno = sy-msgno.
+    ls_msg-msgv1 = sy-msgv1.
+    ls_msg-msgv2 = sy-msgv2.
+    ls_msg-msgv3 = sy-msgv3.
+    ls_msg-msgv4 = sy-msgv4.
+
+    " In Protokoll speichern
+    me->add_message(
+      EXPORTING
+        is_msg           = ls_msg
+    ).
+
+  ENDMETHOD.
+
+
+  METHOD add_text.
+
+    DATA: lv_msg TYPE text255,
+          ls_msg TYPE bal_s_msg.
+
+    lv_msg = iv_text.
+
+    " Freitext in Blöcke mit je 50 Zeichen bringen
+    lv_msg = iv_text.
+    CONDENSE lv_msg.
+    ls_msg-msgty = iv_msg_type.
+    ls_msg-msgid = '/DEEREAG/PNT'.
+    ls_msg-msgno = '040'.
+    ls_msg-msgv1 = lv_msg+0(50).
+    ls_msg-msgv2 = lv_msg+50(50).
+    ls_msg-msgv3 = lv_msg+100(50).
+    ls_msg-msgv4 = lv_msg+150(50).
+
+    CHECK NOT ls_msg IS INITIAL.
+
+    me->add_message( is_msg = ls_msg ).
+
+  ENDMETHOD.
+
+
+  METHOD clear_messages.
+
+    " Protokoll aus Hauptspeicher entfernen
+    CALL FUNCTION 'BAL_LOG_REFRESH'
+      EXPORTING
+        i_log_handle = mv_log_handle
+      EXCEPTIONS
+        OTHERS       = 0.
+
+    " Globale Variablen zurücksetzen
+*    CLEAR: mv_log_handle, ms_last_message, ms_log.
+
+  ENDMETHOD.
+
+
+  METHOD constructor.
+
+*   Create application log entry
+    ms_log-extnumber    = iv_extnumber.
+    ms_log-object       = iv_object.
+    ms_log-subobject    = iv_subobject.
+    ms_log-aldate       = sy-datum.
+    ms_log-altime       = sy-uzeit.
+    ms_log-aluser       = sy-uname.
+    ms_log-alprog       = sy-cprog.
+    ms_log-altcode      = sy-tcode.
+    ms_log-aldate_del   = sy-datum + iv_expiration_days.
+    mv_save_immediately = iv_save_immediately.
+
+    IF iv_log_handle IS NOT INITIAL.
+      mv_log_handle = iv_log_handle.
+      load_log(  ).
+    ELSE.
+      me->open_log( ).
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD get_handle.
+    rv_handle = mv_log_handle.
+  ENDMETHOD.
+
+
+  METHOD get_message_count.
+
+    " Statistik: Zähler für Meldungstypen
+    DATA: ls_statistics TYPE bal_s_scnt.
+
+    " Statistiken zu ermitteln
+    CALL FUNCTION 'BAL_LOG_HDR_READ'
+      EXPORTING
+        i_log_handle  = mv_log_handle " Log handle
+      IMPORTING
+        e_statistics  = ls_statistics
+      EXCEPTIONS
+        log_not_found = 1
+        OTHERS        = 2.
+    IF sy-subrc <> 0.
+      rv_count = 0.
+      RETURN.
+    ENDIF.
+
+    rv_count = ls_statistics-msg_cnt_al.
+
+  ENDMETHOD.
+
+
+  METHOD get_probclass_from_msgty.
+
+    CASE iv_msgty.
+      WHEN 'A'.
+        rv_probclass = 1.
+      WHEN 'X'.
+        rv_probclass = 1.
+      WHEN 'E'.
+        rv_probclass = 2.
+      WHEN 'W'.
+        rv_probclass = 3.
+      WHEN 'I'.
+        rv_probclass = 4.
+      WHEN 'S'.
+        rv_probclass = 4.
+      WHEN OTHERS.
+        rv_probclass = 4.
+    ENDCASE.
+
+  ENDMETHOD.
+
+
+  METHOD is_error.
+    rv_error = abap_false.
+    DATA(ls_msg) = VALUE #( mt_msg_local[ msgty = 'E' ] OPTIONAL ).
+    CHECK ls_msg IS NOT INITIAL.
+    rv_error = abap_true.
+  ENDMETHOD.
+
+
+  METHOD load_log.
+
+    DATA(lt_log_handle) = VALUE bal_t_logh( ( mv_log_handle ) ).
+
+    CALL FUNCTION 'BAL_DB_LOAD'
+      EXPORTING
+        i_t_log_handle     = lt_log_handle     " Alternative 2: Table of log handles
+      EXCEPTIONS
+        no_logs_specified  = 1
+        log_not_found      = 2
+        log_already_loaded = 3
+        OTHERS             = 4.
+    IF sy-subrc <> 0.
+           MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                      WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD open_log.
+
+    CALL FUNCTION 'BAL_LOG_CREATE'
+      EXPORTING
+        i_s_log                 = ms_log        " Log header data
+      IMPORTING
+        e_log_handle            = mv_log_handle " Log handle
+      EXCEPTIONS
+        log_header_inconsistent = 1
+        OTHERS                  = 2.
+
+    IF sy-subrc <> 0.
+*    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+*               WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD save_msg.
+
+    " Daten des Protokollkopfes
+    DATA: lt_object_with_lognumber TYPE STANDARD TABLE OF balnri.
+
+    IF mv_log_handle IS INITIAL.
+      " Wenn noch kein Protokoll geöffnet wurde, dann gibt es auch nichts
+      " das gesichert werden müsste.
+      RETURN.
+    ENDIF.
+
+    " Prüfen, ob überhaupt Meldungen im Protokoll eingetragen sind
+    IF me->get_message_count( ) = 0.
+      RETURN.
+    ENDIF.
+
+    " Fortschreiben des aktuellen Protokolls.
+    CALL FUNCTION 'APPL_LOG_WRITE_DB'
+      EXPORTING
+        object                = ms_log-object
+        subobject             = ms_log-subobject
+        log_handle            = mv_log_handle
+      TABLES
+        object_with_lognumber = lt_object_with_lognumber
+      EXCEPTIONS
+        object_not_found      = 1
+        subobject_not_found   = 2
+        internal_error        = 3
+        OTHERS                = 4.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+METHOD write_and_shift.
+************************************************************************
+* 8/13/23   smartShift project
+* TR Number: CAGK9C30AK
+
+************************************************************************
+
+
+    DATA: lv_fieldtype  TYPE c,
+          lv_value TYPE c LENGTH 200.                                                            "$smart: #139
+
+
+    WRITE iv_value TO lv_value.
+    SHIFT lv_value RIGHT DELETING TRAILING space.
+    SHIFT lv_value LEFT DELETING LEADING space.
+    DESCRIBE FIELD iv_value TYPE lv_fieldtype.
+    CASE lv_fieldtype.
+      WHEN 'N'.
+        SHIFT lv_value LEFT DELETING LEADING '0'.
+    ENDCASE.
+
+    rv_value = lv_value.
+
+  ENDMETHOD.
+ENDCLASS.
