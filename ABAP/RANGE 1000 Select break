@@ -22,7 +22,7 @@ SELECT DISTINCT yard_tu~tu_num_ext, tu_sr_act~tu_sr_act_num FROM /sapyl/yard_tu 
           DATA(lv_thousand) = 1000.
           DO lv_repeat_select TIMES.
             DATA(lv_index) = sy-index.
-            DELETE lr_objectid_aux FROM lv_thousand.
+            DELETE lr_objectid_aux FROM lv_thousand + 1. "From line 1001 including the 1001° remaining the n 1000
             SELECT cdpos~changenr, cdpos~objectid, cdpos~value_new, cdpos~value_old, cdhdr~udate, cdhdr~utime, cdhdr~username
                 FROM cdpos
                 INNER JOIN cdhdr ON cdhdr~changenr = cdpos~changenr
