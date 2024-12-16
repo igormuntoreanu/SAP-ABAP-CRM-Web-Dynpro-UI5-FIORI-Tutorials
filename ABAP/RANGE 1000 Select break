@@ -1,0 +1,60 @@
+SELECT DISTINCT yard_tu~tu_num_ext, tu_sr_act~tu_sr_act_num FROM /sapyl/yard_tu AS yard_tu
+      INNER JOIN /sapyl/tu_sr_act AS tu_sr_act
+      ON yard_tu~db_key = tu_sr_act~parent_key
+      LEFT OUTER JOIN /sapyl/tu_prod AS tu_prod
+      ON yard_tu~db_key = tu_prod~root_key
+      WHERE tu_num_ext IN @ir_tu "@mr_tu
+      AND tu_sr_act~yard_no    IN @ir_yard_no "@mv_yard_no
+      AND tu_prod~matnr     IN @ir_matnr "@mr_matnr
+      AND tu_sr_act~created_on IN @ir_time
+      INTO TABLE @DATA(lt_tu_num_ext_sr_act_num).
+
+      IF sy-subrc = 0.
+        DATA lr_objectid TYPE RANGE OF cdobjectv.
+        LOOP AT lt_tu_num_ext_sr_act_num ASSIGNING FIELD-SYMBOL(<fs_tu_num_ext_sr_act_num>).
+          APPEND VALUE #( sign = 'I' option = 'CP' low = |{ <fs_tu_num_ext_sr_act_num>-tu_num_ext }*{ <fs_tu_num_ext_sr_act_num>-tu_sr_act_num }*| ) TO lr_objectid.
+        ENDLOOP.
+
+        DATA(lv_lines) = lines( lr_objectid ).
+        IF lv_lines > 1000.
+          DATA(lv_repeat_select) = lines( lr_objectid ) DIV 1000.
+          DATA(lr_objectid_aux) = lr_objectid.
+          DATA(lv_thousand) = 1000.
+          DO lv_repeat_select TIMES.
+            DATA(lv_index) = sy-index.
+            DELETE lr_objectid_aux FROM lv_thousand.
+            SELECT cdpos~changenr, cdpos~objectid, cdpos~value_new, cdpos~value_old, cdhdr~udate, cdhdr~utime, cdhdr~username
+                FROM cdpos
+                INNER JOIN cdhdr ON cdhdr~changenr = cdpos~changenr
+                AND cdhdr~objectid = cdpos~objectid
+                WHERE cdhdr~objectclas = '/SCWM/TU'
+                AND cdhdr~objectid IN @lr_objectid_aux
+                AND cdhdr~udate IN @ir_date
+                AND cdpos~tabname = '/SCWM/S_TU_STATUS_CD'
+                AND cdpos~tabkey = 'ISR16'
+                AND cdpos~fname = 'STATUS_VALUE'
+                AND cdpos~chngind = 'U'
+                APPENDING TABLE @DATA(lt_scwm_tu_change).
+            IF lv_index = lv_repeat_select.
+              lr_objectid_aux = lr_objectid.
+              DELETE lr_objectid_aux FROM 1 TO lv_thousand.
+              EXIT.
+            ELSE.
+              ADD 1000 TO lv_thousand.
+            ENDIF.
+          ENDDO.
+          "Select Remaining lines
+          IF lr_objectid_aux IS NOT INITIAL.
+            SELECT cdpos~changenr, cdpos~objectid, cdpos~value_new, cdpos~value_old, cdhdr~udate, cdhdr~utime, cdhdr~username
+                  FROM cdpos
+                  INNER JOIN cdhdr ON cdhdr~changenr = cdpos~changenr
+                  AND cdhdr~objectid = cdpos~objectid
+                  WHERE cdhdr~objectclas = '/SCWM/TU'
+                  AND cdhdr~objectid IN @lr_objectid_aux
+                  AND cdhdr~udate IN @ir_date
+                  AND cdpos~tabname = '/SCWM/S_TU_STATUS_CD'
+                  AND cdpos~tabkey = 'ISR16'
+                  AND cdpos~fname = 'STATUS_VALUE'
+                  AND cdpos~chngind = 'U'
+                  APPENDING TABLE @lt_scwm_tu_change.
+          ENDIF.
