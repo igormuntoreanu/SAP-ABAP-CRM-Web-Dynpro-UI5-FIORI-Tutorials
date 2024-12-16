@@ -1,0 +1,18 @@
+sap.ui.define([
+    "sap/m/MessageToast",
+    "sap/ushell/services/CrossApplicationNavigation"
+], function (MessageToast, CrossApplicationNavigation) {
+    'use strict';
+
+    return {
+        MassUpload: function (oEvent) {
+            var oCrossAppNavigator = sap.ushell.Container.getService("CrossApplicationNavigation");
+            oCrossAppNavigator.toExternal({
+                target: {
+                    semanticObject: "ZDEFENSIVE",
+                    action: "manageLineItems"
+                }
+            });
+        }
+    };
+});
