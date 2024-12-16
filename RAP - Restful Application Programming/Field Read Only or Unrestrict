@@ -1,0 +1,92 @@
+Behavior:
+  action ( features : instance ) setAsCorrected result [1] $self;
+  action ( features : instance ) setAsManual result [1] $self;
+  action ( features : instance ) checkCompSend result [1] $self;
+  action ( features : instance ) viewFile result [1] $self;
+  action ( features : instance ) updateNfMasterData result [1] $self;
+
+  field ( readonly ) Docnum,
+  Uf,
+  Regio,
+  Bukrs,
+  Branch,
+  Brauf,
+  Status,
+  Nfenum,
+  Series,
+  Pstdat,
+  Direct,
+  Nftype,
+  Layout,
+  Parid,
+  Parvw,
+  //  Prescr,
+  Preflg,
+  Resales;
+
+  field ( features : instance ) Prescr;
+
+_________________________-
+
+Local Class:
+METHODS get_instance_features FOR INSTANCE FEATURES
+      IMPORTING keys REQUEST requested_features FOR nfheader RESULT result.
+
+METHOD get_instance_features.
+*  BREAK-POINT.
+    " Read the active flag of the existing members
+    READ ENTITIES OF /bay0/o2c_i_nf_hdr_v2 IN LOCAL MODE
+         ENTITY nfheader
+         FIELDS ( uf docnum status preflg ) WITH CORRESPONDING #( keys )
+         RESULT DATA(lt_result_data)
+         FAILED failed.
+
+    result = VALUE #(
+            FOR ls_result_data IN lt_result_data
+        LET status = COND #( WHEN ls_result_data-status = '5' " Completed
+                             THEN if_abap_behv=>fc-o-disabled
+                             ELSE if_abap_behv=>fc-o-enabled  )
+        IN
+            ( %tky                                 = ls_result_data-%tky
+              %action-setasmanual                  = COND #( WHEN ls_result_data-status <> '5' AND ls_result_data-status <> '8'
+                                                             THEN if_abap_behv=>fc-o-enabled
+                                                             ELSE if_abap_behv=>fc-o-disabled ) " Not Finished
+              %action-setascorrected               = COND #( WHEN ls_result_data-status = '3' THEN
+                                                               if_abap_behv=>fc-o-enabled
+                                                             WHEN ls_result_data-status = '8' THEN
+                                                               if_abap_behv=>fc-o-enabled
+                                                             ELSE
+                                                               if_abap_behv=>fc-o-disabled ) " Error or Manual
+              %action-checkcompsend                = COND #( WHEN ls_result_data-status = '5' THEN
+                                                               if_abap_behv=>fc-o-disabled
+                                                             WHEN ls_result_data-status = '8' THEN
+                                                               if_abap_behv=>fc-o-disabled
+                                                             ELSE
+                                                               if_abap_behv=>fc-o-enabled ) " cannot be Finished(5) nor Manual (8)
+              %action-updatenfmasterdata           = COND #( WHEN ls_result_data-status = '5'
+                                                             THEN if_abap_behv=>fc-o-disabled
+                                                             ELSE if_abap_behv=>fc-o-enabled ) " cannot be Finished(5)
+*                        %action-edit = abap_true
+*                        %features-%action-edit = abap_true
+              %features-%action-setasmanual        = COND #( WHEN ls_result_data-status <> '5' AND ls_result_data-status <> '8'
+                                                             THEN if_abap_behv=>fc-o-enabled
+                                                             ELSE if_abap_behv=>fc-o-disabled ) " Not Finished
+              %features-%action-setascorrected     = COND #( WHEN ls_result_data-status = '3' THEN
+                                                               if_abap_behv=>fc-o-enabled
+                                                             WHEN ls_result_data-status = '8' THEN
+                                                               if_abap_behv=>fc-o-enabled
+                                                             ELSE
+                                                               if_abap_behv=>fc-o-disabled ) " Error or Manual
+              %features-%action-checkcompsend      = COND #( WHEN ls_result_data-status = '5' THEN
+                                                               if_abap_behv=>fc-o-disabled
+                                                             WHEN ls_result_data-status = '8' THEN
+                                                               if_abap_behv=>fc-o-disabled
+                                                             ELSE
+                                                               if_abap_behv=>fc-o-enabled ) " cannot be Finished(5) nor Manual (8)
+              %features-%action-updatenfmasterdata = COND #( WHEN ls_result_data-status = '5'
+                                                             THEN if_abap_behv=>fc-o-disabled
+                                                             ELSE if_abap_behv=>fc-o-enabled )
+              %features-%field-prescr = COND #( WHEN ls_result_data-preflg IS NOT INITIAL THEN if_abap_behv=>fc-f-unrestricted ELSE if_abap_behv=>fc-f-read_only )
+              %field-prescr = COND #( WHEN ls_result_data-preflg IS NOT INITIAL THEN if_abap_behv=>fc-f-unrestricted ELSE if_abap_behv=>fc-f-read_only )
+                                                             ) ). " cannot be Finished(5)
+  ENDMETHOD.
