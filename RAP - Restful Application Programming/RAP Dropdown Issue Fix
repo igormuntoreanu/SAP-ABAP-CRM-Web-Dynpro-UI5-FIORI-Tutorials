@@ -1,0 +1,67 @@
+not beautiful but works by forcing user selecting something from the search help.
+this issue of infinite bubbles by typping something wrong in a RAP Based OData V4 application happens in version 2020
+Enhance Fiori application and set the field as setValueHelpOnly, avoiding then wrong typping
+onInit: function () {
+                    //Watch for creation clicking to set ValueHelpOnly for UF and other fields - every second
+                    this.setInterval = setInterval(function () {
+                        var oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_AGR::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_AGR::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_AUM::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_APP::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_CUL::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_CUL::Mvgr3-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_MAT::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_MAT::Matnr-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_PLG::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_PLG::Mvgr4-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_PRP::Uf-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+
+                        oCreation = sap.ui.getCore().byId("CreateDialog::xBAY0xO2C_C_NF_PRP::Kunnr-inner");
+                        if (oCreation) {
+                            oCreation.setValueHelpOnly(true);
+                        }
+                    }, 1000);
+                },
