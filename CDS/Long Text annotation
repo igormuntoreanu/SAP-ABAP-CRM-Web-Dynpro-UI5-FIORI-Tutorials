@@ -1,0 +1,16 @@
+@𝗨𝗜.𝗺𝘂𝗹𝘁𝗶𝗟𝗶𝗻𝗲𝗧𝗲𝘅𝘁 annotation. 
+
+Additionally, if you want to display the long text as a separate tab in your application, you can create a new facet
+(with type IDENTIFICATION_REFERENCE or FIELDGROUP_REFERENCE) that references your long text field.
+
+@UI.facet: [
+  { id       : 'idLongText',
+    purpose  : #STANDARD,
+    type     : #IDENTIFICATION_REFERENCE,
+    label    : 'Long Text',
+    position : 10,
+    targetQualifier: 'longText' }]
+
+@UI.identification: [ { qualifier : 'longText', position: 10 , label: 'Long Text' }]
+@UI.multilineText: true
+longtext;
