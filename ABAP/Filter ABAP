@@ -1,0 +1,8 @@
+" Define the internal table lt_sbook as a sorted table of ty_book
+DATA: lt_sbook TYPE SORTED TABLE OF ty_book WITH NON-UNIQUE KEY class.
+
+" Apply the FILTER operator to include rows where class is 'F'
+DATA(lt_tab_filter) = FILTER #( lt_sbook WHERE class = 'F' ).
+
+" Apply the FILTER operator to exclude rows where class is 'F'
+DATA(lt_tab_filter) = FILTER #( lt_sbook EXCEPT WHERE class = 'F' ).
