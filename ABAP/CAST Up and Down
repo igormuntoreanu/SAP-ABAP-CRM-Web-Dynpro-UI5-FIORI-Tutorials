@@ -1,0 +1,20 @@
+" Define references for the superclass and subclass
+DATA: 
+  lo_ref_sup TYPE REF TO cl_sup_class,
+  lo_ref_sub TYPE REF TO cl_sub_class.
+
+" Create new objects
+lo_ref_sup = NEW #( ).
+lo_ref_sub = NEW #( ).
+
+" Demonstrate upcasting and downcasting
+lo_ref_sup ?= lo_ref_sub.   " Upcasting
+lo_ref_sub ?= lo_ref_sup.   " Downcasting
+
+" Call a method from the subclass
+lo_ref_sub->method( ).
+
+" Explicit casting using CAST operator
+DATA(lo_ref_sup) = CAST cl_sup_class( lo_ref_sub ).
+
+CAST cl_sub_class( lo_ref_sup )->method( ).
