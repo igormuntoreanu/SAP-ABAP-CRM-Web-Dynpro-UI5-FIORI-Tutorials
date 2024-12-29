@@ -1,0 +1,16 @@
+DATA: lt_tab TYPE TABLE OF (comp1 TYPE i, comp2 TYPE c LENGTH 10),
+      lv_count TYPE i,
+      lv_total TYPE i.
+
+* Sample data for It_tab
+lt_tab = VALUE #(
+  ( comp1 = 1 comp2 = 'name1' )
+  ( comp1 = 3 comp2 = 'name2' )
+  ( comp1 = 5 comp2 = 'name3' )
+  ( comp1 = 4 comp2 = 'name4' ) ).
+
+* Reduce operator for counting
+lv_count = REDUCE i( INIT 0 FOR ls_tab IN lt_tab WHERE ls_tab-comp1 > 2 NEXT i + 1 ).
+
+* Reduce operator for summing
+lv_total = REDUCE i( INIT 0 FOR ls_tab IN lt_tab WHERE ls_tab-comp1 > 2 NEXT i + ls_tab-comp1 ).
