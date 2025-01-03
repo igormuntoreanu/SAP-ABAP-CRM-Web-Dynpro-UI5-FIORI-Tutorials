@@ -1,0 +1,30 @@
+TYPES: tt_numbers TYPE TABLE OF int8 WITH EMPTY KEY.
+
+DATA(lt_numbers) = VALUE tt_numbers( FOR i = 1 THEN i + 1 WHILE i < 11 ( CONV #( i ) ) ).
+
+"Step with Positive number -> Forward
+LOOP AT lt_numbers INTO DATA(forward_num) STEP 2.
+  WRITE: / forward_num.
+ENDLOOP.
+
+DATA(lt_step_forward) = VALUE tt_numbers( FOR num IN lt_numbers STEP 2 ( num ) ).
+"Output -> 1,3,5,7,9
+
+"Step with Negative Number -> Backward
+LOOP AT lt_numbers INTO DATA(backward_num) STEP -2.
+  WRITE: / backward_num.
+ENDLOOP.
+
+DATA(lt_step_backward) = VALUE tt_numbers( FOR num IN lt_numbers STEP -2 ( num ) ).
+"Output -> 10,8,6,4,2
+
+"Step with From and To
+LOOP AT lt_numbers INTO DATA(from_to_index) FROM 6 STEP -1.
+  WRITE: / from_to_index.
+ENDLOOP.
+
+DATA(lt_step_from_to) = VALUE tt_numbers( FOR num IN lt_numbers FROM 6 STEP -1 ( num ) ).
+"Output -> 6,5,4,3,2,1
+
+"Step can be used in
+"LINES OF jtab [FROM idx1] [TO idx2] [STEP n] [USING KEY keyname]
