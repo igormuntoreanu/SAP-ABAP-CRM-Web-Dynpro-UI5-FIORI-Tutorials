@@ -25,3 +25,9 @@ left outer join yveh_maint_dat as maint
          else maint.zz0015
     end as earlier_oil
 }
+_______________________________________________________________________________________
+CAse with CAST
+case when header.kdate <= $session.system_date
+      then cast( 'VALIDO' as zdeerpmm_statusvig )
+      else cast( 'INVALIDO' as zdeerpmm_statusvig )
+      end                               as StatusVigencia,
