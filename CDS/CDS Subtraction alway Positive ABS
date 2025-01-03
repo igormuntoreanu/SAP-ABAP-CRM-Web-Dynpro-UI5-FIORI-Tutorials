@@ -1,0 +1,10 @@
+define view ZCERPMM_PEDIDO_QTD_UTILIZADA2
+  as select from    ekko
+    inner join      ZCERPMM_EKBE_FATH_TOTAL as ekbeCreditoTotal
+      on ekko.ebeln = ekbeCreditoTotal.Pedido
+    left outer join ZCERPMM_EKBE_FATS_TOTAL as ekbeDebitoTotal
+      on ekko.ebeln = ekbeDebitoTotal.Pedido
+{
+  key ebeln                                             as Pedido,
+      ABS( ekbeCreditoTotal.Qtd - ekbeDebitoTotal.Qtd ) as QuantidadeUtilizada
+}
