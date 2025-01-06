@@ -1,0 +1,15 @@
+DATA(lt_dates) = VALUE t_t_dates( ( start_date = '20250101' end_date = '20250131' timestamp = '2025-01-01T12:00:00' ) ).
+
+SELECT FROM @lt_dates AS lt_dates
+  FIELDS start_date, end_date, timestamp,
+         is_valid_date( start_date ) AS is_valid_date, "#-> 1
+         extract_year( start_date ) AS extract_year, "#-> 2025
+         extract_month( start_date ) AS extract_month, "#-> 1
+         extract_day( start_date ) AS extract_day, "#-> 1
+         dayname( start_date ) AS dayname, "#-> Wednesday
+         monthname( start_date ) AS monthname, "#-> January
+         weekday( start_date ) AS weekday, "#-> 30
+         days_between( start_date, end_date ) AS days_between, "#-> 30
+         add_days( start_date, 2 ) AS add_days, "#-> "20250103"
+         add_months( start_date, 4 ) AS add_months "#-> "20250501"
+  INTO TABLE @DATA(lt_result).
