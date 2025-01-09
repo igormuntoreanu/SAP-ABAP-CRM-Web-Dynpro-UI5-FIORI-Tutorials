@@ -8,3 +8,16 @@
                     }
                 }
             }, 30000);
+//cancel Interval when something happens
+let count = 0;
+
+const intervalId = setInterval(() => {
+  console.log("Interval running... Count:", count);
+  count++;
+
+  // Stop the interval after count reaches 5
+  if (count >= 5) {
+    console.log("Interval stopped.");
+    clearInterval(intervalId);
+  }
+}, 1000); // Executes the function every 1 second
