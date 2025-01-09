@@ -1,0 +1,13 @@
+@AbapCatalog.sqlViewName: 'ZANOVIGENTE'
+@AbapCatalog.compiler.compareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Saldo Realizado fmavct'
+define view ZCERPMM_ANO_VIGENTE
+  as select from t000
+{
+  key mandt,
+      cast(substring(cast($session.system_date as abap.char(32)),1,4) as gjahr) as AnoVigente
+}
+where
+  mandt = $session.client
