@@ -1,0 +1,23 @@
+define view ZCERPMM_VTIN_RECEBIMENTO
+  as select from ZCERPMM_BSEG_AWKEY as bseg
+    inner join   /vtin/etapa_proc   as etapa
+      on  bseg.AwkeyCustom = etapa.num_doc
+      and etapa.seq        = '000004'
+    inner join   /vtin/_xml_rec     as xmlRec
+      on etapa.id = xmlRec.id
+{
+  key bseg.Bukrs                                                                                as Empresa,
+  key bseg.Belnr                                                                                as DocContabil,
+  key bseg.Gjahr                                                                                as Ano,
+  key bseg.Buzei                                                                                as Linha,
+      bseg.Awkey                                                                                as BsegRef,
+      etapa.num_doc                                                                             as EtapaDoc,
+      //      xmlRec.authdate as DataRecebimento,
+      xmlRec.datecr                                                                             as DataRecebimento,
+      //      xmlRec.d_emi                                                            as CompetenciaNota,
+      cast(substring(cast(xmlRec.d_emi as j_1bdocdat),1,4) as abap.char( 4 ))                   as AnoCompetencia,
+      cast(substring(cast(xmlRec.d_emi as j_1bdocdat),5,7) as abap.char( 2 ))                   as MesCompetencia,
+      cast(concat(cast(substring(cast(xmlRec.d_emi as j_1bdocdat),1,4) as abap.char( 4 )),
+      cast(substring(cast(xmlRec.d_emi as j_1bdocdat),5,7) as abap.char( 2 ))) as abap.char(6)) as CompetenciaNota,
+      xmlRec.n_nf                                                                               as NumeroNota,
+      xmlRec.v_nf                                                                               as ValorTotalNf
