@@ -1,0 +1,40 @@
+"String Templates"
+
+"ALPHA (IN/OUT)"
+DATA(lv_vbeln) = CONV vbeln( '1' ).
+
+lv_vbeln = |{ lv_vbeln ALPHA = IN }|. " -> 0000000001
+lv_vbeln = |{ lv_vbeln ALPHA = OUT }|. " -> 1
+
+"WIDTH"
+DATA(lv_vbeln_with_extra_zeros) = |{ lv_vbeln ALPHA = IN WIDTH = 15 }|. " -> 000000000000001
+
+"CURRENCY"
+DATA(lv_amount) = 123456.
+DATA(lv_inr) = |{ lv_amount CURRENCY = 'INR' }|. " 1234.56
+DATA(lv_omr) = |{ lv_amount CURRENCY = 'OMR' }|. " 123.456
+
+"NUMBER"
+DATA(lv_number) = 12345678.
+DATA(lv_user_specific) = |{ lv_number NUMBER = USER }|. " 12.345.678
+SET COUNTRY 'US'.
+DATA(lv_env) = |{ lv_number NUMBER = ENVIRONMENT }|. " 12,345,678
+
+"DATE -> Same we have for TIME, TIMESTAMP"
+DATA(lv_date) = sy-datum.
+DATA(lv_user_date) = |{ lv_date DATE = USER }|. " 20.01.2025
+DATA(lv_iso_date) = |{ lv_date DATE = ISO }|. " 2025-01-20
+
+"DECIMAL"
+DATA(lv_decimal) = CONV f( '1234.456877' ).
+DATA(lv_3_decimal) = |{ lv_decimal DECIMALS = 3 }|. " 1234.457
+
+"CASE"
+DATA(lv_name) = 'Bharathi S'.
+DATA(lv_uppercase) = |{ lv_name CASE = UPPER }|. " BHARATHI S
+DATA(lv_lowercase) = |{ lv_name CASE = LOWER }|. " bharathi s
+
+"SIGN"
+DATA(lv_sign) = 123.
+DATA(lv_plus_sign) = |{ lv_sign SIGN = LEFTPLUS }|. " +123
+DATA(lv_right_plus_sign) = |{ lv_sign SIGN = RIGHTPLUS }|. " 123+
