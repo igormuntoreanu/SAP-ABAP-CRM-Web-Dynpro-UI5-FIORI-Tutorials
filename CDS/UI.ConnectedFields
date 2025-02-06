@@ -1,0 +1,47 @@
+@UI: {
+    headerInfo: {
+        typeName: 'Employee',
+        typeNamePlural: 'Employees',
+        title: { 
+            type: #AS_CONNECTED_FIELDS, 
+            valueQualifier: 'EmpNameWithId' 
+        } 
+    }
+}
+annotate entity Employee 
+with {
+
+    @UI.connectedFields: [
+        {
+            qualifier: 'EmpNameWithId',
+            name: 'empId'
+        }
+    ]
+    EmployeeId;
+
+    @UI.identification: [
+        { 
+            position: 20, 
+            label: 'Employee Name',
+            type: #AS_CONNECTED_FIELDS, 
+            valueQualifier: 'EmpNameWithId' 
+        }
+    ]
+    
+    @UI.fieldGroup: { 
+        qualifier: 'generalInfo', 
+        type: #AS_CONNECTED_FIELDS, 
+        valueQualifier: 'EmpNameWithId', 
+        position: 10 
+    }
+    
+    @UI.connectedFields: [
+        {
+            qualifier: 'EmpNameWithId',
+            groupLabel: 'Employee Name',
+            name: 'empName',
+            template: '{empName} - {empId}'
+        }
+    ]
+    EmployeeName;
+}
