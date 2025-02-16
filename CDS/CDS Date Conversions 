@@ -1,0 +1,92 @@
+@AbapCatalog.viewEnhancementCategory: [#NONE] 
+@AccessControl.authorizationCheck: #NOT_REQUIRED 
+@EndUserText.label: 'Date Functions' 
+@Metadata.ignorePropagatedAnnotations: true 
+@ObjectModel.usageType: { 
+    serviceQuality: #X, 
+    sizeCategory: #S, 
+    dataClass: #MIXED 
+}
+
+define view entity ZLC_V_DATE_FUNCTIONS 
+as select from I_CalendarDate 
+
+{
+    key CalendarDate, 
+    dats_add_days( $session.user_date,1, 'NULL' ) 
+        as today, 
+    dats_add_days( $session.user_date,-1, 'NULL' ) 
+        as yesterday, 
+    dats_add_days( $session.user_date,1, 'NULL' ) 
+        as tomorrow, 
+    weekDay, 
+    LastDayOfMonthDate, 
+    dats_is_valid( CalendarDate ) 
+        as isValid, // Ex: 1 
+    CalendarYear, 
+    CalendarMonth, 
+    CalendarDay, 
+
+    // We can extract Day, Month, Year with substring too 
+    substring( CalendarDate,1,4 ) 
+        as extractYear, // Ex: 2025 
+    substring( CalendarDate,5,2 ) 
+        as extractMonth, // Ex: 01 
+    substring( CalendarDate,7,2 ) 
+        as extractDay, // Ex: 07 
+    cast( substring( CalendarDate,1,4 ) as abap.numc(4) ) 
+        as dateYearNumc, 
+
+    // Days between today to dates 
+    dats_days_between( CalendarDate, dats_add_days( $session.user_date,10, 'NULL' ) ) 
+        as daysBetweenDates, 
+    dats_add_days( CalendarDate,10, 'NULL' ) 
+        as addTenDaysToDate, // Ex: 20240117 > 20240127 
+    dats_add_months( CalendarDate,2, 'NULL' ) 
+        as addTwoMonthsToDate, 
+    tstmp_to_dats( tstmp_current_utctimestamp(), 
+        abap_system_timezone( $session.client, 'NULL' ) 
+    ) as currentDate, 
+
+    tstmp_to_tims( tstmp_current_utctimestamp(), 
+        abap_system_timezone( $session.client, 'NULL' ) 
+    ) as currentTime, 
+
+    tstmp_to_dst( tstmp_current_utctimestamp(), 
+        abap_system_timezone( $session.client, 'NULL' ) 
+    ) as summerTimeMark, 
+    dats_to_dats( CalendarDate, 'FAIL' , 'INITIAL' ) 
+        as convertDatsToDats, 
+
+    // This is done for Public Cloud, for on-prem systems t246 table can be used 
+    case weekDay 
+        when '1' then 'Monday' 
+        when '2' then 'Tuesday' 
+        when '3' then 'Wednesday' 
+        when '4' then 'Thursday' 
+        when '5' then 'Friday' 
+        when '6' then 'Saturday' 
+        when '7' then 'Sunday' 
+        else 'NULL' 
+    end as dayName, 
+
+    // For on-prem systems t247 table can be used 
+    case substring( CalendarDate,5,2 ) 
+        when '01' then 'January' 
+        when '02' then 'February' 
+        when '03' then 'March' 
+        when '04' then 'April' 
+        when '05' then 'May' 
+        when '06' then 'June' 
+        when '07' then 'July' 
+        when '08' then 'August' 
+        when '09' then 'September' 
+        when '10' then 'October' 
+        when '11' then 'November' 
+        when '12' then 'December' 
+        else 'NULL' 
+    end as monthName 
+
+} 
+
+where CalendarDate = $session.user_date;
