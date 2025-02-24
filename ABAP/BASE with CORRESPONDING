@@ -17,3 +17,19 @@ _________________-
 LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'FilterReference'.
  lr_ref = CORRESPONDING #( BASE ( lr_ref ) ls_filter-select_options ).
 ENDLOOP.
+______________________
+
+LOOP AT it_filter_select_options INTO ls_filter WHERE property = 'FilterProduct'.
+  LOOP AT ls_filter-select_options INTO ls_so.
+    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_INPUT'
+      EXPORTING
+        input  = ls_so-low
+      IMPORTING
+        output = lv_mat.
+    CLEAR ls_so-low.
+    ls_so-low = lv_mat.
+    APPEND ls_so TO lt_prod_so.
+    CLEAR ls_so.
+  ENDLOOP.
+  lr_prod = CORRESPONDING #( BASE ( lr_prod ) lt_prod_so ).
+ENDLOOP.
