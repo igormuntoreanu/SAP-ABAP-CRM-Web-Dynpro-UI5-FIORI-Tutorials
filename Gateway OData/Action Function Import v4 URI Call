@@ -1,0 +1,37 @@
+POST:
+http://cagapp01.sap.johndeerecloud.com:8000/sap/opu/odata4/deereag/cart_api_data_sb/srvd_a2x/deereag/cart_api_data_sd/0001/CartListHeader(Werks='BZ01',CartNumber='5',CartCounter='2261')/com.sap.gateway.srvd_a2x.deereag.cart_api_data_sd.v0001.setOnHold
+_____________________________________________________________
+$batch:
+Request URL:
+https://jdgatewaycag.deere.com/sap/opu/odata4/deereag/cart_fiori_sb/srvd/deereag/cart_fiori_sd/0001/$batch?sap-client=230
+Request Method:
+POST
+
+content-type:
+multipart/mixed; boundary=718D837630DB82B27B446C74AD767FE30
+______________________________________________________________
+--batch_id-1741345933262-563
+Content-Type:application/http
+Content-Transfer-Encoding:binary
+
+POST CartListHeader(Werks='BZ01',CartNumber='5',CartCounter='2261')/com.sap.gateway.srvd.deereag.cart_fiori_sd.v0001.setOnHold?sap-client=230&$select=SAP__Messages HTTP/1.1
+Accept:application/json;odata.metadata=minimal;IEEE754Compatible=true
+Accept-Language:en
+X-CSRF-Token:dehnwqGd2mb1XLnG2tc_hg==
+Prefer:handling=strict
+Content-Type:application/json;charset=UTF-8;IEEE754Compatible=true
+
+{}
+--batch_id-1741345933262-563
+Content-Type:application/http
+Content-Transfer-Encoding:binary
+
+GET CartListHeader?sap-client=230&$select=CartCounter,CartNumber,OnHold,SAP__Messages,Werks,__EntityControl/Updatable,__OperationControl/setOnHold&$filter=Werks%20eq%20'BZ01'%20and%20CartNumber%20eq%20'5'%20and%20CartCounter%20eq%20'2261' HTTP/1.1
+Accept:application/json;odata.metadata=minimal;IEEE754Compatible=true
+Accept-Language:en
+X-CSRF-Token:dehnwqGd2mb1XLnG2tc_hg==
+Content-Type:application/json;charset=UTF-8;IEEE754Compatible=true
+
+
+--batch_id-1741345933262-563--
+Group ID (API): apiMode1
