@@ -1,0 +1,64 @@
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'CDS For /DEEREAG/CRTLHD Cart List Header'
+define root view entity /DEEREAG/CRTLHD_I_CDS
+  as select from /deereag/crtlhd as CartListHeader
+  //  association to parent /DEEREAG/CRTHD_I_CDS  as _CartHeader on  $projection.Werks      = _CartHeader.Werks
+  //                                                             and $projection.CartNumber = _CartHeader.CartNumber
+  association [1..1] to /DEEREAG/CRTHD_I_CDS  as _CartHeader        on  $projection.Werks      = _CartHeader.Werks
+                                                                    and $projection.CartNumber = _CartHeader.CartNumber
+  association [1..*] to /DEEREAG/CRTDTL_I_CDS as _CartHeaderDetails on  $projection.Werks      = _CartHeaderDetails.Werks
+                                                                    and $projection.CartNumber = _CartHeaderDetails.CartNumber
+  composition [1..*] of /DEEREAG/CRTLDT_I_CDS as _CartListDetails
+  composition [1..*] of /DEEREAG/CRTBPC_I_CDS as _CartListBypassedComponents
+  composition [1..*] of /DEEREAG/CRTLLG_I_CDS as _CartListLogHistory
+  composition [1..*] of /DEEREAG/CRTLOG_I_CDS as _CartLogReprocessErros
+  composition [1..*] of /DEEREAG/CRTGLG_I_CDS as _CartListGeneralLogs
+{
+  key CartListHeader.werks                                                                                       as Werks,
+  key CartListHeader.cart_number                                                                                 as CartNumber,
+  key CartListHeader.cart_counter                                                                                as CartCounter,
+      CartListHeader.cart_status                                                                                 as CartStatus,
+      CartListHeader.arbpl                                                                                       as Arbpl,
+      CartListHeader.due_date                                                                                    as DueDate,
+      CartListHeader.start_date                                                                                  as StartDate,
+      CartListHeader.release_date                                                                                as ReleaseDate,
+      CartListHeader.due_tstamp                                                                                  as DueTstamp,
+      case when TSTMP_IS_VALID( CartListHeader.start_tstamp ) = 1 then CartListHeader.start_tstamp else null end as StartTstamp,
+      //      cast( CartListHeader.start_tstamp as abap.char(21) ) as StartTstamp,
+      CartListHeader.release_tstamp                                                                              as ReleaseTstamp,
+      CartListHeader.firmed                                                                                      as Firmed,
+      CartListHeader.opt_date                                                                                    as OptDate,
+      CartListHeader.cart_notes                                                                                  as CartNotes,
+      CartListHeader.production                                                                                  as Production,
+      CartListHeader.cart_name                                                                                   as CartName,
+      CartListHeader.prvbe                                                                                       as Prvbe,
+      CartListHeader.cart_supervisor                                                                             as CartSupervisor,
+      CartListHeader.replen_source                                                                               as ReplenSource,
+      CartListHeader.cart_seq                                                                                    as CartSeq,
+      CartListHeader.in_house_loc                                                                                as InHouseLoc,
+      CartListHeader.planning_type                                                                               as PlanningType,
+      CartListHeader.trig_work_center                                                                            as TrigWorkCenter,
+      CartListHeader.trig_status                                                                                 as TrigStatus,
+      CartListHeader.order_type                                                                                  as OrderType,
+      CartListHeader.material_mvmt                                                                               as MaterialMvmt,
+      CartListHeader.workmins                                                                                    as Workmins,
+      CartListHeader.print_grp                                                                                   as PrintGrp,
+      CartListHeader.lgpro                                                                                       as Lgpro,
+      CartListHeader.cart_restrict                                                                               as CartRestrict,
+      CartListHeader.mstk_status                                                                                 as MstkStatus,
+      CartListHeader.mvmt_type                                                                                   as MvmtType,
+      CartListHeader.tr_sort                                                                                     as TrSort,
+      CartListHeader.truck_number                                                                                as TruckNumber,
+      CartListHeader.lgnum                                                                                       as Lgnum,
+      CartListHeader.lgtyp                                                                                       as Lgtyp,
+      CartListHeader.lgpla                                                                                       as Lgpla,
+      CartListHeader.on_hold                                                                                     as OnHold,
+      /* Associations */
+      _CartHeader, // Make association public
+      _CartHeaderDetails,
+      _CartListDetails,
+      _CartListBypassedComponents,
+      _CartListLogHistory,
+      _CartLogReprocessErros,
+      _CartListGeneralLogs
+}
