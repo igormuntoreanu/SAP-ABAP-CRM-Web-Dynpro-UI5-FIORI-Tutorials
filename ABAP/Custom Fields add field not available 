@@ -1,0 +1,16 @@
+Here is the plain text version of the post:
+
+
+---
+
+Nikhil Raut
+SAP ABAP Developer | 3x SAP Certified | S/4 HANA cloud...
+
+3h
+
+In ABAP, have you ever needed to make already appended ZZ fields from standard tables, such as the EKKO table, available in the Custom Fields app to use them in Fiori apps, APIs, or Form templates?
+
+Here's a tip, you can achieve this using transaction code SCFD_EUI. In this t-code, specify the table name and execute. The 'Prepare' button will guide you through the necessary steps. After completing these steps, clicking 'Enable' will make your custom fields available in the Custom Fields app.
+
+#sap #abap #sapabap #saptips #abaptips #s4hana #fiori
+
