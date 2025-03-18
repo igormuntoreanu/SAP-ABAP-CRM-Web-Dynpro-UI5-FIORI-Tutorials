@@ -1,0 +1,8 @@
+Download you metadata.xml file.
+
+in your terminal:
+
+1) npm install -g odata-openapi
+2) odata-openapi3 API_CART_FUNCTIONS_metadata.xml
+
+your OPEN Api Schema file will be created at the same folder of your metadata
