@@ -1,3 +1,140 @@
+CLASS lhc_rack DEFINITION INHERITING FROM cl_abap_behavior_handler.
+  PRIVATE SECTION.
+
+    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+      IMPORTING keys REQUEST requested_authorizations FOR rack RESULT result.
+
+    METHODS read FOR READ
+      IMPORTING keys FOR READ rack RESULT result.
+
+    METHODS lock FOR LOCK
+      IMPORTING keys FOR LOCK rack.
+
+    METHODS setnextstatus FOR MODIFY
+      IMPORTING keys FOR ACTION rack~setnextstatus RESULT result.
+
+ENDCLASS.
+
+CLASS lhc_rack IMPLEMENTATION.
+
+  METHOD get_instance_authorizations.
+  ENDMETHOD.
+
+  METHOD read.
+  ENDMETHOD.
+
+  METHOD lock.
+  ENDMETHOD.
+
+  METHOD setnextstatus.
+    DATA: lt_return TYPE TABLE OF bapiret2.
+    " Read Data
+    DATA(ls_rack_odata) = VALUE #( keys[ 1 ] OPTIONAL ).
+
+    SELECT SINGLE *
+    FROM /deereag/crtrack_i_cds
+    INTO @DATA(ls_rack_db)
+    WHERE racknumber = @ls_rack_odata-racknumber.
+    IF sy-subrc = 0.
+      CALL FUNCTION '/DEEREAG/CART_UI5_NEXT_STATUS'
+        EXPORTING
+          cart_number  = ls_rack_db-cartnumber
+          cart_counter = ls_rack_db-cartcounter
+          werks        = ls_rack_db-werks
+        TABLES
+          return       = lt_return.
+
+      cl_rap_plmi_msg_convert=>get_mapper( IMPORTING eo_mapper_bapi = DATA(lo_rap_bapi) ).
+
+      LOOP AT lt_return ASSIGNING FIELD-SYMBOL(<fs_return>).
+        lo_rap_bapi->map_bapi_to_behv_message(
+          EXPORTING
+            is_message_bapi = <fs_return>
+           RECEIVING
+             ro_message_behv = DATA(lo_msg_behavior)
+        ).
+
+        " Throw Warning Msg - Cart List &1 has many Production Orders. Not possible to set to "on Hold"
+        APPEND VALUE #(
+            %cid            = ls_rack_odata-%cid_ref
+            racknumber    = ls_rack_odata-racknumber
+            %msg            = lo_msg_behavior )
+               TO reported-rack.
+
+        reported-%other = VALUE #(
+            ( new_message(
+                  id       = <fs_return>-id
+                  number   = <fs_return>-number
+                  severity = SWITCH #( <fs_return>-type
+                                       WHEN 'E' THEN if_abap_behv_message=>severity-error
+                                       WHEN 'W' THEN if_abap_behv_message=>severity-warning
+                                       WHEN 'I' THEN if_abap_behv_message=>severity-information
+                                       WHEN 'S' THEN if_abap_behv_message=>severity-success
+                                       ELSE if_abap_behv_message=>severity-none )
+                  v1       = <fs_return>-message_v1
+                  v2       = <fs_return>-message_v2
+                  v3       = <fs_return>-message_v3
+                  v4       = <fs_return>-message_v4 ) ) ).
+      ENDLOOP.
+      IF <fs_return> IS ASSIGNED.
+        DATA(lv_type) = <fs_return>-type.
+      ELSE.
+        lv_type = 'S'.
+      ENDIF.
+      "API_CART_FUNCTIONS: status of the Rack &1 updated
+      "API_CART_FUNCTIONS: status of the Rack &1 not updated
+      NEW /deereag/cl_cart_general( )->save_slg1_message(
+       iv_extnumber = CONV #( ls_rack_odata-racknumber )
+       iv_object    = '/DEEREAG/CART'
+       iv_subobject = '/DEEREAG/RACK_NUMBER'
+       is_msg       = VALUE #( msgid = '/DEEREAG/CART'
+                               msgno = COND #( WHEN lv_type = 'E' THEN 089 ELSE 088 )
+                               msgty = lv_type
+                               msgv1 = ls_rack_odata-racknumber )
+     ).
+
+    ENDIF.
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lsc_crtrack_i_cds DEFINITION INHERITING FROM cl_abap_behavior_saver.
+  PROTECTED SECTION.
+
+    METHODS finalize REDEFINITION.
+
+    METHODS check_before_save REDEFINITION.
+
+    METHODS save REDEFINITION.
+
+    METHODS cleanup REDEFINITION.
+
+    METHODS cleanup_finalize REDEFINITION.
+
+ENDCLASS.
+
+CLASS lsc_crtrack_i_cds IMPLEMENTATION.
+
+  METHOD finalize.
+  ENDMETHOD.
+
+  METHOD check_before_save.
+  ENDMETHOD.
+
+  METHOD save.
+  ENDMETHOD.
+
+  METHOD cleanup.
+  ENDMETHOD.
+
+  METHOD cleanup_finalize.
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+___________________________________________________________________________________________________________________________________________________
+Option 2)
 Messages in RAP converting BAPI to RAP messages:
 ____________________________________________________________________________________________________________________________________________________
 CLASS lhc_zyl_i_alerts DEFINITION INHERITING FROM cl_abap_behavior_handler.
