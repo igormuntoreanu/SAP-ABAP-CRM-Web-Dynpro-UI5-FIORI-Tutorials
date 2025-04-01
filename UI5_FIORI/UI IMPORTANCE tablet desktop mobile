@@ -1,0 +1,7 @@
+Use @UI.lineitem.importance to determine in which clients the field should display:
+
+#HIGH: Default value, display in all clients - mobile
+
+#MEDIUM: Only display in desktop browser or tablet
+
+#LOW: Only display in desktop browser
