@@ -1,0 +1,131 @@
+FUNCTION /deereag/cart_set_status.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     REFERENCE(IV_NEW_STATUS) TYPE  /DEEREAG/CART_STAT
+*"     REFERENCE(IV_WERKS) TYPE  WERKS_D
+*"     REFERENCE(IV_CART_NUMBER) TYPE  /DEEREAG/CRTLHD-CART_NUMBER
+*"       OPTIONAL
+*"     REFERENCE(IV_CART_COUNTER) TYPE  /DEEREAG/CRTLHD-CART_COUNTER
+*"       OPTIONAL
+*"     REFERENCE(IV_RACK_NUMBER) TYPE  /DEEREAG/RACK_NUMBER OPTIONAL
+*"  EXPORTING
+*"     REFERENCE(ET_RETURN) TYPE  BAPIRET2_T
+*"----------------------------------------------------------------------
+*************************************************************************
+*  FM Name     : /DEEREAG/CART_SET_STATUS.                              *
+*  Author      : Igor Muntoreanu                                        *
+*  Description : Function to set the entry status to the Cart List      *
+*************************************************************************
+* Mod date    Programmer   Reference    Description                     *
+* 01-APR-2025 TZHJX9J      CAGK9D0LU9   Cart new API - Get and Set Data *
+*************************************************************************
+
+* We are going to determin dynamically the next status and call the function
+* many times until we reach the desired status.
+  DATA: lo_structdescr TYPE REF TO cl_abap_structdescr.
+  lo_structdescr ?= cl_abap_typedescr=>describe_by_name( '/DEEREAG/CRTSEQ' ).
+  DATA(lt_components) = lo_structdescr->get_components( ).
+  DATA(lv_number_components) = lines( lt_components ).
+  DATA ls_return TYPE bapiret2.
+
+  IF iv_rack_number IS NOT INITIAL.
+    SELECT SINGLE werks, cart_number, cart_counter, cart_status, cart_seq, trig_status, mstk_status, on_hold, rack_number
+      FROM /deereag/crtlhd
+      INTO @DATA(ls_cart_list)
+      WHERE werks       = @iv_werks
+        AND rack_number = @iv_rack_number.
+    IF sy-subrc <> 0.
+      " rack does not exist
+      RETURN.
+    ENDIF.
+  ELSE.
+    SELECT SINGLE werks, cart_number, cart_counter, cart_status, cart_seq, trig_status, mstk_status, on_hold, rack_number
+      FROM /deereag/crtlhd
+      INTO @ls_cart_list
+      WHERE werks        = @iv_werks
+        AND cart_number  = @iv_cart_number
+        AND cart_counter = @iv_cart_counter.
+    IF sy-subrc <> 0.
+      " Cartlist does not exist.
+      RETURN.
+    ENDIF.
+  ENDIF.
+
+  IF iv_new_status = ls_cart_list-cart_status.
+    "Cart List &1 already in status &2.
+    APPEND VALUE bapiret2( id = '/DEEREAG/CART' type = 'E' number = 090
+                           message_v1 = |{ iv_cart_number }-{ iv_cart_counter }|
+                           message_v2 = ls_cart_list-cart_status )
+                           TO et_return.
+    RETURN.
+  ENDIF.
+
+  IF iv_new_status < ls_cart_list-cart_status.
+    "Not possible to set a status lower than the current status &1.
+    APPEND VALUE bapiret2( id = '/DEEREAG/CART' type = 'E' number = 091
+                           message_v1 = ls_cart_list-cart_status )
+                           TO et_return.
+    RETURN.
+  ENDIF.
+
+  "Check if desired status is valid per the sequence configuration
+  " Check if Cart SEQ exists.
+  SELECT SINGLE * FROM /deereag/crtseq
+    INTO @DATA(ls_seq)
+    WHERE werks    = @ls_cart_list-werks
+      AND cart_seq = @ls_cart_list-cart_seq.
+  IF sy-subrc <> 0.
+    "Cart Sequence &1 for Plant &2 does not exist.
+    APPEND VALUE bapiret2( id = '/DEEREAG/CART' type = 'E' number = 092
+                           message_v1 = ls_cart_list-cart_seq
+                           message_v2 = ls_cart_list-werks )
+                           TO et_return.
+    RETURN.
+  ENDIF.
+
+  "Calculate how many times we will call the /DEEREAG/CART_UI5_NEXT_STATUS
+  "until we reach the desired status
+  DATA(lv_number_of_status_to_reach) = 0.
+  DATA(lv_status_reached) = space.
+  LOOP AT lt_components INTO DATA(ls_component).
+    " Dynamically assign component value
+    IF sy-tabix > 6. "Only from stauts IN_PROCESS_30 and above
+      ASSIGN COMPONENT sy-tabix OF STRUCTURE ls_seq TO FIELD-SYMBOL(<lv_field>).
+      IF sy-subrc = 0.
+        IF <lv_field> IS INITIAL.
+          "Does no consider status 00
+          CONTINUE.
+        ELSE.
+          lv_number_of_status_to_reach += 1.
+          IF iv_new_status = <lv_field>.
+            lv_status_reached = abap_true.
+            EXIT.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+
+  IF lv_status_reached IS INITIAL.
+    "Desired status is not properly configured
+    APPEND VALUE bapiret2( id = '/DEEREAG/CART' type = 'E' number = 093 )
+                           TO et_return.
+    RETURN.
+  ENDIF.
+
+  DO lv_number_of_status_to_reach TIMES.
+    CALL FUNCTION '/DEEREAG/CART_UI5_NEXT_STATUS'
+      EXPORTING
+        cart_number  = iv_cart_number
+        cart_counter = iv_cart_counter
+        werks        = iv_werks
+        iv_rap       = abap_true
+      TABLES
+        return       = et_return.
+    IF line_exists( et_return[ type = 'E' ] ).
+      EXIT.
+    ENDIF.
+  ENDDO.
+
+ENDFUNCTION.
