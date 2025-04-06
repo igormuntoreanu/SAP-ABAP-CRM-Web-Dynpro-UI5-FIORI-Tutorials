@@ -1,0 +1,46 @@
+TYPES: BEGIN OF ty_employee,
+         employee_id   TYPE i,
+         employee_name TYPE string,
+       END OF ty_employee.
+
+TYPES: BEGIN OF ty_course,
+         course_id     TYPE i,
+         course_name   TYPE string,
+         employee_id   TYPE i,
+       END OF ty_course.
+
+TYPES: BEGIN OF ty_emp_detail,
+         employee_id   TYPE i,
+         employee_name TYPE string,
+         course_id     TYPE i,
+         course_name   TYPE string,
+       END OF ty_emp_detail.
+
+TYPES: tt_employee   TYPE STANDARD TABLE OF ty_employee WITH EMPTY KEY,
+       tt_course     TYPE STANDARD TABLE OF ty_course WITH EMPTY KEY,
+       tt_emp_detail TYPE STANDARD TABLE OF ty_emp_detail WITH EMPTY KEY.
+
+DATA(lt_employees) = VALUE tt_employee(
+  ( employee_id = 1 employee_name = 'Bharathi S' )
+  ( employee_id = 2 employee_name = 'Siva S' )
+).
+
+DATA(lt_courses) = VALUE tt_course(
+  ( course_id = 1 course_name = 'ABAP'  employee_id = 1 )
+  ( course_id = 2 course_name = 'UI5'   employee_id = 1 )
+  ( course_id = 3 course_name = 'FIORI' employee_id = 1 )
+  ( course_id = 1 course_name = 'ABAP'  employee_id = 2 )
+).
+
+DATA(lt_emp_details) = VALUE tt_emp_detail( ).
+
+SELECT FROM @lt_employees AS employees
+  LEFT OUTER JOIN @lt_courses AS courses
+  ON employees~employee_id = courses~employee_id
+  FIELDS employees~employee_id,
+         employees~employee_name,
+         courses~course_id,
+         courses~course_name
+  INTO TABLE @lt_emp_details.
+
+cl_demo_output=>display( lt_emp_details ).
