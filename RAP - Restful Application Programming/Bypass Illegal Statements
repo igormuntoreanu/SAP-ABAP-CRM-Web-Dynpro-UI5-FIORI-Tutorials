@@ -1,0 +1,170 @@
+FORM send_email USING p_pick_line TYPE t_crthd_pick
+                      p_matrl TYPE /deereag/crt_cartlist_itm_matl
+                      p_prod  TYPE /deereag/crt_cartlist_itm_pord
+                      iv_rap  TYPE flag.
+  DATA: lt_mailsubject     TYPE sodocchgi1.
+
+  DATA: lt_mailrecipients TYPE STANDARD TABLE OF SOMLRECI1, "somlrec90,
+        lt_mailtxt        TYPE STANDARD TABLE OF soli.
+  DATA: lt_mailrecipients_line TYPE SOMLRECI1, "somlrec90,
+        lt_mailtxt_line        TYPE soli.
+  DATA: l_cart_number  TYPE /deereag/cart_number,
+        l_cart_counter TYPE /deereag/cart_counter,
+        l_qty          TYPE char10.
+
+* Begin of Insert CAGK9C03MO
+  CONCATENATE 'Plant'(029) ':' cl_abap_char_utilities=>horizontal_tab p_pick_line-werks
+  INTO lt_mailtxt_line SEPARATED BY space.
+  APPEND lt_mailtxt_line TO lt_mailtxt.
+  CLEAR: lt_mailtxt_line.
+* End of Insert CAGK9C03MO
+
+* Mail Contents
+  CONCATENATE 'Cart Description'(017) ':' cl_abap_char_utilities=>horizontal_tab i_makt_line-maktx
+  INTO lt_mailtxt_line SEPARATED BY space.
+  APPEND lt_mailtxt_line TO lt_mailtxt.
+  CLEAR: lt_mailtxt_line.
+  IF i_crthd_pick_line-prd_qty_flag EQ c_x.
+*    CONCATENATE 'Fiori Bypassed Component' cl_abap_char_utilities=>horizontal_tab
+*                p_prod-cart_number '-' p_prod-cart_counter cl_abap_char_utilities=>horizontal_tab
+*                p_prod-comp_material
+*                INTO lt_mailtxt_line
+*                SEPARATED BY space.
+*    APPEND lt_mailtxt_line TO lt_mailtxt.
+*    CLEAR: lt_mailtxt_line.
+    CONCATENATE 'Destination Workcenter'(001) ':'
+                cl_abap_char_utilities=>horizontal_tab
+                p_prod-arbpl
+           INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+* Begin of Insert CAGK9C03MO
+    CONCATENATE 'Grand Sequence'(031) ':'
+               cl_abap_char_utilities=>horizontal_tab
+               p_prod-cy_seqnr
+          INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+* End of Insert CAGK9C03MO.
+    CONCATENATE 'Component'(016) ':'
+                cl_abap_char_utilities=>horizontal_tab
+                p_prod-comp_material
+           INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+    MOVE: p_prod-bypass_qty TO l_qty.
+    CONCATENATE 'Quantity Missing'(015) ':'
+                cl_abap_char_utilities=>horizontal_tab
+                l_qty
+           INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+* Subject.
+    lt_mailsubject-obj_name = 'TEST'.
+    lt_mailsubject-obj_langu = sy-langu.
+    CONCATENATE 'Bypassed Component'(002)
+                 p_prod-cart_number '-' p_prod-cart_counter cl_abap_char_utilities=>horizontal_tab
+                 p_prod-comp_material
+                 INTO lt_mailtxt_line
+                 SEPARATED BY space.
+    lt_mailsubject-obj_descr = lt_mailtxt_line.
+  ELSE.
+    CONCATENATE 'Destination Workcenter'(001) ':'
+               cl_abap_char_utilities=>horizontal_tab
+               p_matrl-arbpl
+          INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+    CONCATENATE 'Component'(016) ':'
+                cl_abap_char_utilities=>horizontal_tab
+                p_matrl-comp_material
+           INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+    MOVE: p_matrl-bypass_qty TO l_qty.
+    CONCATENATE 'Quantity Missing'(015) ':'
+                cl_abap_char_utilities=>horizontal_tab
+                l_qty
+           INTO lt_mailtxt_line SEPARATED BY space.
+    APPEND lt_mailtxt_line TO lt_mailtxt.
+    CLEAR: lt_mailtxt_line.
+* Subject.
+    lt_mailsubject-obj_name = 'TEST'.
+    lt_mailsubject-obj_langu = sy-langu.
+    CONCATENATE 'Bypassed Component'(002)
+                 p_matrl-cart_number '-' p_matrl-cart_counter cl_abap_char_utilities=>horizontal_tab
+                 p_matrl-comp_material
+                 INTO lt_mailtxt_line
+                 SEPARATED BY space.
+    lt_mailsubject-obj_descr = lt_mailtxt_line.
+  ENDIF.
+* Recipients
+  lt_mailrecipients_line-rec_type  = 'U'.
+  lt_mailrecipients_line-receiver = p_pick_line-recp_email.
+  APPEND lt_mailrecipients_line TO lt_mailrecipients .
+
+  IF iv_rap IS INITIAL.
+* Send Mail
+    CALL FUNCTION 'SO_NEW_DOCUMENT_SEND_API1'
+      EXPORTING
+        document_data              = lt_mailsubject
+      TABLES
+        object_content             = lt_mailtxt
+        receivers                  = lt_mailrecipients
+      EXCEPTIONS
+        too_many_receivers         = 1
+        document_not_sent          = 2
+        document_type_not_exist    = 3
+        operation_no_authorization = 4
+        parameter_error            = 5
+        x_error                    = 6
+        enqueue_error              = 7
+        OTHERS                     = 8.
+    IF sy-subrc EQ 0.
+      COMMIT WORK.
+*   Push mail out from SAP outbox
+      SUBMIT rsconn01 WITH mode = 'INT' AND RETURN.
+    ENDIF.
+  ELSE.
+    CALL FUNCTION '/DEEREAG/CART_BYPASS_EMAIL_RAP' STARTING NEW TASK 'SEND_EMAIL'
+      EXPORTING
+        document_data  = lt_mailsubject
+        object_content = lt_mailtxt[]
+        receivers      = lt_mailrecipients[].
+  ENDIF.
+
+ENDFORM.                    "send_email
+
+___________________________________________________________________
+FUNCTION /deereag/cart_bypass_email_rap.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(DOCUMENT_DATA) TYPE  SODOCCHGI1
+*"     VALUE(OBJECT_CONTENT) TYPE  RSPC_T_TEXT
+*"     VALUE(RECEIVERS) TYPE  ARUN_ITA_SOMLRECI1
+*"----------------------------------------------------------------------
+
+  CALL FUNCTION 'SO_NEW_DOCUMENT_SEND_API1'
+    EXPORTING
+      document_data              = document_data
+    TABLES
+      object_content             = object_content
+      receivers                  = receivers
+    EXCEPTIONS
+      too_many_receivers         = 1
+      document_not_sent          = 2
+      document_type_not_exist    = 3
+      operation_no_authorization = 4
+      parameter_error            = 5
+      x_error                    = 6
+      enqueue_error              = 7
+      OTHERS                     = 8.
+
+  IF sy-subrc IS INITIAL.
+    COMMIT WORK.
+*   Push mail out from SAP outbox
+    SUBMIT rsconn01 WITH mode = 'INT' AND RETURN.
+  ENDIF.
+
+ENDFUNCTION.
